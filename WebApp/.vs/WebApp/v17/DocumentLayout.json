@@ -1,0 +1,318 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|c:\\users\\jarield\\source\\repos\\smartsecuritysystem\\webapp\\views\\shared\\_layout.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|solutionrelative:views\\shared\\_layout.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|c:\\users\\jarield\\source\\repos\\smartsecuritysystem\\webapp\\controllers\\camerascontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|solutionrelative:controllers\\camerascontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|c:\\users\\jarield\\source\\repos\\smartsecuritysystem\\webapp\\controllers\\systemcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|solutionrelative:controllers\\systemcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|c:\\users\\jarield\\source\\repos\\smartsecuritysystem\\webapp\\controllers\\logscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|solutionrelative:controllers\\logscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|c:\\users\\jarield\\source\\repos\\smartsecuritysystem\\webapp\\controllers\\alertscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|solutionrelative:controllers\\alertscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|c:\\users\\jarield\\source\\repos\\smartsecuritysystem\\webapp\\controllers\\dashboardcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|solutionrelative:controllers\\dashboardcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|c:\\users\\jarield\\source\\repos\\smartsecuritysystem\\webapp\\views\\cameras\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|solutionrelative:views\\cameras\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|c:\\users\\jarield\\source\\repos\\smartsecuritysystem\\webapp\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|solutionrelative:program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|c:\\users\\jarield\\source\\repos\\smartsecuritysystem\\webapp\\controllers\\authcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|solutionrelative:controllers\\authcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|c:\\users\\jarield\\source\\repos\\smartsecuritysystem\\webapp\\views\\admin\\activitylogs.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|solutionrelative:views\\admin\\activitylogs.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|c:\\users\\jarield\\source\\repos\\smartsecuritysystem\\webapp\\wwwroot\\css\\activitylogs.css||{A5401142-F49D-43DB-90B1-F57BA349E55C}",
+      "RelativeMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|solutionrelative:wwwroot\\css\\activitylogs.css||{A5401142-F49D-43DB-90B1-F57BA349E55C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|c:\\users\\jarield\\source\\repos\\smartsecuritysystem\\webapp\\wwwroot\\css\\personnel.css||{A5401142-F49D-43DB-90B1-F57BA349E55C}",
+      "RelativeMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|solutionrelative:wwwroot\\css\\personnel.css||{A5401142-F49D-43DB-90B1-F57BA349E55C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|c:\\users\\jarield\\source\\repos\\smartsecuritysystem\\webapp\\views\\admin\\personnel.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|solutionrelative:views\\admin\\personnel.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|c:\\users\\jarield\\source\\repos\\smartsecuritysystem\\webapp\\controllers\\admincontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|solutionrelative:controllers\\admincontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|c:\\users\\jarield\\source\\repos\\smartsecuritysystem\\webapp\\wwwroot\\css\\admin.css||{A5401142-F49D-43DB-90B1-F57BA349E55C}",
+      "RelativeMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|solutionrelative:wwwroot\\css\\admin.css||{A5401142-F49D-43DB-90B1-F57BA349E55C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|c:\\users\\jarield\\source\\repos\\smartsecuritysystem\\webapp\\models\\user.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|solutionrelative:models\\user.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|c:\\users\\jarield\\source\\repos\\smartsecuritysystem\\webapp\\wwwroot\\css\\dashboard.css||{A5401142-F49D-43DB-90B1-F57BA349E55C}",
+      "RelativeMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|solutionrelative:wwwroot\\css\\dashboard.css||{A5401142-F49D-43DB-90B1-F57BA349E55C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|c:\\users\\jarield\\source\\repos\\smartsecuritysystem\\webapp\\views\\system\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{3963BD85-F075-446D-A683-B0CA8E7732A5}|WebApp.csproj|solutionrelative:views\\system\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 8,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{d78612c7-9962-4b83-95d9-268046dad23a}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "AlertsController.cs",
+              "DocumentMoniker": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\Controllers\\AlertsController.cs",
+              "RelativeDocumentMoniker": "Controllers\\AlertsController.cs",
+              "ToolTip": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\Controllers\\AlertsController.cs",
+              "RelativeToolTip": "Controllers\\AlertsController.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAEMAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-27T04:47:17.564Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "LogsController.cs",
+              "DocumentMoniker": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\Controllers\\LogsController.cs",
+              "RelativeDocumentMoniker": "Controllers\\LogsController.cs",
+              "ToolTip": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\Controllers\\LogsController.cs",
+              "RelativeToolTip": "Controllers\\LogsController.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAACoAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-27T00:58:49.68Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "DashboardController.cs",
+              "DocumentMoniker": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\Controllers\\DashboardController.cs",
+              "RelativeDocumentMoniker": "Controllers\\DashboardController.cs",
+              "ToolTip": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\Controllers\\DashboardController.cs",
+              "RelativeToolTip": "Controllers\\DashboardController.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABIAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-27T00:56:00.969Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\Program.cs",
+              "RelativeDocumentMoniker": "Program.cs",
+              "ToolTip": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\Program.cs",
+              "RelativeToolTip": "Program.cs",
+              "ViewState": "AgIAAAwAAAAAAAAAAAAwwDUAAAAKAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-26T12:37:47.24Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "AuthController.cs",
+              "DocumentMoniker": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\Controllers\\AuthController.cs",
+              "RelativeDocumentMoniker": "Controllers\\AuthController.cs",
+              "ToolTip": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\Controllers\\AuthController.cs",
+              "RelativeToolTip": "Controllers\\AuthController.cs",
+              "ViewState": "AgIAABgAAAAAAAAAAAAswEAAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-26T11:47:01.896Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "CamerasController.cs",
+              "DocumentMoniker": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\Controllers\\CamerasController.cs",
+              "RelativeDocumentMoniker": "Controllers\\CamerasController.cs",
+              "ToolTip": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\Controllers\\CamerasController.cs",
+              "RelativeToolTip": "Controllers\\CamerasController.cs",
+              "ViewState": "AgIAACkAAAAAAAAAAAAwwFIAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-24T11:21:03.543Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 15,
+              "Title": "User.cs",
+              "DocumentMoniker": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\Models\\User.cs",
+              "RelativeDocumentMoniker": "Models\\User.cs",
+              "ToolTip": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\Models\\User.cs",
+              "RelativeToolTip": "Models\\User.cs",
+              "ViewState": "AgIAAAMAAAAAAAAAAAAAAB8AAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-26T12:13:08.491Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "_Layout.cshtml",
+              "DocumentMoniker": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\Views\\Shared\\_Layout.cshtml",
+              "RelativeDocumentMoniker": "Views\\Shared\\_Layout.cshtml",
+              "ToolTip": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\Views\\Shared\\_Layout.cshtml",
+              "RelativeToolTip": "Views\\Shared\\_Layout.cshtml",
+              "ViewState": "AgIAAHoAAAAAAAAAAAAwwKMAAAAHAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-03-24T10:05:16.402Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "SystemController.cs",
+              "DocumentMoniker": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\Controllers\\SystemController.cs",
+              "RelativeDocumentMoniker": "Controllers\\SystemController.cs",
+              "ToolTip": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\Controllers\\SystemController.cs",
+              "RelativeToolTip": "Controllers\\SystemController.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAB0AAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-27T04:48:35.639Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 14,
+              "Title": "admin.css",
+              "DocumentMoniker": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\wwwroot\\css\\admin.css",
+              "RelativeDocumentMoniker": "wwwroot\\css\\admin.css",
+              "ToolTip": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\wwwroot\\css\\admin.css",
+              "RelativeToolTip": "wwwroot\\css\\admin.css",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAKEAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003000|",
+              "WhenOpened": "2026-03-26T12:11:32.516Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "Index.cshtml",
+              "DocumentMoniker": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\Views\\Cameras\\Index.cshtml",
+              "RelativeDocumentMoniker": "Views\\Cameras\\Index.cshtml",
+              "ToolTip": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\Views\\Cameras\\Index.cshtml",
+              "RelativeToolTip": "Views\\Cameras\\Index.cshtml",
+              "ViewState": "AgIAAGkAAAAAAAAAAAAwwK0AAAAJAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-03-24T11:21:12.22Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 13,
+              "Title": "AdminController.cs",
+              "DocumentMoniker": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\Controllers\\AdminController.cs",
+              "RelativeDocumentMoniker": "Controllers\\AdminController.cs",
+              "ToolTip": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\Controllers\\AdminController.cs",
+              "RelativeToolTip": "Controllers\\AdminController.cs",
+              "ViewState": "AgIAAFUAAAAAAAAAAAAUwGgAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-26T12:09:44.612Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 12,
+              "Title": "Personnel.cshtml",
+              "DocumentMoniker": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\Views\\Admin\\Personnel.cshtml",
+              "RelativeDocumentMoniker": "Views\\Admin\\Personnel.cshtml",
+              "ToolTip": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\Views\\Admin\\Personnel.cshtml",
+              "RelativeToolTip": "Views\\Admin\\Personnel.cshtml",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAF0AAAAJAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-03-26T13:15:06.743Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 11,
+              "Title": "personnel.css",
+              "DocumentMoniker": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\wwwroot\\css\\personnel.css",
+              "RelativeDocumentMoniker": "wwwroot\\css\\personnel.css",
+              "ToolTip": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\wwwroot\\css\\personnel.css",
+              "RelativeToolTip": "wwwroot\\css\\personnel.css",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAHcAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003000|",
+              "WhenOpened": "2026-03-26T13:15:34.875Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 10,
+              "Title": "activitylogs.css",
+              "DocumentMoniker": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\wwwroot\\css\\activitylogs.css",
+              "RelativeDocumentMoniker": "wwwroot\\css\\activitylogs.css",
+              "ToolTip": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\wwwroot\\css\\activitylogs.css",
+              "RelativeToolTip": "wwwroot\\css\\activitylogs.css",
+              "ViewState": "AgIAAHsAAAAAAAAAAAAAwKUAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003000|",
+              "WhenOpened": "2026-03-26T13:18:32.567Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "ActivityLogs.cshtml",
+              "DocumentMoniker": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\Views\\Admin\\ActivityLogs.cshtml",
+              "RelativeDocumentMoniker": "Views\\Admin\\ActivityLogs.cshtml",
+              "ToolTip": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\Views\\Admin\\ActivityLogs.cshtml",
+              "RelativeToolTip": "Views\\Admin\\ActivityLogs.cshtml",
+              "ViewState": "AgIAAGAAAAAAAAAAAAAwwIYAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-03-26T13:19:18.792Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 16,
+              "Title": "dashboard.css",
+              "DocumentMoniker": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\wwwroot\\css\\dashboard.css",
+              "RelativeDocumentMoniker": "wwwroot\\css\\dashboard.css",
+              "ToolTip": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\wwwroot\\css\\dashboard.css",
+              "RelativeToolTip": "wwwroot\\css\\dashboard.css",
+              "ViewState": "AgIAANMCAAAAAAAAAAAAwOMCAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003000|",
+              "WhenOpened": "2026-03-24T10:06:29.666Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 17,
+              "Title": "Index.cshtml",
+              "DocumentMoniker": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\Views\\System\\Index.cshtml",
+              "RelativeDocumentMoniker": "Views\\System\\Index.cshtml",
+              "ToolTip": "C:\\Users\\Jarield\\source\\repos\\SmartSecuritySystem\\WebApp\\Views\\System\\Index.cshtml",
+              "RelativeToolTip": "Views\\System\\Index.cshtml",
+              "ViewState": "AgIAAHYAAAAAAAAAAAAwwJ8AAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-03-24T11:26:36.211Z"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{34e76e81-ee4a-11d0-ae2e-00a0c90fffc3}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

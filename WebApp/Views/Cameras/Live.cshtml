@@ -1,0 +1,112 @@
+﻿@model List<WebApp.Models.Camera>
+
+@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<!-- HEADER -->
+<div class="live-header">
+    <div>
+        <h1 class="page-title">Live Monitoring</h1>
+        <p class="subtitle">Real-time camera feeds - @Model.Count active</p>
+    </div>
+
+    <div class="header-actions">
+        <button class="add-btn" onclick="openModal()">
+            + Add Camera
+        </button>
+
+        <button class="icon-btn">⬜</button>
+        <button class="icon-btn">⤢</button>
+    </div>
+</div>
+
+<!-- CAMERA GRID -->
+<div class="live-grid">
+    @foreach (var cam in Model)
+    {
+        <div class="live-card">
+
+            <!-- TOP -->
+            <div class="live-top">
+                <div class="dot"></div>
+                <span class="cam-title">@cam.Name</span>
+
+                <span class="status">CLEAR</span>
+
+                <button class="delete-btn"
+                        onclick="return confirm('Delete @cam.Name?')">
+                    🗑
+                </button>
+            </div>
+
+            <!-- BODY -->
+            <div class="live-body">
+                <div class="eye">👁</div>
+                <div class="cam-location">@cam.Location</div>
+            </div>
+
+            <!-- FOOTER -->
+            <div class="live-footer">
+                <span>AI Monitoring</span>
+                <span>@DateTime.Now.ToString("hh:mm:ss tt")</span>
+            </div>
+
+        </div>
+    }
+</div>
+
+<!-- ===================== -->
+<!-- ✅ ADD CAMERA MODAL -->
+<!-- ===================== -->
+<div id="cameraModal" class="modal" onclick="outsideClick(event)">
+
+    <form method="post"
+          asp-controller="Cameras"
+          asp-action="Add"
+          class="modal-content"
+          onclick="event.stopPropagation()">
+
+        <span class="close" onclick="closeModal()">&times;</span>
+
+        <h2>Add New Camera</h2>
+
+        <label>Camera Name</label>
+        <input type="text" name="Name" required />
+
+        <label>Location</label>
+        <input type="text" name="Location" required />
+
+        <label>IP Address</label>
+        <input type="text" name="IpAddress" />
+
+        <label>Port</label>
+        <input type="number" name="Port" value="554" />
+
+        <div class="modal-actions">
+            <button type="button" class="cancel" onclick="closeModal()">Cancel</button>
+            <button type="submit" class="save">Add Camera</button>
+        </div>
+
+    </form>
+</div>
+
+<!-- ===================== -->
+<!-- SCRIPT (SAME LOGIC) -->
+<!-- ===================== -->
+<script>
+    function openModal() {
+        document.getElementById("cameraModal").style.display = "flex";
+    }
+
+    function closeModal() {
+        document.getElementById("cameraModal").style.display = "none";
+    }
+
+    function outsideClick(event) {
+        const modal = document.getElementById("cameraModal");
+        if (event.target === modal) {
+            closeModal();
+        }
+    }
+</script>

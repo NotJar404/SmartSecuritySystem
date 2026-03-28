@@ -1,0 +1,84 @@
+﻿@model List<WebApp.Models.Alert>
+
+@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var filter = ViewBag.Filter as string ?? "All";
+}
+
+<h1 class="page-title">Alerts</h1>
+<p class="subtitle">@Model.Count(a => a.Status == "Active") active alerts</p>
+
+<!-- FILTER BUTTONS -->
+<div class="alert-filters">
+    <a asp-action="Index" asp-route-filter="All"
+       class="filter-btn @(filter=="All"?"active":"")">
+        All (@Model.Count)
+    </a>
+
+    <a asp-action="Index" asp-route-filter="Active"
+       class="filter-btn @(filter=="Active"?"active":"")">
+        Active (@Model.Count(a => a.Status=="Active"))
+    </a>
+
+    <a asp-action="Index" asp-route-filter="Resolved"
+       class="filter-btn @(filter=="Resolved"?"active":"")">
+        Resolved (@Model.Count(a => a.Status=="Resolved"))
+    </a>
+</div>
+
+<!-- ALERT LIST -->
+<div class="alerts-container">
+
+@foreach (var alert in Model)
+{
+    var isCritical = alert.Severity == "CRITICAL";
+    var isResolved = alert.Status == "Resolved";
+
+    <div class="alert-card @(isCritical ? "critical" : "warning") @(isResolved ? "resolved" : "")">
+
+        <!-- LEFT ICON -->
+        <div class="alert-icon">
+            ⚠
+        </div>
+
+        <!-- CONTENT -->
+        <div class="alert-content">
+            <div class="alert-header">
+                <h3>@alert.Title</h3>
+
+                <span class="badge severity @(isCritical ? "red" : "yellow")">
+                    @alert.Severity
+                </span>
+
+                @if (isResolved)
+                {
+                    <span class="badge green">RESOLVED</span>
+                }
+            </div>
+
+            <p>@alert.Description</p>
+
+            <div class="alert-meta">
+                📷 @alert.Location
+                • ⏱ @((DateTime.Now - alert.CreatedAt).Minutes)m ago
+                • @alert.CreatedAt.ToString("g")
+            </div>
+        </div>
+
+        <!-- ACTIONS -->
+        <div class="alert-actions">
+            @if (!isResolved)
+            {
+                <form method="post" asp-action="Resolve">
+                    <input type="hidden" name="id" value="@alert.Id" />
+                    <button class="resolve-btn">Resolve</button>
+                </form>
+            }
+
+            <button class="close-btn">✕</button>
+        </div>
+
+    </div>
+}
+
+</div>

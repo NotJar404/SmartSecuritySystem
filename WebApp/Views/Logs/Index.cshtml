@@ -1,0 +1,41 @@
+﻿@model List<WebApp.Models.LogEntry>
+
+@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<h1 class="page-title">Activity Logs</h1>
+<p class="subtitle">System activity and user actions</p>
+
+<div class="logs-container">
+
+    @foreach (var log in Model)
+    {
+        <div class="log-card">
+
+            <!-- ICON -->
+            <div class="log-icon">
+                📝
+            </div>
+
+            <!-- CONTENT -->
+            <div class="log-content">
+                <h3>@log.Action</h3>
+                <p>@log.Details</p>
+
+                <div class="log-meta">
+                    👤 @log.User
+                    • 🌐 @log.IpAddress
+                    • ⏱ @((DateTime.Now - log.Timestamp).Minutes)m ago
+                </div>
+            </div>
+
+            <!-- TIME -->
+            <div class="log-time">
+                @log.Timestamp.ToString("g")
+            </div>
+
+        </div>
+    }
+
+</div>

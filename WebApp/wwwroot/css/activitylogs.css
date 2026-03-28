@@ -1,0 +1,165 @@
+﻿.activity-logs-container {
+    max-width: 960px;
+    margin: 20px auto;
+    color: #eee;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+h1 {
+    font-weight: 700;
+    font-size: 2.5rem;
+}
+
+.subtitle {
+    margin-top: 4px;
+    margin-bottom: 20px;
+    color: #bbb;
+    font-size: 1rem;
+    font-weight: 400;
+}
+
+.search-filters {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+    .search-filters input[type="text"] {
+        flex-grow: 1;
+        padding: 10px 16px;
+        font-size: 1rem;
+        border-radius: 8px;
+        border: none;
+        background-color: #1e1e1e;
+        color: #ddd;
+    }
+
+        .search-filters input[type="text"]::placeholder {
+            color: #888;
+        }
+
+.btn-filters {
+    background-color: #222;
+    color: #ddd;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+    .btn-filters:hover {
+        background-color: #444;
+    }
+
+.logs-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.log-item {
+    background-color: #121212;
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.05);
+}
+
+.log-icon {
+    flex-shrink: 0;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 24px;
+    color: white;
+}
+
+    .log-icon.login {
+        background-color: #1a73e8; /* Blue */
+    }
+
+    .log-icon.create {
+        background-color: #2e7d32; /* Green */
+    }
+
+    .log-icon.delete {
+        background-color: #c62828; /* Red */
+    }
+
+    .log-icon.update {
+        background-color: #f9a825; /* Yellow */
+    }
+
+.log-content {
+    flex-grow: 1;
+    color: #ddd;
+}
+
+    .log-content h3 {
+        font-size: 1.2rem;
+        margin: 0 0 6px 0;
+        font-weight: 600;
+    }
+
+.log-meta {
+    font-size: 0.9rem;
+    color: #aaa;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+    .log-meta i {
+        margin-right: 4px;
+        color: #666;
+    }
+
+.log-date {
+    font-size: 0.85rem;
+    margin-top: 4px;
+    color: #666;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+    .log-date i {
+        font-size: 0.95rem;
+    }
+
+.log-action {
+    flex-shrink: 0;
+}
+
+.action-label {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: white;
+    display: inline-block;
+}
+
+    .action-label.login {
+        background-color: #1a73e8; /* Blue */
+    }
+
+    .action-label.create {
+        background-color: #2e7d32; /* Green */
+    }
+
+    .action-label.delete {
+        background-color: #c62828; /* Red */
+    }
+
+    .action-label.update {
+        background-color: #f9a825; /* Yellow */
+    }

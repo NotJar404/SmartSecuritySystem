@@ -1,0 +1,164 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>@ViewData["Title"] - SecureVision</title>
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="~/css/dashboard.css" />
+    <link rel="stylesheet" href="~/css/admin.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+
+<body>
+    <div class="dashboard">
+
+        <!-- SIDEBAR -->
+        <div class="sidebar">
+
+            <!-- LOGO -->
+            <div class="logo">
+                <div class="logo-icon">
+                    <i class="fa fa-shield-alt"></i>
+                </div>
+                <div>
+                    <h2>SecureVision</h2>
+                    <p>Admin Panel</p>
+                </div>
+            </div>
+
+            <!-- NAV -->
+            <ul>
+
+                @* ================= ADMIN NAV ================= *@
+                @if (User.IsInRole("Admin"))
+                {
+                    <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Admin" ? "active" : "")">
+                        <a asp-controller="Admin" asp-action="Index">
+                            <i class="fa fa-chart-line"></i> Dashboard
+                        </a>
+                    </li>
+
+                    <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Cameras" ? "active" : "")">
+                        <a asp-controller="Cameras" asp-action="Index">
+                            <i class="fa fa-camera"></i> Camera View
+                        </a>
+                    </li>
+
+                    <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Admin" 
+                        && ViewContext.RouteData.Values["action"]?.ToString() == "Personnel" ? "active" : "")">
+                        <a asp-controller="Admin" asp-action="Personnel">
+                            <i class="fa fa-users"></i> Personnel
+                        </a>
+                    </li>
+
+                    <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Logs" ? "active" : "")">
+                        <a asp-controller="Logs" asp-action="Index">
+                            <i class="fa fa-wave-square"></i> Activity Logs
+                        </a>
+                    </li>
+                }
+
+                @* ================= SECURITY NAV ================= *@
+                else if (User.IsInRole("Security"))
+                {
+                    <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Dashboard" ? "active" : "")">
+                        <a asp-controller="Dashboard" asp-action="Index">
+                            <i class="fa fa-home"></i> Dashboard
+                        </a>
+                    </li>
+
+                    <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Cameras" ? "active" : "")">
+                        <a asp-controller="Cameras" asp-action="Index">
+                            <i class="fa fa-camera"></i> Cameras
+                        </a>
+                    </li>
+
+                    <li class="nav-item @(ViewContext.RouteData.Values["action"]?.ToString() == "Live" ? "active" : "")">
+                        <a asp-controller="Cameras" asp-action="Live">
+                            <i class="fa fa-video"></i> Live Monitoring
+                        </a>
+                    </li>
+
+                    <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Alerts" ? "active" : "")">
+                        <a asp-controller="Alerts" asp-action="Index">
+                            <i class="fa fa-bell"></i> Alerts
+                        </a>
+                    </li>
+
+                    <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Logs" ? "active" : "")">
+                        <a asp-controller="Logs" asp-action="Index">
+                            <i class="fa fa-file"></i> Logs
+                        </a>
+                    </li>
+                }
+
+            </ul>
+
+            <!-- SIDEBAR FOOTER -->
+            <div class="sidebar-footer">
+                <span class="status-dot online"></span>
+                <div>
+                    System Status<br />
+                    <small>Online</small>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- MAIN CONTENT -->
+        <div class="main">
+
+            <!-- TOPBAR -->
+            <div class="topbar">
+
+                <div class="top-left">
+                    <h3>@ViewData["Title"]</h3>
+                </div>
+
+                <div class="top-center">
+                    @DateTime.Now.ToString("dddd, MMMM dd, yyyy")
+                </div>
+
+                <div class="top-right">
+                    <span id="liveTime"></span>
+
+                    <i class="fa fa-bell"></i>
+
+                    <div class="user">
+                        <div class="avatar">@(User.Identity?.Name?.Substring(0,1) ?? "U")</div>
+                        <div>
+                            <strong>@User.Identity?.Name</strong>
+                            <small>@(User.IsInRole("Admin") ? "Admin" : "Security")</small>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- PAGE CONTENT -->
+            @RenderBody()
+
+        </div>
+    </div>
+
+    @RenderSection("Scripts", required: false)
+
+    <script>
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('liveTime').textContent =
+                now.toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: true
+                });
+        }
+
+        setInterval(updateTime, 1000);
+        updateTime();
+    </script>
+
+</body>
+</html>

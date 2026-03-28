@@ -1,0 +1,128 @@
+﻿@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Dashboard";
+}
+
+<h1 class="page-title">Dashboard</h1>
+
+<!-- STATS CARDS -->
+<div class="cards">
+
+    <div class="card">
+        <div class="icon blue">
+            <i class="fa fa-camera"></i>
+        </div>
+        <div class="card-info">
+            <h2>4 / 4</h2>
+            <p>Active Cameras</p>
+        </div>
+        <div class="change positive">+0%</div>
+    </div>
+
+    <div class="card">
+        <div class="icon green">
+            <i class="fa fa-chart-line"></i>
+        </div>
+        <div class="card-info">
+            <h2>23</h2>
+            <p>Detections Today</p>
+        </div>
+        <div class="change positive">+12%</div>
+    </div>
+
+    <div class="card">
+        <div class="icon yellow">
+            <i class="fa fa-exclamation-triangle"></i>
+        </div>
+        <div class="card-info">
+            <h2>2</h2>
+            <p>Active Alerts</p>
+        </div>
+        <div class="change negative">-50%</div>
+    </div>
+
+    <div class="card">
+        <div class="icon purple">
+            <i class="fa fa-shield-alt"></i>
+        </div>
+        <div class="card-info">
+            <h2>99.8%</h2>
+            <p>System Uptime</p>
+        </div>
+        <div class="change positive">+0.2%</div>
+    </div>
+
+</div>
+
+<!-- LIVE CAMERA PREVIEW -->
+<div class="section-header">
+    <h2>Live Camera Preview</h2>
+    <a href="#">View All →</a>
+</div>
+
+<div class="cameras">
+
+    <!-- CAMERA 1 -->
+    <div class="cam-card">
+        <div class="cam-header">
+            <div>
+                <span class="status-dot online"></span> Front Door
+            </div>
+            <span class="badge success">CLEAR</span>
+        </div>
+
+        <div class="cam-body">
+            <video autoplay muted loop playsinline>
+                <source src="/videos/frontdoor.mp4" type="video/mp4" />
+            </video>
+        </div>
+
+        <div class="cam-footer">
+            <span>AI Monitoring</span>
+            <span>@DateTime.Now.ToString("hh:mm:ss tt")</span>
+        </div>
+    </div>
+
+    <!-- CAMERA 2 -->
+    <div class="cam-card">
+        <div class="cam-header">
+            <div>
+                <span class="status-dot online"></span> Back Yard
+            </div>
+            <span class="badge success">CLEAR</span>
+        </div>
+
+        <div class="cam-body">
+            <video autoplay muted loop playsinline>
+                <source src="/videos/backyard.mp4" type="video/mp4" />
+            </video>
+        </div>
+
+        <div class="cam-footer">
+            <span>AI Monitoring</span>
+            <span>@DateTime.Now.ToString("hh:mm:ss tt")</span>
+        </div>
+    </div>
+
+</div>
+
+<!-- RECENT EVENTS -->
+<div class="section-header">
+    <h2>Recent Events</h2>
+</div>
+
+<div class="events">
+
+    <div class="event">
+        <span class="tag blue">Motion Detected</span>
+        <p>Front Door</p>
+        <small>14:32:15</small>
+    </div>
+
+    <div class="event">
+        <span class="tag yellow">Person Detected</span>
+        <p>Back Yard</p>
+        <small>14:28:43</small>
+    </div>
+
+</div>

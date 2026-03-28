@@ -1,0 +1,129 @@
+﻿@model WebApp.Controllers.AdminDashboardViewModel
+@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<link rel="stylesheet" href="~/css/admin.css" />
+
+<div class="admin-container">
+
+    <!-- Header -->
+    <div class="dashboard-header">
+        <h1>Admin Dashboard</h1>
+        <p>Welcome back, Admin User</p>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+        <div class="card">
+            <div class="icon blue"></div>
+            <div>
+                <h2>@Model?.TotalPersonnel</h2>
+                <p>Total Personnel</p>
+                <span>Registered accounts</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="icon green"></div>
+            <div>
+                <h2>@Model?.ActiveUsers</h2>
+                <p>Active Users</p>
+                <span>Currently enabled</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="icon yellow"></div>
+            <div>
+                <h2>@Model?.InactiveUsers</h2>
+                <p>Inactive Users</p>
+                <span>Disabled accounts</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="icon red"></div>
+            <div>
+                <h2>@Model?.RecentLogins</h2>
+                <p>Recent Logins</p>
+                <span>Last 24 hours</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="section">
+        <h2>Quick Actions</h2>
+
+        <div class="quick-actions">
+            <div class="action-card">
+                <h3>Add Personnel</h3>
+                <p>Create new account</p>
+            </div>
+
+            <div class="action-card">
+                <h3>Manage Personnel</h3>
+                <p>View all accounts</p>
+            </div>
+
+            <div class="action-card">
+                <h3>Activity Logs</h3>
+                <p>View system logs</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Personnel -->
+    <div class="section">
+        <div class="section-header">
+            <h2>Recent Personnel</h2>
+            <a href="#">View All →</a>
+        </div>
+
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Status</th>
+                    <th>Last Login</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @if (Model?.RecentPersonnel != null && Model.RecentPersonnel.Any())
+                {
+                    foreach (var user in Model.RecentPersonnel)
+                    {
+                        var statusClass = user.Status == "Active" ? "active" : "inactive";
+
+                        <tr>
+                            <td>@user.Name</td>
+                            <td>@user.Username</td>
+                            <td>@user.Email</td>
+                            <td>
+                                <span class="status @statusClass">@user.Status</span>
+                            </td>
+                            <td>
+                                @(user.LastLogin.HasValue 
+                                    ? user.LastLogin.Value.ToString("MMM dd, hh:mm tt") 
+                                    : "Never")
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="5" style="text-align:center; color:#9ca3af;">
+                            No personnel found
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+</div>

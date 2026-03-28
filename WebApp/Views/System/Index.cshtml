@@ -1,0 +1,160 @@
+﻿@model WebApp.Models.SystemStatus
+
+@{
+    ViewData["Title"] = "System Settings";
+}
+
+<!-- IMPORTANT: this class must match your CSS -->
+<div class="system-page">
+    <div class="system-wrapper">
+
+        <!-- HEADER -->
+        <div class="system-header mb-4">
+            <h2>System Settings</h2>
+            <p class="system-muted">Configure and monitor your security system</p>
+        </div>
+
+        <!-- TOP CARDS -->
+        <div class="system-grid-3">
+
+            <!-- Notifications -->
+            <div class="system-card">
+                <div class="sys-card-header">
+                    <div class="icon blue"><i class="fa fa-bell"></i></div>
+                    <div>
+                        <h5>Notifications</h5>
+                        <p class="system-muted">Alert preferences</p>
+                    </div>
+                </div>
+
+                <div class="sys-card-footer">
+                    <span>Enable notifications</span>
+                    <label class="system-switch">
+                        <input type="checkbox" @(Model.NotificationsEnabled ? "checked" : "")
+                               onchange="updateSetting('Notifications', this.checked)" />
+                        <span class="system-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Recording -->
+            <div class="system-card">
+                <div class="sys-card-header">
+                    <div class="icon red"><i class="fa fa-video"></i></div>
+                    <div>
+                        <h5>Recording</h5>
+                        <p class="system-muted">Continuous recording</p>
+                    </div>
+                </div>
+
+                <div class="sys-card-footer">
+                    <span>Enable recording</span>
+                    <label class="system-switch">
+                        <input type="checkbox" @(Model.RecordingEnabled ? "checked" : "")
+                               onchange="updateSetting('Recording', this.checked)" />
+                        <span class="system-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- AI -->
+            <div class="system-card">
+                <div class="sys-card-header">
+                    <div class="icon purple"><i class="fa fa-shield"></i></div>
+                    <div>
+                        <h5>AI Detection</h5>
+                        <p class="system-muted">Smart analysis</p>
+                    </div>
+                </div>
+
+                <div class="sys-card-footer">
+                    <span>Enable AI detection</span>
+                    <label class="system-switch">
+                        <input type="checkbox" @(Model.AiDetectionEnabled ? "checked" : "")
+                               onchange="updateSetting('AI', this.checked)" />
+                        <span class="system-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- STATS GRID -->
+        <div class="system-grid-2 mt-3">
+
+            <!-- HARDWARE -->
+            <div class="system-card">
+                <div class="sys-card-header">
+                    <div class="icon blue"><i class="fa fa-microchip"></i></div>
+                    <h5>Hardware</h5>
+                </div>
+
+                <div class="stats">
+                    <div><span>CPU Usage</span><span class="text-success">@Model.CpuUsage%</span></div>
+                    <div><span>Memory Usage</span><span class="text-success">@Model.MemoryUsage</span></div>
+                    <div><span>Storage</span><span class="text-success">@Model.Storage</span></div>
+                    <div><span>GPU Usage</span><span class="text-warning">@Model.GpuUsage%</span></div>
+                </div>
+            </div>
+
+            <!-- NETWORK -->
+            <div class="system-card">
+                <div class="sys-card-header">
+                    <div class="icon blue"><i class="fa fa-wifi"></i></div>
+                    <h5>Network</h5>
+                </div>
+
+                <div class="stats">
+                    <div><span>Connection Status</span><span class="text-success">@Model.ConnectionStatus</span></div>
+                    <div><span>Bandwidth Usage</span><span class="text-success">@Model.Bandwidth</span></div>
+                    <div><span>Latency</span><span class="text-success">@Model.Latency</span></div>
+                    <div><span>Packet Loss</span><span class="text-success">@Model.PacketLoss</span></div>
+                </div>
+            </div>
+
+            <!-- CAMERAS -->
+            <div class="system-card">
+                <div class="sys-card-header">
+                    <div class="icon blue"><i class="fa fa-camera"></i></div>
+                    <h5>Cameras</h5>
+                </div>
+
+                <div class="stats">
+                    <div><span>Total Cameras</span><span class="text-success">@Model.TotalCameras</span></div>
+                    <div><span>Active Cameras</span><span class="text-success">@Model.ActiveCameras</span></div>
+                    <div><span>Offline Cameras</span><span class="text-warning">@Model.OfflineCameras</span></div>
+                    <div><span>Recording Cameras</span><span class="text-success">@Model.RecordingCameras</span></div>
+                </div>
+            </div>
+
+            <!-- STORAGE -->
+            <div class="system-card">
+                <div class="sys-card-header">
+                    <div class="icon blue"><i class="fa fa-hdd"></i></div>
+                    <h5>Storage</h5>
+                </div>
+
+                <div class="stats">
+                    <div><span>Total Space</span><span class="text-success">@Model.TotalSpace</span></div>
+                    <div><span>Used Space</span><span class="text-success">@Model.UsedSpace</span></div>
+                    <div><span>Recordings</span><span class="text-success">@Model.Recordings</span></div>
+                    <div><span>Retention</span><span class="text-success">@Model.RetentionDays days</span></div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+</div>
+
+@section Scripts {
+<script>
+function updateSetting(setting, value) {
+    fetch('/System/UpdateSetting', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `setting=${setting}&value=${value}`
+    });
+}
+</script>
+}

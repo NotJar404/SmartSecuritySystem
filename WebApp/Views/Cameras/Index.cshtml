@@ -1,0 +1,174 @@
+﻿@model List<WebApp.Models.Camera>
+
+@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="camera-page">
+
+    <!-- HEADER -->
+    <div class="camera-topbar">
+
+        <!-- Left title with icon -->
+        <div class="camera-title">
+            <div class="icon-box">
+                <i class="fa fa-video-camera"></i>
+            </div>
+            <div>
+                <h1>Camera View</h1>
+                <p>Live camera feed monitoring</p>
+            </div>
+        </div>
+
+        <!-- Right actions -->
+        <div class="top-actions">
+            <button class="add-btn" onclick="openModal()">
+                <i class="fa fa-plus"></i> Add Camera
+            </button>
+            <span class="live-pill">● Live</span>
+            <span class="camera-count">@Model.Count Camera Active</span>
+        </div>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div class="camera-layout">
+
+        <!-- LEFT PANEL: CAMERA LIST -->
+        <div class="camera-list">
+            <h3>AVAILABLE CAMERAS</h3>
+
+            @for (int i = 0; i < Model.Count; i++)
+            {
+                var cam = Model[i];
+                var isActive = i == 0; // First camera is active
+
+                <div class="camera-card @(isActive ? "active" : "")" title="@cam.Name">
+
+                    <div class="cam-header">
+                        <span class="cam-name">
+                            <i class="fa fa-camera"></i> @cam.Name
+                        </span>
+                        <span class="delete" title="Delete">
+                            <i class="fa fa-trash"></i>
+                        </span>
+                    </div>
+
+                    <div class="cam-location">@cam.Location</div>
+
+                    <div class="cam-status">
+                        <span class="dot online"></span>
+                        <span class="status-text online-text">Online</span>
+                        <span class="rec">● REC</span>
+                        <span class="md">MD</span>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- RIGHT PANEL: CAMERA VIEW -->
+        <div class="camera-view">
+
+            <!-- HEADER -->
+            <div class="view-header">
+                <div>
+                    <h2>Main Entrance Camera</h2>
+                    <p>Front Door • Camera cam-default</p>
+                </div>
+
+                <button class="expand-btn" title="Expand">
+                    <i class="fa fa-expand"></i>
+                </button>
+            </div>
+
+            <!-- VIDEO AREA -->
+            <div class="video-container">
+
+                <!-- LIVE BADGE -->
+                <div class="live-badge">● LIVE</div>
+
+                <!-- TIME -->
+                <div class="time" id="liveTime">--:--:--</div>
+
+                <!-- PLACEHOLDER -->
+                <div class="camera-placeholder">
+                    <div class="circle"></div>
+                    <i class="fa fa-camera"></i>
+                </div>
+
+                <!-- CAMERA INFO -->
+                <div class="camera-overlay">
+                    <span class="overlay-title">Front Door</span><br/>
+                    <strong>Main Entrance Camera • 1920x1080 • 30fps</strong><br />
+                    192.168.1.100:554
+                </div>
+
+                <!-- RECORDING -->
+                <div class="recording">● Recording</div>
+            </div>
+
+            <!-- CONTROLS -->
+            <div class="controls">
+                <button><i class="fa fa-camera"></i> Take Snapshot</button>
+                <button><i class="fa fa-circle"></i> Start Recording</button>
+                <button><i class="fa fa-search"></i> Zoom Controls</button>
+                <button><i class="fa fa-cog"></i> Settings</button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- MODAL -->
+<div id="cameraModal" class="modal" onclick="outsideClick(event)">
+    <form method="post"
+          asp-controller="Cameras"
+          asp-action="Add"
+          class="modal-content"
+          onclick="event.stopPropagation()">
+
+        <span class="close" onclick="closeModal()">&times;</span>
+
+        <h2>Add New Camera</h2>
+
+        <label>Camera Name</label>
+        <input type="text" name="Name" required />
+
+        <label>Location</label>
+        <input type="text" name="Location" required />
+
+        <label>IP Address</label>
+        <input type="text" name="IpAddress" />
+
+        <label>Port</label>
+        <input type="number" name="Port" value="554" />
+
+        <div class="modal-actions">
+            <button type="button" class="cancel" onclick="closeModal()">Cancel</button>
+            <button type="submit" class="save">Add Camera</button>
+        </div>
+    </form>
+</div>
+
+<script>
+function openModal() {
+    document.getElementById("cameraModal").style.display = "flex";
+}
+
+function closeModal() {
+    document.getElementById("cameraModal").style.display = "none";
+}
+
+function outsideClick(event) {
+    if (event.target.id === "cameraModal") closeModal();
+}
+
+/* LIVE CLOCK */
+function updateTime() {
+    const now = new Date();
+    const time = now.toLocaleTimeString();
+    document.getElementById("liveTime").innerText = time;
+}
+
+setInterval(updateTime, 1000);
+updateTime();
+</script>

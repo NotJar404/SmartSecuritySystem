@@ -1,0 +1,94 @@
+﻿@model List<SmartSecuritySystem.Models.User>
+
+@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Personnel Management";
+}
+
+<link rel="stylesheet" href="~/css/personnel.css" />
+
+<div class="page">
+
+    <!-- HEADER -->
+    <div class="header">
+        <h1>Personnel Management</h1>
+        <p>Manage security personnel accounts</p>
+    </div>
+
+    <!-- SEARCH + ADD -->
+    <div class="toolbar">
+        <form method="get">
+            <input type="text" name="search" placeholder="Search personnel..." />
+        </form>
+
+        <button onclick="toggleModal()" class="btn-primary">
+            <i class="fa fa-user-plus"></i> Add Personnel
+        </button>
+    </div>
+
+    <!-- TABLE -->
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Status</th>
+                    <th>Last Login</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @foreach (var user in Model)
+                {
+                    <tr>
+                        <td>@user.Name</td>
+                        <td>@user.Username</td>
+                        <td>@user.Email</td>
+
+                        <td>
+                            <span class="status active">@user.Status</span>
+                        </td>
+
+                        <td>
+                            @(user.LastLogin.HasValue 
+                                ? user.LastLogin.Value.ToString("MMM dd, hh:mm tt") 
+                                : "Never")
+                        </td>
+
+                        <td class="actions">
+                            <a href="#" class="edit"><i class="fa fa-pen"></i></a>
+                            <a asp-action="Delete" asp-route-id="@user.Id" class="delete">
+                                <i class="fa fa-trash"></i>
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ADD MODAL -->
+<div id="modal" class="modal">
+    <div class="modal-content">
+        <h2>Add Personnel</h2>
+
+        <form method="post" asp-action="Add">
+            <input name="Name" placeholder="Full Name" required />
+            <input name="Username" placeholder="Username" required />
+            <input name="Email" placeholder="Email" required />
+            <input name="PasswordHash" placeholder="Password" required />
+
+            <button type="submit" class="btn-primary">Create</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    function toggleModal() {
+        document.getElementById("modal").classList.toggle("show");
+    }
+</script>

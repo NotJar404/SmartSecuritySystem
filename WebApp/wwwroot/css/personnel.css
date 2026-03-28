@@ -1,0 +1,119 @@
+﻿.page {
+    padding: 30px;
+    color: white;
+}
+
+/* HEADER */
+.header h1 {
+    font-size: 28px;
+}
+
+.header p {
+    color: #9ca3af;
+}
+
+/* TOOLBAR */
+.toolbar {
+    margin-top: 20px;
+    display: flex;
+    justify-content: space-between;
+}
+
+    .toolbar input {
+        width: 300px;
+        padding: 12px;
+        border-radius: 10px;
+        border: none;
+        background: #111827;
+        color: white;
+    }
+
+/* BUTTON */
+.btn-primary {
+    background: #2563eb;
+    padding: 12px 20px;
+    border-radius: 10px;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+/* TABLE */
+.table-container {
+    margin-top: 20px;
+    background: #111827;
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th {
+    text-align: left;
+    padding: 15px;
+    color: #9ca3af;
+}
+
+td {
+    padding: 15px;
+    border-top: 1px solid #1f2937;
+}
+
+/* STATUS */
+.status {
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+}
+
+    .status.active {
+        background: rgba(59,130,246,0.2);
+        color: #3b82f6;
+    }
+
+/* ACTIONS */
+.actions i {
+    margin-right: 10px;
+    cursor: pointer;
+}
+
+.actions .edit {
+    color: #3b82f6;
+}
+
+.actions .delete {
+    color: #ef4444;
+}
+
+/* MODAL */
+.modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+}
+
+    .modal.show {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+.modal-content {
+    background: #111827;
+    padding: 25px;
+    border-radius: 12px;
+    width: 300px;
+}
+
+    .modal-content input {
+        width: 100%;
+        margin-bottom: 10px;
+        padding: 10px;
+        background: #0b0f14;
+        border: none;
+        color: white;
+    }
