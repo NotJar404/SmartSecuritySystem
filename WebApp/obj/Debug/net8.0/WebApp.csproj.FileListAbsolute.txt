@@ -30,3 +30,4 @@ C:\Users\Jarield\source\repos\SmartSecuritySystem\WebApp\obj\Debug\net8.0\refint
 C:\Users\Jarield\source\repos\SmartSecuritySystem\WebApp\obj\Debug\net8.0\WebApp.pdb
 C:\Users\Jarield\source\repos\SmartSecuritySystem\WebApp\obj\Debug\net8.0\WebApp.genruntimeconfig.cache
 C:\Users\Jarield\source\repos\SmartSecuritySystem\WebApp\obj\Debug\net8.0\ref\WebApp.dll
+C:\Users\Jarield\source\repos\SmartSecuritySystem\WebApp\obj\Debug\net8.0\WebApp.sourcelink.json
