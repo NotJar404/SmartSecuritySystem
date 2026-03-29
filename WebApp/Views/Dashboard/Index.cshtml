@@ -3,126 +3,129 @@
     ViewData["Title"] = "Dashboard";
 }
 
-<h1 class="page-title">Dashboard</h1>
+<div class="dashboard-container">
 
-<!-- STATS CARDS -->
-<div class="cards">
-
-    <div class="card">
-        <div class="icon blue">
-            <i class="fa fa-camera"></i>
-        </div>
-        <div class="card-info">
-            <h2>4 / 4</h2>
+    <!-- ===================== -->
+    <!-- STATS -->
+    <!-- ===================== -->
+    <div class="stats">
+        <div class="stat-card">
+            <div class="stat-icon blue"><i class="fa fa-video"></i></div>
+            <h2>1 / 1</h2>
             <p>Active Cameras</p>
+            <span class="stat-change positive">+0%</span>
         </div>
-        <div class="change positive">+0%</div>
-    </div>
 
-    <div class="card">
-        <div class="icon green">
-            <i class="fa fa-chart-line"></i>
-        </div>
-        <div class="card-info">
+        <div class="stat-card">
+            <div class="stat-icon yellow"><i class="fa fa-bullseye"></i></div>
             <h2>23</h2>
             <p>Detections Today</p>
+            <span class="stat-change positive">+12%</span>
         </div>
-        <div class="change positive">+12%</div>
-    </div>
 
-    <div class="card">
-        <div class="icon yellow">
-            <i class="fa fa-exclamation-triangle"></i>
-        </div>
-        <div class="card-info">
+        <div class="stat-card">
+            <div class="stat-icon red"><i class="fa fa-bell"></i></div>
             <h2>2</h2>
             <p>Active Alerts</p>
+            <span class="stat-change negative">-50%</span>
         </div>
-        <div class="change negative">-50%</div>
+
+        <div class="stat-card">
+            <div class="stat-icon green"><i class="fa fa-id-card"></i></div>
+            <h2>4</h2>
+            <p>Access Requests</p>
+            <span class="stat-change neutral">Pending</span>
+        </div>
     </div>
 
-    <div class="card">
-        <div class="icon purple">
-            <i class="fa fa-shield-alt"></i>
-        </div>
-        <div class="card-info">
-            <h2>99.8%</h2>
-            <p>System Uptime</p>
-        </div>
-        <div class="change positive">+0.2%</div>
-    </div>
-
-</div>
-
-<!-- LIVE CAMERA PREVIEW -->
-<div class="section-header">
-    <h2>Live Camera Preview</h2>
-    <a href="#">View All →</a>
-</div>
-
-<div class="cameras">
-
-    <!-- CAMERA 1 -->
-    <div class="cam-card">
-        <div class="cam-header">
-            <div>
-                <span class="status-dot online"></span> Front Door
+    <!-- ===================== -->
+    <!-- QUICK ACTIONS -->
+    <!-- ===================== -->
+    <div class="panel">
+        <h3>Quick Actions</h3>
+        <div class="quick-actions">
+            <div class="qa-card">
+                <div class="qa-icon blue"><i class="fa fa-video"></i></div>
+                <div>
+                    <h4>Live Monitoring</h4>
+                    <p>View all camera feeds in real-time</p>
+                </div>
             </div>
-            <span class="badge success">CLEAR</span>
-        </div>
-
-        <div class="cam-body">
-            <video autoplay muted loop playsinline>
-                <source src="/videos/frontdoor.mp4" type="video/mp4" />
-            </video>
-        </div>
-
-        <div class="cam-footer">
-            <span>AI Monitoring</span>
-            <span>@DateTime.Now.ToString("hh:mm:ss tt")</span>
-        </div>
-    </div>
-
-    <!-- CAMERA 2 -->
-    <div class="cam-card">
-        <div class="cam-header">
-            <div>
-                <span class="status-dot online"></span> Back Yard
+            <div class="qa-card">
+                <div class="qa-icon purple"><i class="fa fa-id-card"></i></div>
+                <div>
+                    <h4>Access Monitoring <span class="badge red">4 Pending</span></h4>
+                    <p>Review RFID access requests</p>
+                </div>
             </div>
-            <span class="badge success">CLEAR</span>
-        </div>
-
-        <div class="cam-body">
-            <video autoplay muted loop playsinline>
-                <source src="/videos/backyard.mp4" type="video/mp4" />
-            </video>
-        </div>
-
-        <div class="cam-footer">
-            <span>AI Monitoring</span>
-            <span>@DateTime.Now.ToString("hh:mm:ss tt")</span>
+            <div class="qa-card">
+                <div class="qa-icon orange"><i class="fa fa-bell"></i></div>
+                <div>
+                    <h4>Security Alerts <span class="badge red">2 Active</span></h4>
+                    <p>Check active security alerts</p>
+                </div>
+            </div>
+            <div class="qa-card">
+                <div class="qa-icon green"><i class="fa fa-file-alt"></i></div>
+                <div>
+                    <h4>Activity Logs</h4>
+                    <p>View security event logs</p>
+                </div>
+            </div>
         </div>
     </div>
 
-</div>
+    <!-- ===================== -->
+    <!-- LOWER GRID -->
+    <!-- ===================== -->
+    <div class="grid-2">
 
-<!-- RECENT EVENTS -->
-<div class="section-header">
-    <h2>Recent Events</h2>
-</div>
+        <!-- RECENT EVENTS -->
+        <div class="panel">
+            <div class="panel-header">
+                <h3>Recent Events</h3>
+                <a href="#">View All</a>
+            </div>
+            <div class="event-item">
+                <div class="event-icon blue"><i class="fa fa-eye"></i></div>
+                <div>
+                    <h4>Motion Detected</h4>
+                    <p>Main Entrance • 14:32:15</p>
+                </div>
+            </div>
+            <div class="event-item">
+                <div class="event-icon orange"><i class="fa fa-user"></i></div>
+                <div>
+                    <h4>Person Detected</h4>
+                    <p>Backyard • 14:28:43</p>
+                </div>
+            </div>
+        </div>
 
-<div class="events">
+        <!-- CAMERA STATUS -->
+        <div class="panel">
+            <div class="panel-header">
+                <h3>Camera Status</h3>
+                <a href="#">View Live</a>
+            </div>
+            <div class="camera-item">
+                <div>
+                    <span class="status-dot online"></span>
+                    Main Entrance Camera
+                    <p>Front Door</p>
+                </div>
+                <span class="status-badge">online</span>
+            </div>
+            <div class="camera-item">
+                <div>
+                    <span class="status-dot online"></span>
+                    Backyard Camera
+                    <p>Garden Area</p>
+                </div>
+                <span class="status-badge">online</span>
+            </div>
+        </div>
 
-    <div class="event">
-        <span class="tag blue">Motion Detected</span>
-        <p>Front Door</p>
-        <small>14:32:15</small>
-    </div>
-
-    <div class="event">
-        <span class="tag yellow">Person Detected</span>
-        <p>Back Yard</p>
-        <small>14:28:43</small>
     </div>
 
 </div>

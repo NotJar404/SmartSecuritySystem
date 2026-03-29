@@ -8,77 +8,113 @@
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <!-- CSS -->
     <link rel="stylesheet" href="~/css/login.css" />
-
-    <!-- Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 </head>
 
 <body>
 
-    <!-- LOGO / TITLE -->
-    <div class="top-header">
-        <div class="logo-box">
-            <i class="fa-solid fa-shield-halved"></i>
-        </div>
-        <h1>SecureVision</h1>
-        <p>Security Personnel Dashboard</p>
-    </div>
+<div class="page-wrapper">
 
-    <!-- LOGIN CARD -->
-    <div class="login-container">
-        <h2>Sign In</h2>
+    <!-- LEFT PANEL -->
+    <div class="left-panel">
+        <div class="left-content">
+            <div class="logo-circle">QCU</div>
 
-        <form method="post" asp-action="Login">
+            <h1>SecureVision</h1>
+            <h3>Quezon City University</h3>
 
-            <!-- USERNAME -->
-            <label>Username</label>
-            <div class="input-group">
-                <i class="fa fa-user"></i>
-                <input type="text" name="username" placeholder="Enter your username" required />
+            <div class="underline"></div>
+
+            <p class="desc">
+                Advanced AI-Assisted Security & Intruder Detection Monitoring System
+            </p>
+
+            <div class="feature-box">
+                <i class="fa fa-shield"></i>
+                <div>
+                    <strong>Real-Time Monitoring</strong>
+                    <p>24/7 surveillance with instant alerts</p>
+                </div>
             </div>
 
-            <!-- PASSWORD -->
-            <label>Password</label>
-            <div class="input-group">
+            <div class="feature-box">
                 <i class="fa fa-lock"></i>
-                <input type="password" id="password" name="password" placeholder="Enter your password" required />
-                <i class="fa fa-eye right-icon" onclick="togglePassword()"></i>
+                <div>
+                    <strong>Secure Access Control</strong>
+                    <p>Role-based authentication system</p>
+                </div>
             </div>
-
-            <!-- OPTIONS -->
-            <div class="options">
-                <label><input type="checkbox" /> Remember me</label>
-                <a href="#">Forgot password?</a>
-            </div>
-
-            <!-- BUTTON -->
-            <button type="submit">
-                <i class="fa fa-lock"></i> Sign In
-            </button>
-
-        </form>
-
-        <!-- DEMO -->
-        <div class="demo">
-            Demo Credentials: admin / 1234
         </div>
-
-        <!-- ERROR -->
-        @if (ViewBag.Error != null)
-        {
-            <p class="error">@ViewBag.Error</p>
-        }
     </div>
 
-    <!-- SCRIPT -->
-    <script>
-        function togglePassword() {
-            const input = document.getElementById("password");
-            input.type = input.type === "password" ? "text" : "password";
-        }
-    </script>
+    <!-- RIGHT PANEL -->
+    <div class="right-panel">
+        <div class="login-container">
+
+            <h2>Sign In</h2>
+            <p class="subtitle">Enter your credentials to access the system</p>
+
+            <form method="post" asp-action="Login">
+
+                <!-- USERNAME -->
+                <label>Username</label>
+                <div class="input-group">
+                    <i class="fa fa-user"></i>
+                    <input type="text" name="username" placeholder="Enter your username" required />
+                </div>
+
+                <!-- PASSWORD -->
+                <label>Password</label>
+                <div class="input-group">
+                    <i class="fa fa-lock"></i>
+                    <input type="password" id="password" name="password" placeholder="Enter your password" required />
+                    <i class="fa fa-eye right-icon" onclick="togglePassword()"></i>
+                </div>
+
+                <!-- OPTIONS -->
+                <div class="options">
+
+                    <!-- REMEMBER ME -->
+                    <label class="remember-me">
+                        <input type="checkbox" name="rememberMe" />
+                        <span>Remember me</span>
+                    </label>
+
+                    <!-- FORGOT PASSWORD -->
+                    <a asp-controller="Auth" asp-action="ForgotPassword">
+                        Forgot password?
+                    </a>
+
+                </div>
+
+                <!-- BUTTON -->
+                <button type="submit">
+                    <i class="fa fa-lock"></i> Sign In
+                </button>
+
+            </form>
+
+            <div class="demo">
+                Demo: admin / 1234
+            </div>
+
+            @if (ViewBag.Error != null)
+            {
+                <p class="error">@ViewBag.Error</p>
+            }
+
+        </div>
+    </div>
+
+</div>
+
+<script>
+    function togglePassword() {
+        const input = document.getElementById("password");
+        input.type = input.type === "password" ? "text" : "password";
+    }
+</script>
 
 </body>
 </html>
