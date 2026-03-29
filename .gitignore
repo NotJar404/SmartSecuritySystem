@@ -1,0 +1,18 @@
+# Visual Studio
+.vs/
+
+# Build folders
+bin/
+obj/
+
+# User-specific files
+*.suo
+*.user
+
+# Build outputs
+*.dll
+*.exe
+*.pdb
+
+# ASP.NET
+*.cache

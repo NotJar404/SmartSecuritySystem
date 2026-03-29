@@ -9,14 +9,28 @@ namespace WebApp.Controllers
     [Authorize(Roles = "Admin,Security")]
     public class CamerasController : Controller
     {
-        // TEMP storage (replace with DB later)
+        // TEMP storage
         private static List<Camera> cameras = new List<Camera>();
+        private static int nextId = 1;
 
         // ===============================
-        // MAIN PAGE (GRID + FOCUS VIEW)
+        // MAIN PAGE
         // ===============================
         public IActionResult Index()
         {
+            // DEFAULT CAMERA (only once)
+            if (!cameras.Any())
+            {
+                cameras.Add(new Camera
+                {
+                    Id = nextId++,
+                    Name = "Main Entrance",
+                    Location = "Front Gate",
+                    IpAddress = "192.168.1.10",
+                    Port = 554
+                });
+            }
+
             return View(cameras);
         }
 
@@ -39,7 +53,37 @@ namespace WebApp.Controllers
                 return View("Index", cameras);
             }
 
+            camera.Id = nextId++;
             cameras.Add(camera);
+
+            return RedirectToAction("Index");
+        }
+
+        // ===============================
+        // EDIT CAMERA
+        // ===============================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult Edit(Camera camera)
+        {
+            var existing = cameras.FirstOrDefault(c => c.Id == camera.Id);
+
+            if (existing == null)
+            {
+                return RedirectToAction("Index");
+            }
+
+            // Prevent duplicate name (except itself)
+            if (cameras.Any(c => c.Name == camera.Name && c.Id != camera.Id))
+            {
+                ModelState.AddModelError("", "Camera name already exists.");
+                return View("Index", cameras);
+            }
+
+            existing.Name = camera.Name;
+            existing.Location = camera.Location;
+            existing.IpAddress = camera.IpAddress;
+            existing.Port = camera.Port;
 
             return RedirectToAction("Index");
         }
@@ -49,9 +93,9 @@ namespace WebApp.Controllers
         // ===============================
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Delete(string name)
+        public IActionResult Delete(int id)
         {
-            var cam = cameras.FirstOrDefault(c => c.Name == name);
+            var cam = cameras.FirstOrDefault(c => c.Id == id);
 
             if (cam != null)
             {

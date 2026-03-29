@@ -1,0 +1,163 @@
+﻿@model List<WebApp.Models.AccessLog>
+@{
+    var door = ViewBag.Door as WebApp.Models.DoorStatus;
+}
+
+<link rel="stylesheet" href="~/css/access.css" />
+
+<div class="page">
+
+    <!-- HEADER -->
+    <div class="topbar">
+        <div class="title-group">
+            <div class="title-icon">
+                <i class="fa fa-window-maximize"></i>
+            </div>
+
+            <div>
+                <h1>Access Monitoring</h1>
+                <p>3 pending <span class="badge-red">1 Alert</span></p>
+            </div>
+        </div>
+
+        <div class="status-green">
+            <i class="fa fa-id-card"></i>
+            RFID Scanner Active
+        </div>
+    </div>
+
+    <!-- SECURITY CONTROLS -->
+    <div class="panel">
+
+        <div class="panel-title">
+            <i class="fa fa-bell"></i>
+            <span>Security Controls</span>
+        </div>
+
+        <div class="door">
+            <div class="door-info">
+                <div class="door-icon">
+                    <i class="fa fa-door-open"></i>
+                </div>
+
+                <div>
+                    <h3>@door.DoorName</h3>
+                    <p>@door.Location</p>
+                </div>
+            </div>
+
+            <button class="btn-red">Unlock</button>
+        </div>
+
+        <div class="line"></div>
+
+        <p class="section-label">Alarm Systems</p>
+
+        <div class="alarm-grid">
+            @foreach (var alarm in new[] {
+                ("fa-user-secret","Intruder Alert"),
+                ("fa-fire","Fire Alarm"),
+                ("fa-wave-square","Earthquake Alert"),
+                ("fa-triangle-exclamation","Emergency Drill")
+            })
+            {
+                <div class="alarm-box">
+                    <div class="alarm-left">
+                        <i class="fa @alarm.Item1"></i>
+                        <span>@alarm.Item2</span>
+                    </div>
+
+                    <label class="toggle">
+                        <input type="checkbox">
+                        <span class="track"></span>
+                    </label>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- RFID -->
+    <div class="panel">
+
+        <div class="panel-title between">
+            <div>
+                <i class="fa fa-id-card"></i>
+                <span>RFID Requests</span>
+            </div>
+            <span class="link">Tap to view</span>
+        </div>
+
+        @foreach (var log in Model)
+        {
+            <div class="rfid"
+                 onclick="openModal('@log.FullName','@log.StudentId','@log.Location','@log.Timestamp.ToString("hh:mm tt")','@log.ImageUrl')">
+
+                <img src="@log.ImageUrl" class="avatar" />
+
+                <div class="rfid-body">
+
+                    <div class="rfid-top">
+                        <h4>@log.FullName</h4>
+                        <i class="fa fa-circle-check ok"></i>
+                    </div>
+
+                    <p class="muted">@log.StudentId • Student</p>
+
+                    <div class="rfid-meta">
+                        <span><i class="fa fa-location-dot"></i> @log.Location</span>
+                        <span><i class="fa fa-clock"></i> @log.Timestamp.ToShortTimeString()</span>
+                    </div>
+
+                </div>
+
+            </div>
+        }
+
+    </div>
+
+</div>
+
+<!-- MODAL -->
+<div id="rfidModal" class="modal">
+    <div class="modal-content">
+
+        <span class="close" onclick="closeModal()">&times;</span>
+
+        <div class="modal-header">
+            <img id="modalImg" class="modal-avatar" />
+            <div>
+                <h3 id="modalName"></h3>
+                <p id="modalId"></p>
+            </div>
+        </div>
+
+        <div class="modal-body">
+            <p><i class="fa fa-location-dot"></i> <span id="modalLocation"></span></p>
+            <p><i class="fa fa-clock"></i> <span id="modalTime"></span></p>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    function openModal(name, id, location, time, img) {
+        document.getElementById("rfidModal").style.display = "flex";
+
+        document.getElementById("modalName").innerText = name;
+        document.getElementById("modalId").innerText = id;
+        document.getElementById("modalLocation").innerText = location;
+        document.getElementById("modalTime").innerText = time;
+        document.getElementById("modalImg").src = img;
+    }
+
+    function closeModal() {
+        document.getElementById("rfidModal").style.display = "none";
+    }
+
+    window.onclick = function (e) {
+        let modal = document.getElementById("rfidModal");
+        if (e.target === modal) {
+            modal.style.display = "none";
+        }
+    }
+</script>

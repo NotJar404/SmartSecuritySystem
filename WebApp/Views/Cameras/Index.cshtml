@@ -20,13 +20,13 @@
         </div>
     </div>
 
-    <!-- ================= GRID VIEW ================= -->
+    <!-- GRID VIEW -->
     <div id="gridView" class="live-grid">
 
         @foreach (var cam in Model)
         {
             <div class="live-card"
-                 onclick="openFromGrid('@cam.Name','@cam.Location','@cam.IpAddress')">
+                 onclick="openFromGrid('@cam.Id','@cam.Name','@cam.Location','@cam.IpAddress','@cam.Port')">
 
                 <div class="live-top">
                     <span>@cam.Name</span>
@@ -46,7 +46,7 @@
 
     </div>
 
-    <!-- ================= FOCUS VIEW ================= -->
+    <!-- FOCUS VIEW -->
     <div id="focusView" class="camera-layout" style="display:none;">
 
         <!-- LEFT LIST -->
@@ -54,7 +54,7 @@
             @foreach (var cam in Model)
             {
                 <div class="camera-card"
-                     onclick="selectCamera('@cam.Name','@cam.Location','@cam.IpAddress')">
+                     onclick="openFromGrid('@cam.Id','@cam.Name','@cam.Location','@cam.IpAddress','@cam.Port')">
                     <strong>@cam.Name</strong><br />
                     <small>@cam.Location</small>
                 </div>
@@ -71,6 +71,7 @@
                 </div>
 
                 <button onclick="toggleFullscreen()">⤢</button>
+                <button onclick="editSelectedCamera()">Edit</button>
             </div>
 
             <div class="video-container">
@@ -91,96 +92,57 @@
 
 </div>
 
-<!-- ================= MODAL ================= -->
+<!-- MODAL -->
 <div id="cameraModal" class="modal" onclick="outsideClick(event)">
-    <form method="post" asp-controller="Cameras" asp-action="Add"
-          class="modal-content modern-modal" onclick="event.stopPropagation()">
+    <form method="post"
+          id="cameraForm"
+          asp-controller="Cameras"
+          asp-action="Add"
+          class="modal-content modern-modal"
+          onclick="event.stopPropagation()">
+
+        <!-- HIDDEN ID -->
+        <input type="hidden" name="Id" id="camId" />
 
         <!-- HEADER -->
         <div class="modal-header">
-            <h2>Add New Camera</h2>
+            <h2 id="modalTitle">Add New Camera</h2>
             <span class="close" onclick="closeModal()">&times;</span>
         </div>
 
         <!-- BODY -->
         <div class="modal-body">
 
-            <!-- BASIC INFO -->
             <h4 class="section-title">Basic Information</h4>
 
-            <label>Camera Name <span class="required">*</span></label>
-            <input type="text" name="Name" placeholder="e.g., Main Entrance, Parking Lot" required />
+            <label>Camera Name *</label>
+            <input type="text" id="camName" name="Name" required />
 
-            <label>Location <span class="required">*</span></label>
-            <input type="text" name="Location" placeholder="e.g., Front Door, North Side" required />
+            <label>Location *</label>
+            <input type="text" id="camLocation" name="Location" required />
 
             <hr />
 
-            <!-- NETWORK -->
             <h4 class="section-title">Network Configuration</h4>
 
             <div class="grid-2">
                 <div>
                     <label>IP Address</label>
-                    <input type="text" name="IpAddress" placeholder="192.168.1.100" />
+                    <input type="text" id="camIp" name="IpAddress" />
                 </div>
 
                 <div>
                     <label>Port</label>
-                    <input type="number" name="Port" value="554" />
+                    <input type="number" id="camPort" name="Port" value="554" />
                 </div>
             </div>
-
-            <hr />
-
-            <!-- VIDEO -->
-            <h4 class="section-title">Video Settings</h4>
-
-            <div class="grid-2">
-                <div>
-                    <label>Resolution</label>
-                    <select name="Resolution">
-                        <option>1920x1080 (Full HD)</option>
-                        <option>1280x720 (HD)</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label>Frame Rate (FPS)</label>
-                    <select name="Fps">
-                        <option>30 FPS</option>
-                        <option>60 FPS</option>
-                    </select>
-                </div>
-            </div>
-
-            <hr />
-
-            <!-- FEATURES -->
-            <h4 class="section-title">Features</h4>
-
-            <label class="checkbox">
-                <input type="checkbox" name="Recording" checked />
-                <span>
-                    Enable Recording<br />
-                    <small>Automatically record camera feed</small>
-                </span>
-            </label>
-
-            <label class="checkbox">
-                <input type="checkbox" name="Motion" checked />
-                <span>
-                    Motion Detection<br />
-                    <small>Trigger alerts on motion detection</small>
-                </span>
-            </label>
 
         </div>
 
         <!-- FOOTER -->
         <div class="modal-footer">
             <button type="button" class="cancel" onclick="closeModal()">Cancel</button>
-            <button type="submit" class="save">Add Camera</button>
+            <button type="submit" class="save" id="saveBtn">Add Camera</button>
         </div>
 
     </form>
@@ -188,7 +150,10 @@
 
 @section Scripts {
 <script>
-    // SWITCH VIEWS
+    // STORE selected camera globally
+    let selectedCamera = null;
+
+    // VIEW SWITCH
     function showGrid() {
         document.getElementById("gridView").style.display = "grid";
         document.getElementById("focusView").style.display = "none";
@@ -199,38 +164,67 @@
         document.getElementById("focusView").style.display = "flex";
     }
 
-    // CLICK FROM GRID → OPEN FOCUS
-    function openFromGrid(name, location, ip) {
-        showFocus();
-        selectCamera(name, location, ip);
+    // SELECT CAMERA FOR DISPLAY
+    function selectCamera(cam) {
+        selectedCamera = cam;
+
+        document.getElementById("camTitle").innerText = cam.Name;
+        document.getElementById("camSubtitle").innerText = cam.Location;
+
+        document.getElementById("overlayName").innerText = cam.Name;
+        document.getElementById("overlayLocation").innerText = cam.Location;
+        document.getElementById("overlayIp").innerText = cam.IpAddress || "No IP";
     }
 
-    // SELECT CAMERA
-    function selectCamera(name, location, ip) {
-        document.getElementById("camTitle").innerText = name;
-        document.getElementById("camSubtitle").innerText = location;
+    // CLICK GRID OR LIST → FOCUS + SELECT
+    function openFromGrid(id, name, location, ip, port) {
+        showFocus();
 
-        document.getElementById("overlayName").innerText = name;
-        document.getElementById("overlayLocation").innerText = location;
-        document.getElementById("overlayIp").innerText = ip || "No IP";
+        selectCamera({ Id: id, Name: name, Location: location, IpAddress: ip, Port: port });
+    }
+
+    // EDIT SELECTED CAMERA
+    function editSelectedCamera() {
+        if (!selectedCamera) return;
+
+        document.getElementById("cameraForm").action = "/Cameras/Edit";
+        document.getElementById("modalTitle").innerText = "Edit Camera";
+        document.getElementById("saveBtn").innerText = "Save Changes";
+
+        document.getElementById("camId").value = selectedCamera.Id;
+        document.getElementById("camName").value = selectedCamera.Name;
+        document.getElementById("camLocation").value = selectedCamera.Location;
+        document.getElementById("camIp").value = selectedCamera.IpAddress;
+        document.getElementById("camPort").value = selectedCamera.Port;
+
+        document.getElementById("cameraModal").style.display = "flex";
+    }
+
+    // ADD NEW CAMERA
+    function openModal() {
+        selectedCamera = null;
+
+        document.getElementById("cameraForm").action = "/Cameras/Add";
+        document.getElementById("modalTitle").innerText = "Add New Camera";
+        document.getElementById("saveBtn").innerText = "Add Camera";
+
+        document.getElementById("camId").value = "";
+        document.getElementById("camName").value = "";
+        document.getElementById("camLocation").value = "";
+        document.getElementById("camIp").value = "";
+        document.getElementById("camPort").value = 554;
+
+        document.getElementById("cameraModal").style.display = "flex";
     }
 
     // FULLSCREEN
     function toggleFullscreen() {
         const view = document.getElementById("cameraView");
-
-        if (!document.fullscreenElement) {
-            view.requestFullscreen();
-        } else {
-            document.exitFullscreen();
-        }
+        if (!document.fullscreenElement) view.requestFullscreen();
+        else document.exitFullscreen();
     }
 
-    // MODAL
-    function openModal() {
-        document.getElementById("cameraModal").style.display = "flex";
-    }
-
+    // CLOSE MODAL
     function closeModal() {
         document.getElementById("cameraModal").style.display = "none";
     }
@@ -238,5 +232,6 @@
     function outsideClick(e) {
         if (e.target.id === "cameraModal") closeModal();
     }
+
 </script>
 }
