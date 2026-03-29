@@ -4,7 +4,8 @@
     ViewData["Title"] = "System Settings";
 }
 
-<!-- IMPORTANT: this class must match your CSS -->
+@Html.AntiForgeryToken() <!-- CSRF token for AJAX -->
+
 <div class="system-page">
     <div class="system-wrapper">
 
@@ -26,7 +27,6 @@
                         <p class="system-muted">Alert preferences</p>
                     </div>
                 </div>
-
                 <div class="sys-card-footer">
                     <span>Enable notifications</span>
                     <label class="system-switch">
@@ -46,7 +46,6 @@
                         <p class="system-muted">Continuous recording</p>
                     </div>
                 </div>
-
                 <div class="sys-card-footer">
                     <span>Enable recording</span>
                     <label class="system-switch">
@@ -57,7 +56,7 @@
                 </div>
             </div>
 
-            <!-- AI -->
+            <!-- AI Detection -->
             <div class="system-card">
                 <div class="sys-card-header">
                     <div class="icon purple"><i class="fa fa-shield"></i></div>
@@ -66,7 +65,6 @@
                         <p class="system-muted">Smart analysis</p>
                     </div>
                 </div>
-
                 <div class="sys-card-footer">
                     <span>Enable AI detection</span>
                     <label class="system-switch">
@@ -88,7 +86,6 @@
                     <div class="icon blue"><i class="fa fa-microchip"></i></div>
                     <h5>Hardware</h5>
                 </div>
-
                 <div class="stats">
                     <div><span>CPU Usage</span><span class="text-success">@Model.CpuUsage%</span></div>
                     <div><span>Memory Usage</span><span class="text-success">@Model.MemoryUsage</span></div>
@@ -103,7 +100,6 @@
                     <div class="icon blue"><i class="fa fa-wifi"></i></div>
                     <h5>Network</h5>
                 </div>
-
                 <div class="stats">
                     <div><span>Connection Status</span><span class="text-success">@Model.ConnectionStatus</span></div>
                     <div><span>Bandwidth Usage</span><span class="text-success">@Model.Bandwidth</span></div>
@@ -118,7 +114,6 @@
                     <div class="icon blue"><i class="fa fa-camera"></i></div>
                     <h5>Cameras</h5>
                 </div>
-
                 <div class="stats">
                     <div><span>Total Cameras</span><span class="text-success">@Model.TotalCameras</span></div>
                     <div><span>Active Cameras</span><span class="text-success">@Model.ActiveCameras</span></div>
@@ -133,7 +128,6 @@
                     <div class="icon blue"><i class="fa fa-hdd"></i></div>
                     <h5>Storage</h5>
                 </div>
-
                 <div class="stats">
                     <div><span>Total Space</span><span class="text-success">@Model.TotalSpace</span></div>
                     <div><span>Used Space</span><span class="text-success">@Model.UsedSpace</span></div>
@@ -143,18 +137,24 @@
             </div>
 
         </div>
-
     </div>
 </div>
 
 @section Scripts {
 <script>
 function updateSetting(setting, value) {
-    fetch('/System/UpdateSetting', {
+    const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+
+    fetch('/Admin/UpdateSetting', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'RequestVerificationToken': token
+        },
         body: `setting=${setting}&value=${value}`
-    });
+    })
+    .then(() => console.log(setting + ' updated'))
+    .catch(() => alert('Failed to update setting'));
 }
 </script>
 }

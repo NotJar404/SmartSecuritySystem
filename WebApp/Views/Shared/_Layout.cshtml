@@ -33,7 +33,8 @@
                 @* ================= ADMIN NAV ================= *@
                 @if (User.IsInRole("Admin"))
                 {
-                    <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Admin" ? "active" : "")">
+                    <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Admin"
+                        && ViewContext.RouteData.Values["action"]?.ToString() == "Index" ? "active" : "")">
                         <a asp-controller="Admin" asp-action="Index">
                             <i class="fa fa-chart-line"></i> Dashboard
                         </a>
@@ -41,12 +42,11 @@
 
                     <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Cameras" ? "active" : "")">
                         <a asp-controller="Cameras" asp-action="Index">
-                            <i class="fa fa-camera"></i> Camera View
+                            <i class="fa fa-video"></i> Live Monitoring
                         </a>
                     </li>
 
-                    <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Admin" 
-                        && ViewContext.RouteData.Values["action"]?.ToString() == "Personnel" ? "active" : "")">
+                    <li class="nav-item @(ViewContext.RouteData.Values["action"]?.ToString() == "Personnel" ? "active" : "")">
                         <a asp-controller="Admin" asp-action="Personnel">
                             <i class="fa fa-users"></i> Personnel
                         </a>
@@ -54,7 +54,14 @@
 
                     <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Logs" ? "active" : "")">
                         <a asp-controller="Logs" asp-action="Index">
-                            <i class="fa fa-wave-square"></i> Activity Logs
+                            <i class="fa fa-file"></i> Activity Logs
+                        </a>
+                    </li>
+
+                    <!-- ✅ NEW: SYSTEM SETTINGS -->
+                    <li class="nav-item @(ViewContext.RouteData.Values["action"]?.ToString() == "System" ? "active" : "")">
+                        <a asp-controller="Admin" asp-action="System">
+                            <i class="fa fa-cogs"></i> System Settings
                         </a>
                     </li>
                 }
@@ -70,12 +77,6 @@
 
                     <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Cameras" ? "active" : "")">
                         <a asp-controller="Cameras" asp-action="Index">
-                            <i class="fa fa-camera"></i> Cameras
-                        </a>
-                    </li>
-
-                    <li class="nav-item @(ViewContext.RouteData.Values["action"]?.ToString() == "Live" ? "active" : "")">
-                        <a asp-controller="Cameras" asp-action="Live">
                             <i class="fa fa-video"></i> Live Monitoring
                         </a>
                     </li>

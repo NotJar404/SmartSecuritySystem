@@ -1,42 +1,27 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using SmartSecuritySystem.Models;
+using WebApp.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using WebApp.Models;
 
 namespace WebApp.Controllers
 {
+    [Authorize(Roles = "Admin")] // only Admin can access
     public class AdminController : Controller
     {
-        // In-memory user list (replace with DB in production)
+        // In-memory user list (existing)
         private static List<User> users = new List<User>
         {
-            new User
-            {
-                Id = 1,
-                Name = "John Doe",
-                Username = "johndoe",
-                Email = "john.doe@securevision.com",
-                Status = "Active",
-                LastLogin = DateTime.Now.AddHours(-5),
-                Role = "Security",
-                PasswordHash = "1234"
-            },
-            new User
-            {
-                Id = 2,
-                Name = "Jane Smith",
-                Username = "janesmith",
-                Email = "jane.smith@securevision.com",
-                Status = "Active",
-                LastLogin = DateTime.Now.AddDays(-1),
-                Role = "Security",
-                PasswordHash = "1234"
-            }
+            new User { Id = 1, Name = "John Doe", Username = "johndoe", Email = "john.doe@securevision.com", Status = "Active", LastLogin = DateTime.Now.AddHours(-5), Role = "Security", PasswordHash = "1234" },
+            new User { Id = 2, Name = "Jane Smith", Username = "janesmith", Email = "jane.smith@securevision.com", Status = "Active", LastLogin = DateTime.Now.AddDays(-1), Role = "Security", PasswordHash = "1234" }
         };
 
-        // Admin Dashboard view (existing)
+        // In-memory system status (singleton for now)
+        private static SystemStatus systemStatus = new SystemStatus();
+
+        // ------------------ DASHBOARD ------------------
         public IActionResult Index()
         {
             var model = new AdminDashboardViewModel
@@ -45,14 +30,13 @@ namespace WebApp.Controllers
                 ActiveUsers = users.Count(u => u.Status == "Active"),
                 InactiveUsers = users.Count(u => u.Status != "Active"),
                 RecentLogins = users.Count(u => u.LastLogin.HasValue && (DateTime.Now - u.LastLogin.Value).TotalHours <= 24),
-
                 RecentPersonnel = users.OrderByDescending(u => u.LastLogin ?? DateTime.MinValue).Take(5).ToList()
             };
 
             return View(model);
         }
 
-        // Personnel Management Page
+        // ------------------ PERSONNEL ------------------
         public IActionResult Personnel(string search)
         {
             var filtered = users;
@@ -68,7 +52,6 @@ namespace WebApp.Controllers
             return View(filtered);
         }
 
-        // Add Personnel POST
         [HttpPost]
         public IActionResult Add(User user)
         {
@@ -81,7 +64,6 @@ namespace WebApp.Controllers
             return RedirectToAction("Personnel");
         }
 
-        // Delete Personnel
         public IActionResult Delete(int id)
         {
             var user = users.FirstOrDefault(u => u.Id == id);
@@ -90,9 +72,36 @@ namespace WebApp.Controllers
 
             return RedirectToAction("Personnel");
         }
+
+        // ------------------ SYSTEM SETTINGS ------------------
+        public IActionResult System()
+        {
+            // optional: you could sync camera stats here if needed
+            return View(systemStatus);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult UpdateSetting(string setting, bool value)
+        {
+            switch (setting)
+            {
+                case "Notifications":
+                    systemStatus.NotificationsEnabled = value;
+                    break;
+                case "Recording":
+                    systemStatus.RecordingEnabled = value;
+                    break;
+                case "AI":
+                    systemStatus.AiDetectionEnabled = value;
+                    break;
+            }
+
+            return Ok();
+        }
     }
 
-    // ViewModel (you can move this to Models/AdminDashboardViewModel.cs later)
+    // ------------------ VIEWMODEL ------------------
     public class AdminDashboardViewModel
     {
         public int TotalPersonnel { get; set; }

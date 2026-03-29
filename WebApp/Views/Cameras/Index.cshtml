@@ -8,167 +8,235 @@
 
     <!-- HEADER -->
     <div class="camera-topbar">
-
-        <!-- Left title with icon -->
-        <div class="camera-title">
-            <div class="icon-box">
-                <i class="fa fa-video-camera"></i>
-            </div>
-            <div>
-                <h1>Camera View</h1>
-                <p>Live camera feed monitoring</p>
-            </div>
+        <div>
+            <h1>Live Monitoring</h1>
+            <p>@Model.Count active cameras</p>
         </div>
 
-        <!-- Right actions -->
         <div class="top-actions">
-            <button class="add-btn" onclick="openModal()">
-                <i class="fa fa-plus"></i> Add Camera
-            </button>
-            <span class="live-pill">● Live</span>
-            <span class="camera-count">@Model.Count Camera Active</span>
+            <button onclick="showGrid()">Grid</button>
+            <button onclick="showFocus()">Focus</button>
+            <button class="add-btn" onclick="openModal()">+ Add Camera</button>
         </div>
     </div>
 
-    <!-- MAIN CONTENT -->
-    <div class="camera-layout">
+    <!-- ================= GRID VIEW ================= -->
+    <div id="gridView" class="live-grid">
 
-        <!-- LEFT PANEL: CAMERA LIST -->
+        @foreach (var cam in Model)
+        {
+            <div class="live-card"
+                 onclick="openFromGrid('@cam.Name','@cam.Location','@cam.IpAddress')">
+
+                <div class="live-top">
+                    <span>@cam.Name</span>
+                    <span class="status">LIVE</span>
+                </div>
+
+                <div class="live-body">
+                    <i class="fa fa-camera"></i>
+                    <div>@cam.Location</div>
+                </div>
+
+                <div class="live-footer">
+                    <span>AI Monitoring</span>
+                </div>
+            </div>
+        }
+
+    </div>
+
+    <!-- ================= FOCUS VIEW ================= -->
+    <div id="focusView" class="camera-layout" style="display:none;">
+
+        <!-- LEFT LIST -->
         <div class="camera-list">
-            <h3>AVAILABLE CAMERAS</h3>
-
-            @for (int i = 0; i < Model.Count; i++)
+            @foreach (var cam in Model)
             {
-                var cam = Model[i];
-                var isActive = i == 0; // First camera is active
-
-                <div class="camera-card @(isActive ? "active" : "")" title="@cam.Name">
-
-                    <div class="cam-header">
-                        <span class="cam-name">
-                            <i class="fa fa-camera"></i> @cam.Name
-                        </span>
-                        <span class="delete" title="Delete">
-                            <i class="fa fa-trash"></i>
-                        </span>
-                    </div>
-
-                    <div class="cam-location">@cam.Location</div>
-
-                    <div class="cam-status">
-                        <span class="dot online"></span>
-                        <span class="status-text online-text">Online</span>
-                        <span class="rec">● REC</span>
-                        <span class="md">MD</span>
-                    </div>
+                <div class="camera-card"
+                     onclick="selectCamera('@cam.Name','@cam.Location','@cam.IpAddress')">
+                    <strong>@cam.Name</strong><br />
+                    <small>@cam.Location</small>
                 </div>
             }
         </div>
 
-        <!-- RIGHT PANEL: CAMERA VIEW -->
-        <div class="camera-view">
+        <!-- RIGHT VIEW -->
+        <div class="camera-view" id="cameraView">
 
-            <!-- HEADER -->
             <div class="view-header">
                 <div>
-                    <h2>Main Entrance Camera</h2>
-                    <p>Front Door • Camera cam-default</p>
+                    <h2 id="camTitle">Select Camera</h2>
+                    <p id="camSubtitle"></p>
                 </div>
 
-                <button class="expand-btn" title="Expand">
-                    <i class="fa fa-expand"></i>
-                </button>
+                <button onclick="toggleFullscreen()">⤢</button>
             </div>
 
-            <!-- VIDEO AREA -->
             <div class="video-container">
-
-                <!-- LIVE BADGE -->
                 <div class="live-badge">● LIVE</div>
 
-                <!-- TIME -->
-                <div class="time" id="liveTime">--:--:--</div>
-
-                <!-- PLACEHOLDER -->
                 <div class="camera-placeholder">
-                    <div class="circle"></div>
                     <i class="fa fa-camera"></i>
                 </div>
 
-                <!-- CAMERA INFO -->
                 <div class="camera-overlay">
-                    <span class="overlay-title">Front Door</span><br/>
-                    <strong>Main Entrance Camera • 1920x1080 • 30fps</strong><br />
-                    192.168.1.100:554
+                    <strong id="overlayName"></strong><br />
+                    <span id="overlayLocation"></span><br />
+                    <span id="overlayIp"></span>
                 </div>
-
-                <!-- RECORDING -->
-                <div class="recording">● Recording</div>
             </div>
-
-            <!-- CONTROLS -->
-            <div class="controls">
-                <button><i class="fa fa-camera"></i> Take Snapshot</button>
-                <button><i class="fa fa-circle"></i> Start Recording</button>
-                <button><i class="fa fa-search"></i> Zoom Controls</button>
-                <button><i class="fa fa-cog"></i> Settings</button>
-            </div>
-
         </div>
     </div>
+
 </div>
 
-<!-- MODAL -->
+<!-- ================= MODAL ================= -->
 <div id="cameraModal" class="modal" onclick="outsideClick(event)">
-    <form method="post"
-          asp-controller="Cameras"
-          asp-action="Add"
-          class="modal-content"
-          onclick="event.stopPropagation()">
+    <form method="post" asp-controller="Cameras" asp-action="Add"
+          class="modal-content modern-modal" onclick="event.stopPropagation()">
 
-        <span class="close" onclick="closeModal()">&times;</span>
+        <!-- HEADER -->
+        <div class="modal-header">
+            <h2>Add New Camera</h2>
+            <span class="close" onclick="closeModal()">&times;</span>
+        </div>
 
-        <h2>Add New Camera</h2>
+        <!-- BODY -->
+        <div class="modal-body">
 
-        <label>Camera Name</label>
-        <input type="text" name="Name" required />
+            <!-- BASIC INFO -->
+            <h4 class="section-title">Basic Information</h4>
 
-        <label>Location</label>
-        <input type="text" name="Location" required />
+            <label>Camera Name <span class="required">*</span></label>
+            <input type="text" name="Name" placeholder="e.g., Main Entrance, Parking Lot" required />
 
-        <label>IP Address</label>
-        <input type="text" name="IpAddress" />
+            <label>Location <span class="required">*</span></label>
+            <input type="text" name="Location" placeholder="e.g., Front Door, North Side" required />
 
-        <label>Port</label>
-        <input type="number" name="Port" value="554" />
+            <hr />
 
-        <div class="modal-actions">
+            <!-- NETWORK -->
+            <h4 class="section-title">Network Configuration</h4>
+
+            <div class="grid-2">
+                <div>
+                    <label>IP Address</label>
+                    <input type="text" name="IpAddress" placeholder="192.168.1.100" />
+                </div>
+
+                <div>
+                    <label>Port</label>
+                    <input type="number" name="Port" value="554" />
+                </div>
+            </div>
+
+            <hr />
+
+            <!-- VIDEO -->
+            <h4 class="section-title">Video Settings</h4>
+
+            <div class="grid-2">
+                <div>
+                    <label>Resolution</label>
+                    <select name="Resolution">
+                        <option>1920x1080 (Full HD)</option>
+                        <option>1280x720 (HD)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label>Frame Rate (FPS)</label>
+                    <select name="Fps">
+                        <option>30 FPS</option>
+                        <option>60 FPS</option>
+                    </select>
+                </div>
+            </div>
+
+            <hr />
+
+            <!-- FEATURES -->
+            <h4 class="section-title">Features</h4>
+
+            <label class="checkbox">
+                <input type="checkbox" name="Recording" checked />
+                <span>
+                    Enable Recording<br />
+                    <small>Automatically record camera feed</small>
+                </span>
+            </label>
+
+            <label class="checkbox">
+                <input type="checkbox" name="Motion" checked />
+                <span>
+                    Motion Detection<br />
+                    <small>Trigger alerts on motion detection</small>
+                </span>
+            </label>
+
+        </div>
+
+        <!-- FOOTER -->
+        <div class="modal-footer">
             <button type="button" class="cancel" onclick="closeModal()">Cancel</button>
             <button type="submit" class="save">Add Camera</button>
         </div>
+
     </form>
 </div>
 
+@section Scripts {
 <script>
-function openModal() {
-    document.getElementById("cameraModal").style.display = "flex";
-}
+    // SWITCH VIEWS
+    function showGrid() {
+        document.getElementById("gridView").style.display = "grid";
+        document.getElementById("focusView").style.display = "none";
+    }
 
-function closeModal() {
-    document.getElementById("cameraModal").style.display = "none";
-}
+    function showFocus() {
+        document.getElementById("gridView").style.display = "none";
+        document.getElementById("focusView").style.display = "flex";
+    }
 
-function outsideClick(event) {
-    if (event.target.id === "cameraModal") closeModal();
-}
+    // CLICK FROM GRID → OPEN FOCUS
+    function openFromGrid(name, location, ip) {
+        showFocus();
+        selectCamera(name, location, ip);
+    }
 
-/* LIVE CLOCK */
-function updateTime() {
-    const now = new Date();
-    const time = now.toLocaleTimeString();
-    document.getElementById("liveTime").innerText = time;
-}
+    // SELECT CAMERA
+    function selectCamera(name, location, ip) {
+        document.getElementById("camTitle").innerText = name;
+        document.getElementById("camSubtitle").innerText = location;
 
-setInterval(updateTime, 1000);
-updateTime();
+        document.getElementById("overlayName").innerText = name;
+        document.getElementById("overlayLocation").innerText = location;
+        document.getElementById("overlayIp").innerText = ip || "No IP";
+    }
+
+    // FULLSCREEN
+    function toggleFullscreen() {
+        const view = document.getElementById("cameraView");
+
+        if (!document.fullscreenElement) {
+            view.requestFullscreen();
+        } else {
+            document.exitFullscreen();
+        }
+    }
+
+    // MODAL
+    function openModal() {
+        document.getElementById("cameraModal").style.display = "flex";
+    }
+
+    function closeModal() {
+        document.getElementById("cameraModal").style.display = "none";
+    }
+
+    function outsideClick(e) {
+        if (e.target.id === "cameraModal") closeModal();
+    }
 </script>
+}
