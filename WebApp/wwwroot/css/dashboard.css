@@ -177,53 +177,108 @@ body {
 /* ============================= */
 
 /* ----------------------------- */
-/* STATS CARDS (Dashboard) */
+/* GLOBAL RHYTHM (FIGMA-LIKE) */
+/* ----------------------------- */
+:root {
+    --radius-lg: 16px;
+    --radius-md: 12px;
+    --radius-sm: 10px;
+}
+
+/* ----------------------------- */
+/* STATS (PIXEL PERFECT) */
 /* ----------------------------- */
 .stats {
-    display: flex;
-    gap: 20px;
-    margin-bottom: 40px;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 18px;
+    margin-bottom: 28px;
 }
 
 .stat-card {
     background: #0f172a;
-    flex: 1 1 220px; /* same min width */
-    min-height: 150px; /* ensures decent height */
-    border-radius: 16px;
-    padding: 28px 28px; /* slightly more padding */
-    box-shadow: 0 8px 20px rgba(0,0,0,0.5);
-    position: relative;
-    transition: transform 0.3s ease;
+    border-radius: 14px;
+    padding: 18px 20px;
+    height: 130px;
     display: flex;
     flex-direction: column;
-    justify-content: space-between; /* spreads content evenly */
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.2);
 }
 
-    .stat-card:hover {
-        transform: translateY(-6px);
+/* TOP ROW */
+.stat-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* ICON (FIXED ALIGNMENT) */
+.stat-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+    /* normalize icon rendering */
+    .stat-icon i,
+    .stat-icon svg {
+        display: block;
+        line-height: 1;
     }
 
-    .stat-card h2 {
-        font-size: 2rem;
-        font-weight: 700;
-        margin-bottom: 12px; /* more breathing space */
+    /* Font Awesome FIX (core alignment fix) */
+    .stat-icon i {
+        font-size: 16px;
+        width: 1.25em; /* works with fa-fw */
+        text-align: center; /* centers glyph inside box */
     }
 
-    .stat-card p {
-        font-size: 1rem;
-        color: #94a3b8;
-        margin-bottom: 8px;
+    /* optional micro-adjustments for specific icons */
+    .stat-icon .fa-bell {
+        transform: translateY(1px);
     }
 
-.stat-change {
-    position: absolute;
-    bottom: 20px;
-    right: 28px;
+    .stat-icon .fa-bullseye {
+        transform: translateY(0.5px);
+    }
+
+/* LABEL */
+.stat-label {
+    font-size: 11px;
     font-weight: 600;
-    font-size: 0.95rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
 }
 
+/* MAIN VALUE */
+.stat-card h2 {
+    font-size: 26px;
+    font-weight: 700;
+    margin: 8px 0 0;
+    line-height: 1.1;
+}
+
+/* SUBTEXT */
+.stat-card p {
+    font-size: 12px;
+    color: #94a3b8;
+    margin-top: 2px;
+}
+
+/* BOTTOM ALIGN FIX */
+.stat-change {
+    margin-top: auto;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+    /* COLORS */
     .stat-change.positive {
         color: #22c55e;
     }
@@ -236,173 +291,168 @@ body {
         color: #10b981;
     }
 
-.stat-icon {
-    width: 44px;
-    height: 44px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 20px;
-    color: #ffffff;
-    margin-bottom: 12px;
-}
-
-    .stat-icon.blue {
-        background: #2563eb;
-    }
-
-    .stat-icon.green {
-        background: #16a34a;
-    }
-
-    .stat-icon.yellow {
-        background: #f59e0b;
-    }
-
-    .stat-icon.red {
-        background: #ef4444;
-    }
-
 /* ----------------------------- */
-/* QUICK ACTIONS (Dashboard) */
+/* PANEL */
 /* ----------------------------- */
 .panel {
     background: #0f172a;
-    border-radius: 16px;
-    padding: 28px 30px;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
-    margin-bottom: 40px;
+    border-radius: var(--radius-lg);
+    padding: 22px;
+    margin-bottom: 32px;
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.25);
 }
 
     .panel h3 {
-        font-size: 1.3rem;
+        font-size: 18px;
         font-weight: 700;
-        margin-bottom: 25px;
-        color: #ffffff;
+        margin-bottom: 18px;
     }
 
+/* ----------------------------- */
+/* QUICK ACTIONS */
+/* ----------------------------- */
 .quick-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 22px;
-    justify-content: space-between; /* spreads cards evenly */
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
 }
 
 .qa-card {
-    flex: 1 1 calc(50% - 22px); /* 2 per row, automatically adjusts */
-    min-width: 260px;
-    max-width: 320px; /* prevents too wide */
     background: #111827;
-    border-radius: 14px;
-    padding: 22px;
+    border-radius: var(--radius-md);
+    padding: 16px 18px;
     display: flex;
-    gap: 18px;
+    justify-content: space-between;
     align-items: center;
     cursor: pointer;
-    transition: background-color 0.3s ease;
+    border: 1px solid rgba(255,255,255,0.05);
+    transition: all 0.18s ease;
 }
 
     .qa-card:hover {
         background: #1f2937;
+        transform: translateY(-2px);
     }
 
+/* LEFT */
+.qa-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* ICON */
 .qa-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 22px;
-    color: #ffffff;
-    flex-shrink: 0;
+    font-size: 16px;
 }
 
+    /* softer fills */
     .qa-icon.blue {
-        background: #2563eb;
+        background: rgba(59,130,246,0.15);
+        color: #60a5fa;
     }
 
     .qa-icon.purple {
-        background: #7c3aed;
+        background: rgba(124,58,237,0.15);
+        color: #a78bfa;
     }
 
     .qa-icon.orange {
-        background: #ea580c;
+        background: rgba(234,88,12,0.15);
+        color: #fb923c;
     }
 
     .qa-icon.green {
-        background: #16a34a;
+        background: rgba(34,197,94,0.15);
+        color: #4ade80;
     }
 
+/* TEXT */
 .qa-card h4 {
-    font-size: 1.05rem;
-    font-weight: 700;
-    margin-bottom: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .qa-card p {
-    font-size: 0.9rem;
+    font-size: 12px;
     color: #94a3b8;
+    margin-top: 2px;
 }
 
+/* BADGE */
 .badge.red {
     background: #ef4444;
-    color: white;
-    font-size: 0.75rem;
-    padding: 3px 8px;
-    border-radius: 9999px;
+    color: #fff;
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 999px;
     font-weight: 600;
-    margin-left: 8px;
+}
+
+/* ARROW */
+.qa-arrow {
+    font-size: 13px;
+    color: #6b7280;
+    opacity: 0.5;
+    transition: 0.18s;
+}
+
+.qa-card:hover .qa-arrow {
+    opacity: 1;
+    color: #fff;
+    transform: translateX(3px);
 }
 
 /* ----------------------------- */
-/* LOWER GRID (Dashboard) */
+/* LOWER GRID */
 /* ----------------------------- */
 .grid-2 {
-    display: flex;
-    gap: 28px;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+    gap: 20px;
 }
 
-    .grid-2 > .panel {
-        flex: 1 1 500px;
-    }
-
-/* PANEL HEADER */
+/* HEADER */
 .panel-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 24px;
+    margin-bottom: 14px;
 }
 
-    .panel-header h3 {
-        font-size: 1.25rem;
-        font-weight: 700;
-    }
-
     .panel-header a {
-        font-size: 0.95rem;
+        font-size: 12px;
         color: #3b82f6;
-        text-decoration: none;
         font-weight: 600;
+        text-decoration: none;
     }
 
         .panel-header a:hover {
             text-decoration: underline;
         }
 
+/* ----------------------------- */
 /* EVENTS */
+/* ----------------------------- */
 .event-item {
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding: 14px 12px;
-    border-radius: 14px;
+    gap: 12px;
+    padding: 12px;
+    border-radius: var(--radius-sm);
     background: #111827;
-    margin-bottom: 16px;
-    transition: background-color 0.25s ease;
+    margin-bottom: 10px;
+    transition: 0.18s;
 }
 
     .event-item:hover {
@@ -410,46 +460,37 @@ body {
     }
 
 .event-icon {
-    width: 44px;
-    height: 44px;
-    border-radius: 10px;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 20px;
-    color: white;
-    flex-shrink: 0;
+    font-size: 14px;
 }
 
     .event-icon.blue {
-        background: #2563eb;
+        background: rgba(37,99,235,0.15);
+        color: #3b82f6;
     }
 
     .event-icon.orange {
-        background: #ea580c;
+        background: rgba(234,88,12,0.15);
+        color: #f97316;
     }
 
-.event-item h4 {
-    font-weight: 700;
-    font-size: 1.05rem;
-    margin-bottom: 4px;
-}
-
-.event-item p {
-    color: #94a3b8;
-    font-size: 0.9rem;
-}
-
-/* CAMERA ITEMS */
+/* ----------------------------- */
+/* CAMERA */
+/* ----------------------------- */
 .camera-item {
     display: flex;
     justify-content: space-between;
-    padding: 14px 16px;
-    background: #111827;
-    border-radius: 14px;
-    margin-bottom: 16px;
     align-items: center;
-    transition: background-color 0.25s ease;
+    background: #111827;
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    margin-bottom: 10px;
+    transition: 0.18s;
 }
 
     .camera-item:hover {
@@ -459,44 +500,46 @@ body {
     .camera-item > div {
         display: flex;
         align-items: center;
-        gap: 14px;
+        gap: 10px;
     }
 
 .dot {
-    width: 12px;
-    height: 12px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
-    flex-shrink: 0;
 }
 
     .dot.online {
         background: #22c55e;
+        box-shadow: 0 0 6px rgba(34,197,94,0.5);
     }
 
 .camera-item p {
+    font-size: 12px;
     color: #94a3b8;
-    font-size: 0.85rem;
-    margin-top: 2px;
 }
 
+/* STATUS */
 .status-badge {
-    background: rgba(34, 197, 94, 0.2);
+    background: rgba(34,197,94,0.15);
     color: #22c55e;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
     font-weight: 600;
-    font-size: 0.85rem;
-    padding: 5px 12px;
-    border-radius: 9999px;
-    text-transform: lowercase;
 }
 
-/* ============================= */
+/* ----------------------------- */
 /* RESPONSIVE */
-/* ============================= */
-@media (max-width: 900px) {
-    .stats, .grid-2, .quick-actions {
-        flex-direction: column;
+/* ----------------------------- */
+@media (max-width: 768px) {
+    .stats,
+    .quick-actions,
+    .grid-2 {
+        grid-template-columns: 1fr;
     }
 }
+
 
 /* ========================================================= */
 /* ==================== CAMERA UI (UPDATED) ================= */

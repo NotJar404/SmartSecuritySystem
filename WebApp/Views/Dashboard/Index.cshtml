@@ -9,33 +9,55 @@
     <!-- STATS -->
     <!-- ===================== -->
     <div class="stats">
+
         <div class="stat-card">
-            <div class="stat-icon blue"><i class="fa fa-video"></i></div>
+            <div class="stat-top">
+                <div class="stat-icon blue"><i class="fa fa-video fa-fw"></i></div>
+                <span class="stat-label">Active Cameras</span>
+            </div>
+
             <h2>1 / 1</h2>
             <p>Active Cameras</p>
+
             <span class="stat-change positive">+0%</span>
         </div>
 
         <div class="stat-card">
-            <div class="stat-icon yellow"><i class="fa fa-bullseye"></i></div>
+            <div class="stat-top">
+                <div class="stat-icon yellow"><i class="fa fa-bullseye fa-fw"></i></div>
+                <span class="stat-label">Detections Today</span>
+            </div>
+
             <h2>23</h2>
             <p>Detections Today</p>
+
             <span class="stat-change positive">+12%</span>
         </div>
 
         <div class="stat-card">
-            <div class="stat-icon red"><i class="fa fa-bell"></i></div>
+            <div class="stat-top">
+                <div class="stat-icon red"><i class="fa fa-bell fa-fw"></i></div>
+                <span class="stat-label">Active Alerts</span>
+            </div>
+
             <h2>2</h2>
             <p>Active Alerts</p>
+
             <span class="stat-change negative">-50%</span>
         </div>
 
         <div class="stat-card">
-            <div class="stat-icon green"><i class="fa fa-id-card"></i></div>
+            <div class="stat-top">
+                <div class="stat-icon green"><i class="fa fa-id-card fa-fw"></i></div>
+                <span class="stat-label">Access Requests</span>
+            </div>
+
             <h2>4</h2>
             <p>Access Requests</p>
+
             <span class="stat-change neutral">Pending</span>
         </div>
+
     </div>
 
     <!-- ===================== -->
@@ -43,35 +65,67 @@
     <!-- ===================== -->
     <div class="panel">
         <h3>Quick Actions</h3>
+
         <div class="quick-actions">
+
             <div class="qa-card">
-                <div class="qa-icon blue"><i class="fa fa-video"></i></div>
-                <div>
-                    <h4>Live Monitoring</h4>
-                    <p>View all camera feeds in real-time</p>
+                <div class="qa-left">
+                    <div class="qa-icon blue"><i class="fa fa-video"></i></div>
+                    <div>
+                        <h4>Live Monitoring</h4>
+                        <p>View all camera feeds in real-time</p>
+                    </div>
+                </div>
+                <div class="qa-arrow">
+                    <i class="fa fa-chevron-right"></i>
                 </div>
             </div>
+
             <div class="qa-card">
-                <div class="qa-icon purple"><i class="fa fa-id-card"></i></div>
-                <div>
-                    <h4>Access Monitoring <span class="badge red">4 Pending</span></h4>
-                    <p>Review RFID access requests</p>
+                <div class="qa-left">
+                    <div class="qa-icon purple"><i class="fa fa-id-card"></i></div>
+                    <div>
+                        <h4>
+                            Access Monitoring
+                            <span class="badge red">4 Pending</span>
+                        </h4>
+                        <p>Review RFID access requests</p>
+                    </div>
+                </div>
+                <div class="qa-arrow">
+                    <i class="fa fa-chevron-right"></i>
                 </div>
             </div>
+
             <div class="qa-card">
-                <div class="qa-icon orange"><i class="fa fa-bell"></i></div>
-                <div>
-                    <h4>Security Alerts <span class="badge red">2 Active</span></h4>
-                    <p>Check active security alerts</p>
+                <div class="qa-left">
+                    <div class="qa-icon orange"><i class="fa fa-bell"></i></div>
+                    <div>
+                        <h4>
+                            Security Alerts
+                            <span class="badge red">2 Active</span>
+                        </h4>
+                        <p>Check active security alerts</p>
+                    </div>
+                </div>
+                <div class="qa-arrow">
+                    <i class="fa fa-chevron-right"></i>
                 </div>
             </div>
+
             <div class="qa-card">
-                <div class="qa-icon green"><i class="fa fa-file-alt"></i></div>
-                <div>
-                    <h4>Activity Logs</h4>
-                    <p>View security event logs</p>
+                <div class="qa-left">
+                    <div class="qa-icon green"><i class="fa fa-file-alt"></i></div>
+                    <div>
+                        <h4>Activity Logs</h4>
+                        <p>View security event logs</p>
+                    </div>
+                </div>
+                <div class="qa-arrow">
+                    <i class="fa fa-chevron-right"></i>
                 </div>
             </div>
+
         </div>
     </div>
 
@@ -86,6 +140,7 @@
                 <h3>Recent Events</h3>
                 <a href="#">View All</a>
             </div>
+
             <div class="event-item">
                 <div class="event-icon blue"><i class="fa fa-eye"></i></div>
                 <div>
@@ -93,6 +148,7 @@
                     <p>Main Entrance • 14:32:15</p>
                 </div>
             </div>
+
             <div class="event-item">
                 <div class="event-icon orange"><i class="fa fa-user"></i></div>
                 <div>
@@ -108,22 +164,29 @@
                 <h3>Camera Status</h3>
                 <a href="#">View Live</a>
             </div>
+
             <div class="camera-item">
                 <div>
-                    <span class="status-dot online"></span>
-                    Main Entrance Camera
-                    <p>Front Door</p>
+                    <span class="dot online"></span>
+                    <div>
+                        <strong>Main Entrance Camera</strong>
+                        <p>Front Door</p>
+                    </div>
                 </div>
                 <span class="status-badge">online</span>
             </div>
+
             <div class="camera-item">
                 <div>
-                    <span class="status-dot online"></span>
-                    Backyard Camera
-                    <p>Garden Area</p>
+                    <span class="dot online"></span>
+                    <div>
+                        <strong>Backyard Camera</strong>
+                        <p>Garden Area</p>
+                    </div>
                 </div>
                 <span class="status-badge">online</span>
             </div>
+
         </div>
 
     </div>
