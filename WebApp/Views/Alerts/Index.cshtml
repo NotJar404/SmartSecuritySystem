@@ -4,9 +4,10 @@
     Layout = "~/Views/Shared/_Layout.cshtml";
     var filter = ViewBag.Filter as string ?? "All";
 }
+<link rel="stylesheet" href="~/css/alert.css" />
 
 <h1 class="page-title">Alerts</h1>
-<p class="subtitle">@Model.Count(a => a.Status == "Active") active alerts</p>
+<p class="subtitle">@Model.Count(a => a.Status == WebApp.Models.AlertStatus.Active) active alerts</p>
 
 <!-- FILTER BUTTONS -->
 <div class="alert-filters">
@@ -17,12 +18,17 @@
 
     <a asp-action="Index" asp-route-filter="Active"
        class="filter-btn @(filter=="Active"?"active":"")">
-        Active (@Model.Count(a => a.Status=="Active"))
+        Active (@Model.Count(a => a.Status == WebApp.Models.AlertStatus.Active))
+    </a>
+
+    <a asp-action="Index" asp-route-filter="Acknowledged"
+       class="filter-btn @(filter=="Acknowledged"?"active":"")">
+        Acknowledged (@Model.Count(a => a.Status == WebApp.Models.AlertStatus.Acknowledged))
     </a>
 
     <a asp-action="Index" asp-route-filter="Resolved"
        class="filter-btn @(filter=="Resolved"?"active":"")">
-        Resolved (@Model.Count(a => a.Status=="Resolved"))
+        Resolved (@Model.Count(a => a.Status == WebApp.Models.AlertStatus.Resolved))
     </a>
 </div>
 
@@ -31,54 +37,137 @@
 
 @foreach (var alert in Model)
 {
-    var isCritical = alert.Severity == "CRITICAL";
-    var isResolved = alert.Status == "Resolved";
+    var isCritical = alert.Severity == WebApp.Models.SeverityLevel.CRITICAL;
+    var isResolved = alert.Status == WebApp.Models.AlertStatus.Resolved;
 
-    <div class="alert-card @(isCritical ? "critical" : "warning") @(isResolved ? "resolved" : "")">
+    <div class="alert-card @(isCritical ? "critical" : "warning") @(isResolved ? "resolved" : "")"
+         onclick="openModal(
+            '@alert.Id',
+            '@alert.Title',
+            '@alert.Description',
+            '@alert.Location',
+            '@alert.Severity',
+            '@alert.CreatedAt.ToString("g")',
+            '@alert.Status'
+         )">
 
-        <!-- LEFT ICON -->
-        <div class="alert-icon">
-            ⚠
-        </div>
+        <!-- ICON -->
+        <div class="alert-icon">⚠</div>
 
         <!-- CONTENT -->
         <div class="alert-content">
             <div class="alert-header">
                 <h3>@alert.Title</h3>
 
-                <span class="badge severity @(isCritical ? "red" : "yellow")">
-                    @alert.Severity
+                <span class="badge @(isCritical ? "red" : "yellow")">
+                    @alert.Severity.ToString()
                 </span>
 
-                @if (isResolved)
-                {
-                    <span class="badge green">RESOLVED</span>
-                }
+                <span class="badge">
+                    @alert.Status.ToString()
+                </span>
             </div>
 
             <p>@alert.Description</p>
 
             <div class="alert-meta">
-                📷 @alert.Location
-                • ⏱ @((DateTime.Now - alert.CreatedAt).Minutes)m ago
+                📍 @alert.Location
+                • ⏱ @alert.MinutesAgo m ago
                 • @alert.CreatedAt.ToString("g")
             </div>
         </div>
 
-        <!-- ACTIONS -->
+        <!-- QUICK RESOLVE BUTTON -->
         <div class="alert-actions">
             @if (!isResolved)
             {
-                <form method="post" asp-action="Resolve">
+                <form method="post" asp-action="Resolve" onclick="event.stopPropagation();">
                     <input type="hidden" name="id" value="@alert.Id" />
-                    <button class="resolve-btn">Resolve</button>
+                    <button type="submit">Resolve</button>
                 </form>
             }
 
-            <button class="close-btn">✕</button>
+            <button onclick="event.stopPropagation();">✕</button>
         </div>
 
     </div>
 }
 
 </div>
+
+<!-- MODAL -->
+<div id="alertModal" style="display:none;">
+    <div>
+        <span onclick="closeModal()" style="cursor:pointer;">&times;</span>
+
+        <h2 id="modalTitle"></h2>
+
+        <p><strong>Status:</strong> <span id="modalStatus"></span></p>
+        <p><strong>Severity:</strong> <span id="modalSeverity"></span></p>
+        <p><strong>Location:</strong> <span id="modalLocation"></span></p>
+        <p><strong>Time:</strong> <span id="modalTime"></span></p>
+
+        <hr />
+
+        <p><strong>Description:</strong></p>
+        <p id="modalDescription"></p>
+
+        <hr />
+
+        <p><strong>Snapshot:</strong></p>
+        <img src="/images/sample.jpg" alt="snapshot" width="100%" />
+
+        <hr />
+
+        <!-- ACTION BUTTONS -->
+        <div>
+            <!-- ACKNOWLEDGE -->
+            <form method="post" asp-action="Acknowledge">
+                <input type="hidden" name="id" class="modalAlertId" />
+                <button type="submit">Acknowledge</button>
+            </form>
+
+            <!-- RESOLVE -->
+            <form method="post" asp-action="Resolve">
+                <input type="hidden" name="id" class="modalAlertId" />
+                <button type="submit">Resolve</button>
+            </form>
+
+            <!-- ESCALATE -->
+            <form method="post" asp-action="Escalate">
+                <input type="hidden" name="id" class="modalAlertId" />
+                <button type="submit">Escalate</button>
+            </form>
+
+            <!-- VIEW LIVE -->
+            <button onclick="viewLive()">View Live</button>
+        </div>
+    </div>
+</div>
+
+<!-- SCRIPT -->
+<script>
+function openModal(id, title, desc, location, severity, time, status) {
+    document.getElementById("alertModal").style.display = "block";
+
+    // Set all hidden inputs
+    document.querySelectorAll(".modalAlertId").forEach(input => {
+        input.value = id;
+    });
+
+    document.getElementById("modalTitle").innerText = title;
+    document.getElementById("modalDescription").innerText = desc;
+    document.getElementById("modalLocation").innerText = location;
+    document.getElementById("modalSeverity").innerText = severity;
+    document.getElementById("modalTime").innerText = time;
+    document.getElementById("modalStatus").innerText = status;
+}
+
+function closeModal() {
+    document.getElementById("alertModal").style.display = "none";
+}
+
+function viewLive() {
+    window.location.href = '/LiveMonitoring';
+}
+</script>

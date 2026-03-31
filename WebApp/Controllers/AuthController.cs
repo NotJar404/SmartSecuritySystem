@@ -1,15 +1,29 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
-using Microsoft.AspNetCore.Authentication;
+﻿using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Mvc;
+using SmartSecuritySystem.Models;
+using System;
+using System.Collections.Generic;
+using System.Security.Claims;
+using System.Threading.Tasks;
+using WebApp.Models;
+using WebApp.Services;
 
 namespace SmartSecuritySystem.Controllers
 {
     public class AuthController : Controller
     {
+        private readonly AuthService _authService;
+
+        public AuthController(AuthService authService)
+        {
+            _authService = authService;
+        }
+
         // =========================
         // GET: LOGIN
         // =========================
+        [HttpGet]
         public IActionResult Login()
         {
             return View();
@@ -21,150 +35,115 @@ namespace SmartSecuritySystem.Controllers
         [HttpPost]
         public async Task<IActionResult> Login(string username, string password, bool rememberMe)
         {
-            string role = null;
+            var (success, user) = _authService.ValidateUser(username, password);
 
-            // 🔥 TEMP USERS (Replace with DB)
-            if (username == "admin" && password == "1234")
-                role = "Admin";
-            else if (username == "security" && password == "1234")
-                role = "Security";
-
-            if (role != null)
+            if (!success)
             {
-                var claims = new List<Claim>
-                {
-                    new Claim(ClaimTypes.Name, username),
-                    new Claim(ClaimTypes.Role, role)
-                };
-
-                var identity = new ClaimsIdentity(
-                    claims,
-                    CookieAuthenticationDefaults.AuthenticationScheme);
-
-                var principal = new ClaimsPrincipal(identity);
-
-                var authProperties = new AuthenticationProperties
-                {
-                    IsPersistent = rememberMe,
-                    ExpiresUtc = rememberMe
-                        ? DateTime.UtcNow.AddDays(7)
-                        : DateTime.UtcNow.AddHours(1)
-                };
-
-                await HttpContext.SignInAsync(
-                    CookieAuthenticationDefaults.AuthenticationScheme,
-                    principal,
-                    authProperties);
-
-                // 🔁 REDIRECT BASED ON ROLE
-                if (role == "Admin")
-                    return RedirectToAction("Index", "Admin");
-                else
-                    return RedirectToAction("Index", "Dashboard");
+                ViewBag.Error = "Invalid username or password";
+                return View();
             }
 
-            ViewBag.Error = "Invalid username or password";
-            return View();
+            // Store user ID in session
+            HttpContext.Session.SetInt32("UserId", user.Id);
+
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.Name, user.Username),
+                new Claim(ClaimTypes.Role, user.Role)
+            };
+
+            var identity = new ClaimsIdentity(
+                claims,
+                CookieAuthenticationDefaults.AuthenticationScheme);
+
+            var principal = new ClaimsPrincipal(identity);
+
+            var authProperties = new AuthenticationProperties
+            {
+                IsPersistent = rememberMe,
+                ExpiresUtc = rememberMe
+                    ? DateTime.UtcNow.AddDays(7)
+                    : DateTime.UtcNow.AddHours(1)
+            };
+
+            await HttpContext.SignInAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                principal,
+                authProperties);
+
+            // Redirect based on role
+            return user.Role == "Admin"
+                ? RedirectToAction("Index", "Admin")
+                : RedirectToAction("Index", "Dashboard");
         }
 
         // =========================
         // LOGOUT
         // =========================
+        [HttpGet]
         public async Task<IActionResult> Logout()
         {
+            HttpContext.Session.Clear();
             await HttpContext.SignOutAsync();
             return RedirectToAction("Login");
         }
 
         // =========================
-        // GET: FORGOT PASSWORD
+        // GET: PROFILE
         // =========================
         [HttpGet]
-        public IActionResult ForgotPassword()
+        public IActionResult Profile()
         {
-            return View();
+            var user = _authService.GetCurrentUser(HttpContext);
+            if (user == null) return RedirectToAction("Login");
+
+            return View(user);
         }
 
         // =========================
-        // POST: FORGOT PASSWORD
+        // POST: PROFILE (update name, role, picture)
         // =========================
         [HttpPost]
-        public IActionResult ForgotPassword(string email)
+        public IActionResult UpdateProfile(int id, string name, string role)
         {
-            if (string.IsNullOrEmpty(email))
-            {
-                ViewBag.Error = "Email is required";
-                return View();
-            }
+            var user = _authService.GetCurrentUser(HttpContext);
+            if (user == null) return RedirectToAction("Login");
 
-            // 🔥 TEMP USER CHECK (Replace with DB)
-            if (email == "admin@email.com")
-            {
-                // 🔐 GENERATE TOKEN
-                var token = Guid.NewGuid().ToString();
+            user.Name = name;
+            user.Role = role;
 
-                // 👉 In real system:
-                // Save token to DB with expiry + user
-
-                // 🔗 CREATE RESET LINK
-                var resetLink = Url.Action(
-                    "ResetPassword",
-                    "Auth",
-                    new { token = token },
-                    Request.Scheme);
-
-                // 👉 SEND EMAIL HERE (later)
-                Console.WriteLine("RESET LINK: " + resetLink);
-
-                ViewBag.Message = "Password reset link has been sent to your email.";
-            }
-            else
-            {
-                ViewBag.Error = "Email not found";
-            }
-
-            return View();
+            TempData["Success"] = "Profile updated successfully!";
+            return RedirectToAction("Profile");
         }
 
         // =========================
-        // GET: RESET PASSWORD
-        // =========================
-        [HttpGet]
-        public IActionResult ResetPassword(string token)
-        {
-            if (string.IsNullOrEmpty(token))
-            {
-                return RedirectToAction("Login");
-            }
-
-            // 👉 In real system:
-            // Validate token from DB
-
-            ViewBag.Token = token;
-            return View();
-        }
-
-        // =========================
-        // POST: RESET PASSWORD
+        // POST: CHANGE PASSWORD
         // =========================
         [HttpPost]
-        public IActionResult ResetPassword(string token, string newPassword)
+        public IActionResult ChangePassword(Changepass model)
         {
-            if (string.IsNullOrEmpty(token) || string.IsNullOrEmpty(newPassword))
+            var user = _authService.GetCurrentUser(HttpContext);
+            if (user == null) return RedirectToAction("Login");
+
+            // Validate model
+            if (!ModelState.IsValid)
             {
-                ViewBag.Error = "Invalid request";
-                return View();
+                TempData["PasswordError"] = "Invalid input";
+                return RedirectToAction("Profile");
             }
 
-            // 👉 In real system:
-            // 1. Validate token
-            // 2. Get user
-            // 3. Hash password
-            // 4. Save to DB
-            // 5. Delete token
+            // Check current password
+            if (!_authService.VerifyPassword(user, model.CurrentPassword))
+            {
+                TempData["PasswordError"] = "Current password is incorrect";
+                return RedirectToAction("Profile");
+            }
 
-            ViewBag.Message = "Password successfully reset!";
-            return View();
+            // Update password
+            _authService.UpdatePassword(user.Id, model.NewPassword);
+
+            TempData["PasswordSuccess"] = "Password updated successfully!";
+            return RedirectToAction("Profile");
         }
     }
 }

@@ -4,186 +4,211 @@
     <meta charset="utf-8" />
     <title>@ViewData["Title"] - SecureVision</title>
 
-    <!-- CSS -->
     <link rel="stylesheet" href="~/css/dashboard.css" />
     <link rel="stylesheet" href="~/css/admin.css" />
-    <link rel="stylesheet" href="~/css/access.css" />
+    <link rel="stylesheet" href="~/css/shared.css" />
+    <link rel="stylesheet" href="~/css/profile.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 </head>
 
 <body>
-    <div class="dashboard">
+<div class="dashboard">
 
-        <!-- SIDEBAR -->
-        <div class="sidebar">
+    <!-- SIDEBAR -->
+    <div class="sidebar">
 
-            <!-- LOGO -->
-            <div class="logo">
-                <div class="logo-icon">
-                    <i class="fa fa-shield-halved"></i>
-                </div>
-                <div>
-                    <h2>SecureVision</h2>
-                    <p>Quezon City University</p>
-                </div>
+        <div class="logo">
+            <div class="logo-icon">
+                <i class="fa fa-shield-halved"></i>
             </div>
-
-            <!-- NAV -->
-            <ul>
-
-                @* ================= ADMIN NAV ================= *@
-                @if (User.IsInRole("Admin"))
-                {
-                    <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Admin" ? "active" : "")">
-                        <a asp-controller="Admin" asp-action="Index">
-                            <i class="fa fa-chart-line"></i> Dashboard
-                        </a>
-                    </li>
-
-                    <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Cameras" ? "active" : "")">
-                        <a asp-controller="Cameras" asp-action="Index">
-                            <i class="fa fa-video"></i> Live Monitoring
-                        </a>
-                    </li>
-
-                    <!-- 🔥 NEW ACCESS -->
-                    <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Access" ? "active" : "")">
-                        <a asp-controller="Access" asp-action="Index">
-                            <i class="fa fa-id-card"></i> Access Monitoring
-                        </a>
-                    </li>
-
-                    <li class="nav-item @(ViewContext.RouteData.Values["action"]?.ToString() == "Personnel" ? "active" : "")">
-                        <a asp-controller="Admin" asp-action="Personnel">
-                            <i class="fa fa-users"></i> Personnel
-                        </a>
-                    </li>
-
-                    <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Logs" ? "active" : "")">
-                        <a asp-controller="Logs" asp-action="Index">
-                            <i class="fa fa-file-lines"></i> Activity Logs
-                        </a>
-                    </li>
-
-                    <li class="nav-item @(ViewContext.RouteData.Values["action"]?.ToString() == "System" ? "active" : "")">
-                        <a asp-controller="Admin" asp-action="System">
-                            <i class="fa fa-gear"></i> System Settings
-                        </a>
-                    </li>
-                }
-
-                @* ================= SECURITY NAV ================= *@
-                else if (User.IsInRole("Security"))
-                {
-                    <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Dashboard" ? "active" : "")">
-                        <a asp-controller="Dashboard" asp-action="Index">
-                            <i class="fa fa-home"></i> Dashboard
-                        </a>
-                    </li>
-
-                    <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Cameras" ? "active" : "")">
-                        <a asp-controller="Cameras" asp-action="Index">
-                            <i class="fa fa-video"></i> Live Monitoring
-                        </a>
-                    </li>
-
-                    <!-- 🔥 ACCESS MONITORING (IMPORTANT) -->
-                    <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Access" ? "active" : "")">
-                        <a asp-controller="Access" asp-action="Index">
-                            <i class="fa fa-id-badge"></i> Access Monitoring
-                        </a>
-                    </li>
-
-                    <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Alerts" ? "active" : "")">
-                        <a asp-controller="Alerts" asp-action="Index">
-                            <i class="fa fa-bell"></i> Alerts
-                        </a>
-                    </li>
-
-                    <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Logs" ? "active" : "")">
-                        <a asp-controller="Logs" asp-action="Index">
-                            <i class="fa fa-file"></i> Logs
-                        </a>
-                    </li>
-                }
-
-            </ul>
-
-            <!-- FOOTER -->
-            <div class="sidebar-footer">
-                <span class="status-dot online"></span>
-                <div>
-                    System Status<br />
-                    <small>All systems operational</small>
-                </div>
+            <div>
+                <h2>SecureVision</h2>
+                <p>Quezon City University</p>
             </div>
-
         </div>
 
-        <!-- MAIN -->
-        <div class="main">
-
-            <!-- TOPBAR -->
-            <div class="topbar">
-
-                <div class="top-left">
-                    <h3>@ViewData["Title"]</h3>
-                </div>
-
-                <div class="top-center">
-                    @DateTime.Now.ToString("dddd, MMMM dd, yyyy")
-                </div>
-
-                <div class="top-right">
-
-                    <!-- LIVE TIME -->
-                    <span id="liveTime"></span>
-
-                    <!-- 🔥 ALERT ICON WITH BADGE -->
-                    <div class="notif">
-                        <i class="fa fa-bell"></i>
-                        <span class="notif-badge">1</span>
-                    </div>
-
-                    <!-- USER -->
-                    <div class="user">
-                        <div class="avatar">
-                            @(User.Identity?.Name?.Substring(0,1).ToUpper() ?? "U")
-                        </div>
-                        <div>
-                            <strong>@User.Identity?.Name</strong>
-                            <small>@(User.IsInRole("Admin") ? "Administrator" : "Security Personnel")</small>
-                        </div>
-                    </div>
-
-                </div>
-
+        <!-- PROFILE -->
+        <a asp-controller="Profile" asp-action="Index" class="profile-card">
+            <div class="profile-avatar">
+                @(User.Identity?.Name?.Substring(0,1).ToUpper() ?? "U")
             </div>
+            <div class="profile-info">
+                <strong>@User.Identity?.Name</strong>
+                <small>
+                    @(User.IsInRole("Admin") ? "Administrator" : "Security Personnel")
+                </small>
+            </div>
+        </a>
 
-            <!-- CONTENT -->
-            @RenderBody()
+        <!-- NAV -->
+        <ul>
+            @if (User.IsInRole("Admin"))
+            {
+                <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Admin" ? "active" : "")">
+                    <a asp-controller="Admin" asp-action="Index">
+                        <i class="fa fa-chart-line"></i> Dashboard
+                    </a>
+                </li>
 
+                <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Cameras" ? "active" : "")">
+                    <a asp-controller="Cameras" asp-action="Index">
+                        <i class="fa fa-video"></i> Live Monitoring
+                    </a>
+                </li>
+
+                <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Access" ? "active" : "")">
+                    <a asp-controller="Access" asp-action="Index">
+                        <i class="fa fa-id-card"></i> Access Monitoring
+                    </a>
+                </li>
+
+                <li class="nav-item @(ViewContext.RouteData.Values["action"]?.ToString() == "Personnel" ? "active" : "")">
+                    <a asp-controller="Admin" asp-action="Personnel">
+                        <i class="fa fa-users"></i> Personnel
+                    </a>
+                </li>
+
+                <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Logs" ? "active" : "")">
+                    <a asp-controller="Logs" asp-action="Index">
+                        <i class="fa fa-file-lines"></i> Activity Logs
+                    </a>
+                </li>
+
+                <li class="nav-item @(ViewContext.RouteData.Values["action"]?.ToString() == "System" ? "active" : "")">
+                    <a asp-controller="Admin" asp-action="System">
+                        <i class="fa fa-gear"></i> System Settings
+                    </a>
+                </li>
+            }
+            else if (User.IsInRole("Security"))
+            {
+                <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Dashboard" ? "active" : "")">
+                    <a asp-controller="Dashboard" asp-action="Index">
+                        <i class="fa fa-home"></i> Dashboard
+                    </a>
+                </li>
+
+                <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Cameras" ? "active" : "")">
+                    <a asp-controller="Cameras" asp-action="Index">
+                        <i class="fa fa-video"></i> Live Monitoring
+                    </a>
+                </li>
+
+                <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Access" ? "active" : "")">
+                    <a asp-controller="Access" asp-action="Index">
+                        <i class="fa fa-id-badge"></i> Access Monitoring
+                    </a>
+                </li>
+
+                <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Alerts" ? "active" : "")">
+                    <a asp-controller="Alerts" asp-action="Index">
+                        <i class="fa fa-bell"></i> Alerts
+                    </a>
+                </li>
+
+                <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Logs" ? "active" : "")">
+                    <a asp-controller="Logs" asp-action="Index">
+                        <i class="fa fa-file"></i> Logs
+                    </a>
+                </li>
+            }
+        </ul>
+
+        <!-- LOGOUT -->
+        <div class="sidebar-footer">
+            <a href="#" onclick="confirmLogout()" class="logout-btn">
+                <i class="fa fa-right-from-bracket"></i> Logout
+            </a>
         </div>
+
     </div>
 
-    @RenderSection("Scripts", required: false)
+    <!-- MAIN -->
+    <div class="main">
 
-    <!-- 🔥 LIVE CLOCK -->
-    <script>
-        function updateTime() {
-            const now = new Date();
-            document.getElementById('liveTime').textContent =
-                now.toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                    hour12: true
-                });
-        }
+        <div class="topbar">
+            <div class="top-left">
+                <h3>@ViewData["Title"]</h3>
+            </div>
 
-        setInterval(updateTime, 1000);
-        updateTime();
-    </script>
+            <div class="top-center">
+                @DateTime.Now.ToString("dddd, MMMM dd, yyyy")
+            </div>
+
+            <div class="top-right">
+                <span id="liveTime"></span>
+
+                <!-- 🔥 THEME TOGGLE -->
+                <div class="theme-toggle" onclick="toggleTheme()" id="themeToggle">
+                    <i id="themeIcon" class="fa fa-moon"></i>
+                </div>
+
+                <a asp-controller="Alerts" asp-action="Index" class="notif">
+                    <i class="fa fa-bell"></i>
+                    <span class="notif-badge">1</span>
+                </a>
+            </div>
+        </div>
+
+        @RenderBody()
+
+    </div>
+</div>
+
+@RenderSection("Scripts", required: false)
+
+<script>
+/* 🕒 TIME */
+function updateTime() {
+    const now = new Date();
+    document.getElementById('liveTime').textContent =
+        now.toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true
+        });
+}
+setInterval(updateTime, 1000);
+updateTime();
+
+/* 🌙 THEME TOGGLE */
+function toggleTheme() {
+    const body = document.body;
+    const icon = document.getElementById("themeIcon");
+
+    body.classList.toggle("light-mode");
+
+    if (body.classList.contains("light-mode")) {
+        icon.classList.replace("fa-moon", "fa-sun");
+        localStorage.setItem("theme", "light");
+    } else {
+        icon.classList.replace("fa-sun", "fa-moon");
+        localStorage.setItem("theme", "dark");
+    }
+}
+
+/* LOAD THEME ON START */
+window.onload = function () {
+    const savedTheme = localStorage.getItem("theme");
+    const icon = document.getElementById("themeIcon");
+
+    if (savedTheme === "light") {
+        document.body.classList.add("light-mode");
+        icon.classList.replace("fa-moon", "fa-sun");
+    } else {
+        document.body.classList.remove("light-mode");
+        icon.classList.replace("fa-sun", "fa-moon");
+    }
+};
+
+/* 🔓 LOGOUT */
+function confirmLogout() {
+    if (confirm("Are you sure you want to logout?")) {
+        window.location.href = '/Auth/Logout';
+    }
+}
+</script>
 
 </body>
 </html>

@@ -1,0 +1,366 @@
+﻿
+/* ========================================================= */
+/* ==================== CAMERA UI (UPDATED) ================= */
+/* ========================================================= */
+
+.camera-page {
+    color: #e5e7eb;
+    padding: 20px;
+}
+
+/* ========================================================= */
+/* ===================== HEADER ============================= */
+/* ========================================================= */
+
+.camera-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 28px;
+}
+
+    .camera-topbar h1 {
+        font-size: 22px;
+        font-weight: 600;
+        margin: 0;
+    }
+
+    .camera-topbar p {
+        color: #64748b;
+        font-size: 13px;
+        margin-top: 4px;
+    }
+
+/* ACTIONS */
+
+.top-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+    .top-actions button {
+        background: #0f172a;
+        border: 1px solid #1e293b;
+        color: #cbd5f5;
+        padding: 8px 14px;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: 0.2s;
+    }
+
+        .top-actions button:hover {
+            background: #1e293b;
+        }
+
+.add-btn {
+    background: #2563eb !important;
+    color: white;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 12px;
+    font-weight: 500;
+}
+
+    .add-btn:hover {
+        background: #1d4ed8 !important;
+    }
+
+/* ========================================================= */
+/* ===================== GRID VIEW ========================== */
+/* ========================================================= */
+
+.live-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 20px;
+}
+
+/* CARD */
+
+.live-card {
+    background: linear-gradient(145deg, #0f172a, #020617);
+    border: 1px solid #1e293b;
+    border-radius: 18px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+
+    .live-card:hover {
+        transform: translateY(-4px);
+        border-color: #2563eb;
+        box-shadow: 0 10px 30px rgba(37, 99, 235, 0.2);
+    }
+
+/* TOP */
+
+.live-top {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+    .live-top span:first-child {
+        font-weight: 600;
+    }
+
+.status {
+    margin-left: auto;
+    background: rgba(34,197,94,0.15);
+    color: #22c55e;
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 999px;
+}
+
+/* BODY */
+
+.live-body {
+    height: 200px;
+    border-radius: 14px;
+    background: radial-gradient(circle, #111827, #020617);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+}
+
+    .live-body i {
+        font-size: 40px;
+        opacity: 0.15;
+    }
+
+    .live-body div {
+        font-size: 13px;
+        color: #64748b;
+    }
+
+/* FOOTER */
+
+.live-footer {
+    margin-top: 10px;
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+/* ========================================================= */
+/* ===================== FOCUS VIEW ========================= */
+/* ========================================================= */
+
+.camera-layout {
+    display: flex;
+    gap: 24px;
+}
+
+/* LEFT PANEL */
+
+.camera-list {
+    width: 300px;
+}
+
+.camera-card {
+    background: #020617;
+    border: 1px solid #1e293b;
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+    .camera-card:hover {
+        border-color: #2563eb;
+    }
+
+    .camera-card.active {
+        background: linear-gradient(145deg, #2563eb, #1d4ed8);
+        border: none;
+    }
+
+/* ========================================================= */
+/* ===================== RIGHT VIEW ========================= */
+/* ========================================================= */
+
+.camera-view {
+    flex: 1;
+}
+
+/* HEADER */
+
+.view-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+    .view-header h2 {
+        margin: 0;
+        font-size: 18px;
+    }
+
+    .view-header p {
+        font-size: 13px;
+        color: #64748b;
+    }
+
+    /* FULLSCREEN BUTTON */
+
+    .view-header button {
+        background: #0f172a;
+        border: none;
+        padding: 10px;
+        border-radius: 10px;
+        color: white;
+        cursor: pointer;
+    }
+
+/* ========================================================= */
+/* ===================== VIDEO ============================== */
+/* ========================================================= */
+
+.video-container {
+    height: 380px;
+    border-radius: 18px;
+    background: radial-gradient(circle at center, #111827, #020617);
+    border: 1px solid #1e293b;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* LIVE BADGE */
+
+.live-badge {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    background: #ef4444;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* TIME */
+
+.time {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: black;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+}
+
+/* CAMERA ICON */
+
+.camera-placeholder i {
+    font-size: 70px;
+    opacity: 0.1;
+}
+
+/* OVERLAY */
+
+.camera-overlay {
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+    background: rgba(0,0,0,0.6);
+    padding: 12px;
+    border-radius: 10px;
+    font-size: 12px;
+}
+
+/* RECORDING */
+
+.recording {
+    position: absolute;
+    bottom: 16px;
+    right: 16px;
+    color: #ef4444;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+/* ========================================================= */
+/* ===================== MODAL ============================== */
+/* ========================================================= */
+
+.modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+.modal-content {
+    width: 420px;
+    max-height: 90vh;
+    background: #020617;
+    border-radius: 16px;
+    border: 1px solid #1e293b;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* HEADER */
+
+.modal-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #1e293b;
+    display: flex;
+    justify-content: space-between;
+}
+
+.close {
+    cursor: pointer;
+    font-size: 22px;
+}
+
+/* BODY */
+
+.modal-body {
+    padding: 16px 20px;
+    overflow-y: auto;
+}
+
+/* INPUTS */
+
+input, select {
+    width: 100%;
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    color: #e5e7eb;
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 14px;
+}
+
+/* FOOTER */
+
+.modal-footer {
+    padding: 14px 20px;
+    border-top: 1px solid #1e293b;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+button.cancel {
+    background: #1e293b;
+    color: #cbd5f5;
+}
+
+button.save {
+    background: #2563eb;
+    color: white;
+}

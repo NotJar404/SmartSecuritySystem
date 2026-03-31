@@ -1,0 +1,351 @@
+﻿/* ============================= */
+/* RESET & GLOBAL */
+/* ============================= */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #020617;
+    color: #ffffff;
+}
+
+/* ============================= */
+/* DASHBOARD & GENERAL LAYOUT */
+/* ============================= */
+.dashboard {
+    display: flex;
+    min-height: 100vh;
+}
+
+.main {
+    flex: 1;
+    padding: 30px 36px;
+    overflow-y: auto;
+}
+
+/* ============================= */
+/* SIDEBAR */
+/* ============================= */
+.sidebar {
+    width: 260px;
+    background: #0f172a;
+    padding: 20px 15px;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid rgba(255,255,255,0.05);
+}
+
+/* LOGO */
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 25px;
+}
+
+.logo-icon {
+    background: #2563eb;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+}
+
+.logo h2 {
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.logo p {
+    font-size: 0.7rem;
+    color: #94a3b8;
+}
+
+/* ============================= */
+/* PROFILE CARD */
+/* ============================= */
+.profile-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+    margin-bottom: 20px;
+    border-radius: 12px;
+    text-decoration: none;
+    background: #111827;
+    color: #fff;
+    transition: all 0.2s ease;
+}
+
+    .profile-card:hover {
+        background: #1f2937;
+    }
+
+.profile-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: #2563eb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1rem;
+}
+
+.profile-info strong {
+    font-size: 0.9rem;
+}
+
+.profile-info small {
+    display: block;
+    font-size: 0.7rem;
+    color: #94a3b8;
+}
+
+/* ============================= */
+/* NAVIGATION */
+/* ============================= */
+.sidebar ul {
+    list-style: none;
+    margin-top: 10px;
+    flex: 1;
+}
+
+.nav-item {
+    margin-bottom: 6px;
+}
+
+    .nav-item a {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 14px;
+        border-radius: 10px;
+        text-decoration: none;
+        color: #94a3b8;
+        font-size: 0.9rem;
+        transition: all 0.2s ease;
+    }
+
+    /* ACTIVE */
+    .nav-item.active a {
+        background: #f97316; /* orange like your UI */
+        color: #fff;
+        font-weight: 500;
+    }
+
+    /* HOVER */
+    .nav-item a:hover {
+        background: rgba(249, 115, 22, 0.15);
+        color: #fff;
+    }
+
+/* ============================= */
+/* SIDEBAR FOOTER */
+/* ============================= */
+.sidebar-footer {
+    padding-top: 15px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* THEME BUTTON */
+.theme-toggle {
+    background: #1f2937;
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #94a3b8;
+}
+
+    .theme-toggle:hover {
+        background: #374151;
+    }
+
+/* LOGOUT */
+.logout-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #ef4444;
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+    .logout-btn:hover {
+        opacity: 0.8;
+    }
+
+/* ============================= */
+/* TOPBAR */
+/* ============================= */
+.topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.top-left h3 {
+    font-size: 1.3rem;
+    font-weight: 600;
+}
+
+.top-center {
+    color: #94a3b8;
+    font-size: 0.85rem;
+}
+
+.top-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+/* TIME */
+#liveTime {
+    font-size: 0.9rem;
+    color: #e2e8f0;
+}
+
+/* NOTIFICATION */
+.notif {
+    position: relative;
+    cursor: pointer;
+}
+
+    .notif i {
+        font-size: 1.1rem;
+    }
+
+.notif-badge {
+    position: absolute;
+    top: -6px;
+    right: -8px;
+    background: #ef4444;
+    color: #fff;
+    font-size: 0.6rem;
+    padding: 2px 6px;
+    border-radius: 999px;
+}
+
+/* ============================= */
+/* USER (OPTIONAL IF USED) */
+/* ============================= */
+.user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.avatar {
+    width: 36px;
+    height: 36px;
+    background: #2563eb;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ============================= */
+/* PAGE TITLE */
+/* ============================= */
+.page-title {
+    font-size: 1.6rem;
+    font-weight: 600;
+    margin-bottom: 20px;
+}
+
+/* ============================= */
+/* THEME TOGGLE (TOPBAR) */
+/* ============================= */
+.theme-toggle {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: #1f2937;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #e5e7eb;
+    transition: 0.2s;
+}
+
+    .theme-toggle:hover {
+        background: #374151;
+    }
+
+/* ============================= */
+/* NOTIFICATION LINK FIX */
+/* ============================= */
+.notif {
+    position: relative;
+    cursor: pointer;
+    color: white;
+    text-decoration: none;
+}
+
+/* ============================= */
+/* LIGHT MODE */
+/* ============================= */
+body.light-mode {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+    /* SIDEBAR */
+    body.light-mode .sidebar {
+        background: #ffffff;
+        color: #0f172a;
+    }
+
+    body.light-mode .nav-item a {
+        color: #334155;
+    }
+
+        body.light-mode .nav-item a:hover {
+            background: #e2e8f0;
+        }
+
+    body.light-mode .nav-item.active a {
+        background: #f97316;
+        color: white;
+    }
+
+    /* PROFILE */
+    body.light-mode .profile-card {
+        background: #f1f5f9;
+        color: #0f172a;
+    }
+
+        body.light-mode .profile-card:hover {
+            background: #e2e8f0;
+        }
+
+    /* TOPBAR */
+    body.light-mode .top-center {
+        color: #64748b;
+    }
+
+    /* THEME BUTTON */
+    body.light-mode .theme-toggle {
+        background: #e2e8f0;
+        color: #0f172a;
+    }

@@ -1,0 +1,256 @@
+﻿/* ============================= */
+/* ALERT PAGE STYLING - HCI FRIENDLY */
+/* ============================= */
+
+/* ----------------------------- */
+/* FILTER BUTTONS */
+/* ----------------------------- */
+.alert-filters {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 25px;
+    flex-wrap: wrap;
+}
+
+.filter-btn {
+    padding: 8px 16px;
+    background: #1f2937;
+    border-radius: 12px;
+    color: #cbd5f5;
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.2s ease-in-out;
+}
+
+    .filter-btn:hover {
+        background: #374151;
+        color: #f9fafb;
+    }
+
+    .filter-btn.active {
+        background: #2563eb;
+        color: #ffffff;
+        box-shadow: 0 4px 10px rgba(37, 99, 235, 0.4);
+    }
+
+/* ----------------------------- */
+/* ALERT LIST CONTAINER */
+/* ----------------------------- */
+.alerts-container {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+/* ----------------------------- */
+/* ALERT CARD */
+/* ----------------------------- */
+.alert-card {
+    display: flex;
+    gap: 15px;
+    padding: 20px 25px;
+    border-radius: 16px;
+    align-items: flex-start;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+    .alert-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+    }
+
+    /* CARD COLORS BASED ON SEVERITY */
+    .alert-card.critical {
+        background: #7f1d1d; /* dark red */
+        border-left: 5px solid #ef4444; /* bright red */
+        color: #fef2f2;
+    }
+
+    .alert-card.warning {
+        background: #78350f; /* dark orange */
+        border-left: 5px solid #f97316; /* bright orange */
+        color: #fffbeb;
+    }
+
+    .alert-card.resolved {
+        opacity: 0.6;
+        filter: grayscale(30%);
+    }
+
+/* ----------------------------- */
+/* ALERT ICON */
+/* ----------------------------- */
+.alert-icon {
+    font-size: 28px;
+    background: rgba(255,255,255,0.1);
+    padding: 16px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ----------------------------- */
+/* ALERT CONTENT */
+/* ----------------------------- */
+.alert-content {
+    flex: 1;
+}
+
+.alert-header {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+    .alert-header h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+    }
+
+.badge {
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #fff;
+    text-transform: uppercase;
+}
+
+/* BADGE COLORS BASED ON SEVERITY/STATUS */
+.red {
+    background: #ef4444;
+}
+
+.yellow {
+    background: #f97316;
+}
+
+.green {
+    background: #16a34a;
+}
+
+.alert-meta {
+    margin-top: 6px;
+    font-size: 13px;
+    color: #94a3b8;
+}
+
+/* ----------------------------- */
+/* ALERT ACTIONS (RESOLVE / CLOSE) */
+/* ----------------------------- */
+.alert-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+    .alert-actions button,
+    .alert-actions .resolve-btn {
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-weight: 500;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+        .alert-actions button:hover,
+        .alert-actions .resolve-btn:hover {
+            opacity: 0.85;
+        }
+
+/* QUICK RESOLVE BUTTON */
+.resolve-btn {
+    background: #16a34a;
+    color: #fff;
+}
+
+/* CLOSE BUTTON */
+.close-btn {
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 18px;
+}
+
+/* ----------------------------- */
+/* MODAL STYLING */
+/* ----------------------------- */
+#alertModal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.55);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 999;
+}
+
+    #alertModal > div {
+        background: #1f2937;
+        padding: 25px 30px;
+        border-radius: 18px;
+        width: 90%;
+        max-width: 600px;
+        color: #f9fafb;
+        position: relative;
+    }
+
+    #alertModal span {
+        position: absolute;
+        top: 15px;
+        right: 20px;
+        font-size: 24px;
+        cursor: pointer;
+        color: #fef2f2;
+        transition: all 0.2s ease;
+    }
+
+        #alertModal span:hover {
+            color: #f87171;
+        }
+
+    #alertModal h2 {
+        margin-top: 0;
+        font-size: 22px;
+        margin-bottom: 15px;
+    }
+
+    #alertModal img {
+        border-radius: 12px;
+        margin-top: 10px;
+    }
+
+    #alertModal form button,
+    #alertModal button {
+        margin-top: 10px;
+        padding: 8px 14px;
+        border-radius: 10px;
+        border: none;
+        cursor: pointer;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+        #alertModal form button:hover,
+        #alertModal button:hover {
+            opacity: 0.85;
+        }
+
+    #alertModal form button {
+        width: 100%;
+        margin-bottom: 8px;
+    }
+
+    #alertModal button {
+        width: 100%;
+        background: #2563eb;
+        color: #fff;
+    }

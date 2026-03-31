@@ -1,22 +1,16 @@
-using Microsoft.AspNetCore.Authentication.Cookies;
+﻿using Microsoft.AspNetCore.Authentication.Cookies;
 using WebApp.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// =========================
+// ADD SERVICES
+// =========================
+
+// Add MVC controllers + views
 builder.Services.AddControllersWithViews();
 
-// ?? ADD AUTHENTICATION (REQUIRED)
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-    .AddCookie(options =>
-    {
-        options.LoginPath = "/Auth/Login";
-        options.AccessDeniedPath = "/Auth/Login";
-    });
-
-builder.Services.AddAuthorization();
-
-// ? SESSION (you can keep this if needed)
+// Add session support
 builder.Services.AddSession(options =>
 {
     options.IdleTimeout = TimeSpan.FromMinutes(30);
@@ -24,12 +18,29 @@ builder.Services.AddSession(options =>
     options.Cookie.IsEssential = true;
 });
 
-// ? YOUR SERVICES
-builder.Services.AddScoped<SystemService>();
+// Add authentication (cookies)
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/Auth/Login";          // Redirect if not logged in
+        options.AccessDeniedPath = "/Auth/Login";   // Redirect if role denied
+    });
 
+// Add authorization
+builder.Services.AddAuthorization();
+
+// Add your services
+builder.Services.AddSingleton<AuthService>();  // 🔹 In-memory AuthService
+builder.Services.AddScoped<SystemService>();   // Your other service
+
+// =========================
+// BUILD APP
+// =========================
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// =========================
+// MIDDLEWARE
+// =========================
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
@@ -41,14 +52,18 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
-// ? ORDER MATTERS ??
-app.UseSession();          // optional
-app.UseAuthentication();   // ?? REQUIRED
-app.UseAuthorization();    // ?? REQUIRED
+app.UseSession();          // must be BEFORE auth
+app.UseAuthentication();   // must be BEFORE authorization
+app.UseAuthorization();
 
+// =========================
 // ROUTES
+// =========================
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Auth}/{action=Login}/{id?}");
 
+// =========================
+// RUN
+// =========================
 app.Run();

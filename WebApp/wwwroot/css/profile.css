@@ -1,0 +1,147 @@
+﻿/* ============================= */
+/* PROFILE PAGE */
+/* ============================= */
+
+.profile-container {
+    display: flex;
+    gap: 40px;
+    background: #0f172a;
+    padding: 25px;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.05);
+}
+
+/* LEFT SIDE */
+.profile-left {
+    width: 220px;
+    text-align: center;
+}
+
+.profile-img {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid #2563eb;
+    margin-bottom: 15px;
+}
+
+/* FILE INPUT */
+.file-input {
+    width: 100%;
+    margin-bottom: 10px;
+    font-size: 0.8rem;
+}
+
+/* RIGHT SIDE */
+.profile-right {
+    flex: 1;
+}
+
+/* FORM */
+.form-group {
+    margin-bottom: 15px;
+}
+
+    .form-group label {
+        font-size: 0.8rem;
+        color: #94a3b8;
+        display: block;
+        margin-bottom: 4px;
+    }
+
+    .form-group input {
+        width: 100%;
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid #1f2937;
+        background: #020617;
+        color: #fff;
+    }
+
+/* READONLY */
+.readonly {
+    background: #111827 !important;
+    color: #94a3b8;
+}
+
+/* BUTTONS */
+.btn {
+    padding: 10px 16px;
+    border-radius: 8px;
+    border: none;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+    .btn.primary {
+        background: #2563eb;
+        color: #fff;
+    }
+
+        .btn.primary:hover {
+            background: #1d4ed8;
+        }
+
+    .btn.danger {
+        background: #ef4444;
+        color: #fff;
+    }
+
+        .btn.danger:hover {
+            background: #dc2626;
+        }
+
+/* ALERTS */
+.alert {
+    padding: 10px 14px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    font-size: 0.85rem;
+}
+
+    .alert.success {
+        background: rgba(34,197,94,0.15);
+        color: #22c55e;
+    }
+
+    .alert.error {
+        background: rgba(239,68,68,0.15);
+        color: #ef4444;
+    }
+
+/* PASSWORD SECTION */
+.password-form {
+    max-width: 400px;
+}
+
+/* TITLES */
+.section-title {
+    margin-bottom: 15px;
+    font-weight: 500;
+}
+
+.divider {
+    margin: 30px 0;
+    border: 1px solid rgba(255,255,255,0.05);
+}
+
+/* ============================= */
+/* LIGHT MODE SUPPORT */
+/* ============================= */
+
+body.light-mode .profile-container {
+    background: #ffffff;
+}
+
+body.light-mode .form-group input {
+    background: #f1f5f9;
+    color: #0f172a;
+    border: 1px solid #e2e8f0;
+}
+
+body.light-mode .readonly {
+    background: #e2e8f0 !important;
+    color: #475569;
+}
