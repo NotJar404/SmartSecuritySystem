@@ -56,12 +56,6 @@
                     </a>
                 </li>
 
-                <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Access" ? "active" : "")">
-                    <a asp-controller="Access" asp-action="Index">
-                        <i class="fa fa-id-card"></i> Access Monitoring
-                    </a>
-                </li>
-
                 <li class="nav-item @(ViewContext.RouteData.Values["action"]?.ToString() == "Personnel" ? "active" : "")">
                     <a asp-controller="Admin" asp-action="Personnel">
                         <i class="fa fa-users"></i> Personnel

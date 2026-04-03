@@ -2,6 +2,7 @@
 
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Alerts";
     var filter = ViewBag.Filter as string ?? "All";
 }
 <link rel="stylesheet" href="~/css/alert.css" />
@@ -96,51 +97,62 @@
 </div>
 
 <!-- MODAL -->
-<div id="alertModal" style="display:none;">
+<div id="alertModal">
     <div>
         <span onclick="closeModal()" style="cursor:pointer;">&times;</span>
 
         <h2 id="modalTitle"></h2>
 
-        <p><strong>Status:</strong> <span id="modalStatus"></span></p>
-        <p><strong>Severity:</strong> <span id="modalSeverity"></span></p>
-        <p><strong>Location:</strong> <span id="modalLocation"></span></p>
-        <p><strong>Time:</strong> <span id="modalTime"></span></p>
+        <!-- ALERT INFORMATION SECTION -->
+        <div class="section">
+            <div class="info-row">
+                <span class="info-label">Status:</span>
+                <span id="modalStatus"></span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Severity:</span>
+                <span id="modalSeverity"></span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Location:</span>
+                <span id="modalLocation"></span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Time:</span>
+                <span id="modalTime"></span>
+            </div>
+        </div>
 
-        <hr />
+        <!-- DESCRIPTION SECTION -->
+        <div class="section">
+            <h4 class="section-title">Description</h4>
+            <p id="modalDescription"></p>
+        </div>
 
-        <p><strong>Description:</strong></p>
-        <p id="modalDescription"></p>
+        <!-- SNAPSHOT SECTION -->
+        <div class="section">
+            <h4 class="section-title">Snapshot</h4>
+            <img src="/images/sample.jpg" alt="snapshot" width="100%" />
+        </div>
 
-        <hr />
-
-        <p><strong>Snapshot:</strong></p>
-        <img src="/images/sample.jpg" alt="snapshot" width="100%" />
-
-        <hr />
-
-        <!-- ACTION BUTTONS -->
-        <div>
-            <!-- ACKNOWLEDGE -->
+        <!-- ACTION BUTTONS SECTION -->
+        <div class="section section-actions">
             <form method="post" asp-action="Acknowledge">
                 <input type="hidden" name="id" class="modalAlertId" />
-                <button type="submit">Acknowledge</button>
+                <button type="submit" class="btn-acknowledge">Acknowledge</button>
             </form>
 
-            <!-- RESOLVE -->
             <form method="post" asp-action="Resolve">
                 <input type="hidden" name="id" class="modalAlertId" />
-                <button type="submit">Resolve</button>
+                <button type="submit" class="btn-resolve">Resolve</button>
             </form>
 
-            <!-- ESCALATE -->
             <form method="post" asp-action="Escalate">
                 <input type="hidden" name="id" class="modalAlertId" />
-                <button type="submit">Escalate</button>
+                <button type="submit" class="btn-escalate">Escalate</button>
             </form>
 
-            <!-- VIEW LIVE -->
-            <button onclick="viewLive()">View Live</button>
+            <button onclick="viewLive()" class="btn-live">View Live</button>
         </div>
     </div>
 </div>
@@ -148,7 +160,8 @@
 <!-- SCRIPT -->
 <script>
 function openModal(id, title, desc, location, severity, time, status) {
-    document.getElementById("alertModal").style.display = "block";
+    var modal = document.getElementById("alertModal");
+    modal.classList.add("active");
 
     // Set all hidden inputs
     document.querySelectorAll(".modalAlertId").forEach(input => {
@@ -164,10 +177,20 @@ function openModal(id, title, desc, location, severity, time, status) {
 }
 
 function closeModal() {
-    document.getElementById("alertModal").style.display = "none";
+    var modal = document.getElementById("alertModal");
+    modal.classList.remove("active");
 }
 
 function viewLive() {
-    window.location.href = '/LiveMonitoring';
+    window.location.href = '/Cameras';
 }
+
+// Close modal when clicking outside
+document.getElementById("alertModal").addEventListener("click", function(e) {
+    if (e.target === this) {
+        closeModal();
+    }
+});
+</script>
+</script>
 </script>

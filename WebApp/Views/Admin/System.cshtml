@@ -1,10 +1,26 @@
-﻿@model WebApp.Models.SystemStatus
-
+﻿@using WebApp.Models
 @{
     ViewData["Title"] = "System Settings";
+
+    // 🔹 Temporary hardcoded initial data
+    var cameras = new List<CameraDevice>
+    {
+        new CameraDevice { Id = 1, Name = "Front Gate", Location = "Entrance", IpAddress = "192.168.1.10" },
+        new CameraDevice { Id = 2, Name = "Lobby", Location = "Reception", IpAddress = "192.168.1.11" },
+        new CameraDevice { Id = 3, Name = "Parking Lot", Location = "Outdoor", IpAddress = "192.168.1.12" }
+    };
+
+    var alarms = new List<EmergencyAlarm>
+    {
+        new EmergencyAlarm { Id = 1, Name = "Intruder Alert", Description = "Triggered when an intruder is detected", IconType = "intruder", IsEnabled = false },
+        new EmergencyAlarm { Id = 2, Name = "Fire Alarm", Description = "Triggered when smoke/fire detected", IconType = "fire", IsEnabled = false },
+        new EmergencyAlarm { Id = 3, Name = "Earthquake Drill", Description = "For earthquake simulation drills", IconType = "earthquake", IsEnabled = false },
+        new EmergencyAlarm { Id = 4, Name = "Emergency Drill", Description = "General emergency drill simulation", IconType = "ambulance", IsEnabled = false }
+    };
 }
 
-@Html.AntiForgeryToken() <!-- CSRF token for AJAX -->
+<link rel="stylesheet" href="~/css/System.css" />
+@Html.AntiForgeryToken()
 
 <div class="system-page">
     <div class="system-wrapper">
@@ -30,8 +46,7 @@
                 <div class="sys-card-footer">
                     <span>Enable notifications</span>
                     <label class="system-switch">
-                        <input type="checkbox" @(Model.NotificationsEnabled ? "checked" : "")
-                               onchange="updateSetting('Notifications', this.checked)" />
+                        <input type="checkbox" checked />
                         <span class="system-slider"></span>
                     </label>
                 </div>
@@ -49,8 +64,7 @@
                 <div class="sys-card-footer">
                     <span>Enable recording</span>
                     <label class="system-switch">
-                        <input type="checkbox" @(Model.RecordingEnabled ? "checked" : "")
-                               onchange="updateSetting('Recording', this.checked)" />
+                        <input type="checkbox" checked />
                         <span class="system-slider"></span>
                     </label>
                 </div>
@@ -68,8 +82,7 @@
                 <div class="sys-card-footer">
                     <span>Enable AI detection</span>
                     <label class="system-switch">
-                        <input type="checkbox" @(Model.AiDetectionEnabled ? "checked" : "")
-                               onchange="updateSetting('AI', this.checked)" />
+                        <input type="checkbox" checked />
                         <span class="system-slider"></span>
                     </label>
                 </div>
@@ -77,84 +90,141 @@
 
         </div>
 
-        <!-- STATS GRID -->
-        <div class="system-grid-2 mt-3">
+        <!-- CAMERA + ALARM ROW -->
+        <div class="system-grid-2">
 
-            <!-- HARDWARE -->
-            <div class="system-card">
-                <div class="sys-card-header">
-                    <div class="icon blue"><i class="fa fa-microchip"></i></div>
-                    <h5>Hardware</h5>
-                </div>
-                <div class="stats">
-                    <div><span>CPU Usage</span><span class="text-success">@Model.CpuUsage%</span></div>
-                    <div><span>Memory Usage</span><span class="text-success">@Model.MemoryUsage</span></div>
-                    <div><span>Storage</span><span class="text-success">@Model.Storage</span></div>
-                    <div><span>GPU Usage</span><span class="text-warning">@Model.GpuUsage%</span></div>
-                </div>
-            </div>
-
-            <!-- NETWORK -->
-            <div class="system-card">
-                <div class="sys-card-header">
-                    <div class="icon blue"><i class="fa fa-wifi"></i></div>
-                    <h5>Network</h5>
-                </div>
-                <div class="stats">
-                    <div><span>Connection Status</span><span class="text-success">@Model.ConnectionStatus</span></div>
-                    <div><span>Bandwidth Usage</span><span class="text-success">@Model.Bandwidth</span></div>
-                    <div><span>Latency</span><span class="text-success">@Model.Latency</span></div>
-                    <div><span>Packet Loss</span><span class="text-success">@Model.PacketLoss</span></div>
-                </div>
-            </div>
-
-            <!-- CAMERAS -->
+            <!-- CAMERA CONFIGURATION -->
             <div class="system-card">
                 <div class="sys-card-header">
                     <div class="icon blue"><i class="fa fa-camera"></i></div>
-                    <h5>Cameras</h5>
+                    <h5>Camera Configuration</h5>
                 </div>
-                <div class="stats">
-                    <div><span>Total Cameras</span><span class="text-success">@Model.TotalCameras</span></div>
-                    <div><span>Active Cameras</span><span class="text-success">@Model.ActiveCameras</span></div>
-                    <div><span>Offline Cameras</span><span class="text-warning">@Model.OfflineCameras</span></div>
-                    <div><span>Recording Cameras</span><span class="text-success">@Model.RecordingCameras</span></div>
+
+                <div class="camera-container">
+
+                    <!-- CAMERA LIST -->
+                    <div class="camera-list">
+                        @for (int i = 0; i < cameras.Count; i++)
+                        {
+                            var cam = cameras[i];
+                            <div class="camera-item @(i == 0 ? "active" : "")"
+                                 data-id="@cam.Id"
+                                 data-name="@cam.Name"
+                                 data-location="@cam.Location"
+                                 data-ip="@cam.IpAddress"
+                                 onclick="selectCamera(this)">
+                                <i class="fa fa-video-camera"></i>
+                                <span>@cam.Name</span>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- EDIT PANEL -->
+                    <div class="camera-edit">
+                        <input type="hidden" id="camId" />
+                        <input type="text" id="camName" class="form-control" placeholder="Camera Name" />
+                        <input type="text" id="camLocation" class="form-control" placeholder="Location" />
+                        <input type="text" id="camIp" class="form-control" placeholder="IP Address" />
+                        <button class="btn btn-primary" onclick="updateCamera()">Update Camera</button>
+                    </div>
+
                 </div>
             </div>
 
-            <!-- STORAGE -->
+            <!-- EMERGENCY ALARM -->
             <div class="system-card">
                 <div class="sys-card-header">
-                    <div class="icon blue"><i class="fa fa-hdd"></i></div>
-                    <h5>Storage</h5>
+                    <div class="icon red"><i class="fa fa-exclamation-triangle"></i></div>
+                    <h5>Emergency Alarm</h5>
                 </div>
-                <div class="stats">
-                    <div><span>Total Space</span><span class="text-success">@Model.TotalSpace</span></div>
-                    <div><span>Used Space</span><span class="text-success">@Model.UsedSpace</span></div>
-                    <div><span>Recordings</span><span class="text-success">@Model.Recordings</span></div>
-                    <div><span>Retention</span><span class="text-success">@Model.RetentionDays days</span></div>
+
+                <div class="alarm-list">
+                    @foreach (var alarm in alarms)
+                    {
+                        <div class="alarm-item @(alarm.IsEnabled ? "active" : "")">
+                            <div class="alarm-info">
+                                <div class="alarm-icon @alarm.IconType">
+                                    <i class="fa @(alarm.IconType == "intruder" ? "fa-user-secret" :
+                                                  alarm.IconType == "fire" ? "fa-fire" :
+                                                  alarm.IconType == "earthquake" ? "fa-globe" :
+                                                  "fa-ambulance")"></i>
+                                </div>
+                                <div>
+                                    <strong>@alarm.Name</strong>
+                                    <p class="alarm-desc">@alarm.Description</p>
+                                </div>
+                            </div>
+                            <label class="system-switch">
+                                <input type="checkbox" @(alarm.IsEnabled ? "checked" : "") 
+                                       onchange="confirmToggle(this, @alarm.Id)" />
+                                <span class="system-slider"></span>
+                            </label>
+                        </div>
+                    }
                 </div>
+
             </div>
 
         </div>
+
     </div>
 </div>
 
 @section Scripts {
 <script>
-function updateSetting(setting, value) {
-    const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
 
-    fetch('/Admin/UpdateSetting', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'RequestVerificationToken': token
-        },
-        body: `setting=${setting}&value=${value}`
-    })
-    .then(() => console.log(setting + ' updated'))
-    .catch(() => alert('Failed to update setting'));
+// CAMERA
+function selectCamera(el) {
+    document.getElementById("camId").value = el.dataset.id;
+    document.getElementById("camName").value = el.dataset.name;
+    document.getElementById("camLocation").value = el.dataset.location;
+    document.getElementById("camIp").value = el.dataset.ip;
+
+    document.querySelectorAll('.camera-item').forEach(i => i.classList.remove('active'));
+    el.classList.add('active');
 }
+
+function updateCamera() {
+    const id = document.getElementById("camId").value;
+    if (!id) { alert("Select a camera first"); return; }
+
+    const name = document.getElementById("camName").value;
+    const location = document.getElementById("camLocation").value;
+    const ip = document.getElementById("camIp").value;
+
+    alert(`Camera updated!\nName: ${name}\nLocation: ${location}\nIP: ${ip}`);
+}
+
+// ALARM with confirmation
+function confirmToggle(checkbox, alarmId) {
+    const alarmName = checkbox.closest('.alarm-item').querySelector('strong').innerText;
+    const confirmMsg = `Are you sure you want to turn ${checkbox.checked ? 'ON' : 'OFF'} the "${alarmName}" alarm?`;
+    if (confirm(confirmMsg)) {
+        toggleAlarm(checkbox, alarmId);
+    } else {
+        checkbox.checked = !checkbox.checked; // revert
+    }
+}
+
+function toggleAlarm(checkbox, alarmId) {
+    document.querySelectorAll('.alarm-item').forEach(item => item.classList.remove('active'));
+
+    if (checkbox.checked) {
+        document.querySelectorAll('.alarm-item input').forEach(cb => {
+            if (cb !== checkbox) cb.checked = false;
+        });
+        checkbox.closest('.alarm-item').classList.add('active');
+    }
+}
+
+// AUTO-SELECT FIRST CAMERA & ALARM
+document.addEventListener("DOMContentLoaded", () => {
+    const firstCam = document.querySelector('.camera-item.active');
+    if (firstCam) selectCamera(firstCam);
+
+    const firstAlarm = document.querySelector('.alarm-item.active input');
+    if (firstAlarm) firstAlarm.closest('.alarm-item').classList.add('active');
+});
 </script>
 }

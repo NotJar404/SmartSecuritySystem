@@ -3,12 +3,13 @@ using SmartSecuritySystem.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using WebApp.Models; // unified namespace
 
 namespace WebApp.Services
 {
     public class AuthService
     {
-        // 🔥 In-memory user list for testing
+        // 🔹 In-memory users (temporary for testing)
         private readonly List<User> _users;
 
         public AuthService()
@@ -19,7 +20,7 @@ namespace WebApp.Services
                 {
                     Id = 1,
                     Username = "admin",
-                    PasswordHash = "1234", // plain text for testing
+                    PasswordHash = "1234", // ⚠️ plain text for dev only
                     Role = "Admin",
                     Name = "System Administrator",
                     Email = "admin@email.com",
@@ -29,7 +30,7 @@ namespace WebApp.Services
                 {
                     Id = 2,
                     Username = "security",
-                    PasswordHash = "1234", // plain text for testing
+                    PasswordHash = "1234",
                     Role = "Security",
                     Name = "Security Personnel",
                     Email = "security@email.com",
@@ -41,47 +42,50 @@ namespace WebApp.Services
         // =========================
         // VALIDATE LOGIN
         // =========================
-        public (bool success, User user) ValidateUser(string username, string password)
+        public (bool success, User? user) ValidateUser(string username, string password)
         {
-            var user = _users.FirstOrDefault(u => u.Username.Equals(username, StringComparison.OrdinalIgnoreCase));
-            if (user == null) return (false, null);
+            if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+                return (false, null);
 
-            if (VerifyPassword(user, password))
-            {
-                return (true, user);
-            }
+            var user = _users.FirstOrDefault(u =>
+                u.Username.Equals(username, StringComparison.OrdinalIgnoreCase));
 
-            return (false, null);
+            if (user == null || !VerifyPassword(user, password))
+                return (false, null);
+
+            return (true, user);
         }
 
         // =========================
         // GET CURRENT USER FROM SESSION
         // =========================
-        public User GetCurrentUser(HttpContext context)
+        public User? GetCurrentUser(HttpContext context)
         {
-            var userId = context.Session.GetInt32("UserId");
+            int? userId = context.Session.GetInt32("UserId");
             if (userId == null) return null;
 
             return _users.FirstOrDefault(u => u.Id == userId.Value);
         }
 
         // =========================
-        // VERIFY PASSWORD
+        // VERIFY PASSWORD (private)
         // =========================
-        public bool VerifyPassword(User user, string password)
+        public bool VerifyPassword(User? user, string password)
         {
-            return user.PasswordHash == password; // ⚠️ plain text for testing only
+            if (user == null) return false;
+            return user.PasswordHash == password; // ⚠️ plain text, dev only
         }
 
         // =========================
         // UPDATE PASSWORD
         // =========================
-        public void UpdatePassword(int userId, string newPassword)
+        public bool UpdatePassword(int userId, string newPassword)
         {
             var user = _users.FirstOrDefault(u => u.Id == userId);
-            if (user == null) return;
+            if (user == null) return false;
 
-            user.PasswordHash = newPassword; // ⚠️ plain text
+            user.PasswordHash = newPassword;
+            return true;
         }
 
         // =========================
@@ -89,7 +93,10 @@ namespace WebApp.Services
         // =========================
         public bool EmailExists(string email)
         {
-            return _users.Any(u => u.Email.Equals(email, StringComparison.OrdinalIgnoreCase));
+            if (string.IsNullOrWhiteSpace(email)) return false;
+
+            return _users.Any(u =>
+                u.Email.Equals(email, StringComparison.OrdinalIgnoreCase));
         }
 
         // =========================
@@ -105,7 +112,7 @@ namespace WebApp.Services
         // =========================
         public bool ResetPassword(string token, string newPassword)
         {
-            // 🔥 TEMP: just reset admin password for testing
+            // 🔹 TEMP: always resets admin for testing
             var user = _users.FirstOrDefault(u => u.Username == "admin");
             if (user == null) return false;
 

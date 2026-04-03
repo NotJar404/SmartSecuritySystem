@@ -7,10 +7,10 @@ var builder = WebApplication.CreateBuilder(args);
 // ADD SERVICES
 // =========================
 
-// Add MVC controllers + views
+// Add MVC
 builder.Services.AddControllersWithViews();
 
-// Add session support
+// Session
 builder.Services.AddSession(options =>
 {
     options.IdleTimeout = TimeSpan.FromMinutes(30);
@@ -18,29 +18,48 @@ builder.Services.AddSession(options =>
     options.Cookie.IsEssential = true;
 });
 
-// Add authentication (cookies)
+// Authentication (Cookies)
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
-        options.LoginPath = "/Auth/Login";          // Redirect if not logged in
-        options.AccessDeniedPath = "/Auth/Login";   // Redirect if role denied
+        options.LoginPath = "/Auth/Login";
+        options.AccessDeniedPath = "/Auth/Login";
     });
 
-// Add authorization
+// Authorization
 builder.Services.AddAuthorization();
 
-// Add your services
-builder.Services.AddSingleton<AuthService>();  // 🔹 In-memory AuthService
-builder.Services.AddScoped<SystemService>();   // Your other service
+// =========================
+// 🔥 IMPORTANT: SERVICES
+// =========================
+
+// Auth (in-memory is fine)
+builder.Services.AddSingleton<AuthService>();
+
+// ✅ FIXED: MUST BE SINGLETON (NOT SCOPED)
+// 🔹 FOR DATABASE INTEGRATION:
+//    - Change to AddScoped<SystemService>() when using DbContext
+//    - Add DbContext: builder.Services.AddDbContext<SecurityDbContext>()
+//    - Inject repositories: AddScoped(typeof(IRepository<>), typeof(GenericRepository<>))
+//    - Replace in-memory data with database queries
+builder.Services.AddSingleton<SystemService>();
+
+// 🔹 TODO: Add these when database is ready:
+// builder.Services.AddDbContext<SecurityDbContext>(options =>
+//     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+// builder.Services.AddScoped(typeof(IRepository<>), typeof(GenericRepository<>));
+// builder.Services.AddScoped<ISystemRepository, SystemRepository>();
 
 // =========================
 // BUILD APP
 // =========================
+
 var app = builder.Build();
 
 // =========================
 // MIDDLEWARE
 // =========================
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
@@ -52,18 +71,22 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
-app.UseSession();          // must be BEFORE auth
-app.UseAuthentication();   // must be BEFORE authorization
+// 🔥 ORDER IS IMPORTANT
+app.UseSession();
+app.UseAuthentication();
 app.UseAuthorization();
 
 // =========================
-// ROUTES
+// ROUTING
 // =========================
+
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Auth}/{action=Login}/{id?}");
+    pattern: "{controller=System}/{action=Index}/{id?}"
+);
 
 // =========================
 // RUN
 // =========================
+
 app.Run();

@@ -2,6 +2,7 @@
 
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Live Monitoring";
 }
 <link rel="stylesheet" href="~/css/camera.css" />
 
@@ -94,12 +95,12 @@
 </div>
 
 <!-- MODAL -->
-<div id="cameraModal" class="modal" onclick="outsideClick(event)">
+<div id="cameraModal" class="modal">
     <form method="post"
           id="cameraForm"
           asp-controller="Cameras"
           asp-action="Add"
-          class="modal-content modern-modal"
+          class="modal-content"
           onclick="event.stopPropagation()">
 
         <!-- HIDDEN ID -->
@@ -114,27 +115,86 @@
         <!-- BODY -->
         <div class="modal-body">
 
-            <h4 class="section-title">Basic Information</h4>
+            <!-- BASIC INFORMATION -->
+            <div class="section">
+                <h4 class="section-title">Basic Information</h4>
 
-            <label>Camera Name *</label>
-            <input type="text" id="camName" name="Name" required />
-
-            <label>Location *</label>
-            <input type="text" id="camLocation" name="Location" required />
-
-            <hr />
-
-            <h4 class="section-title">Network Configuration</h4>
-
-            <div class="grid-2">
-                <div>
-                    <label>IP Address</label>
-                    <input type="text" id="camIp" name="IpAddress" />
+                <div class="form-group">
+                    <label for="camName">Camera Name <span class="required">*</span></label>
+                    <input type="text" id="camName" name="Name" placeholder="e.g., Main Entrance Camera" required />
                 </div>
 
-                <div>
-                    <label>Port</label>
-                    <input type="number" id="camPort" name="Port" value="554" />
+                <div class="form-group">
+                    <label for="camLocation">Location <span class="required">*</span></label>
+                    <input type="text" id="camLocation" name="Location" placeholder="e.g., Front Door" required />
+                </div>
+            </div>
+
+            <!-- NETWORK CONFIGURATION -->
+            <div class="section">
+                <h4 class="section-title">Network Configuration</h4>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="camIp">IP Address</label>
+                        <input type="text" id="camIp" name="IpAddress" placeholder="192.168.1.100" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="camPort">Port</label>
+                        <input type="number" id="camPort" name="Port" placeholder="554" value="554" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIDEO SETTINGS -->
+            <div class="section">
+                <h4 class="section-title">Video Settings</h4>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="camResolution">Resolution</label>
+                        <select id="camResolution" name="Resolution">
+                            <option value="">Select Resolution</option>
+                            <option value="640x480">640x480 (VGA)</option>
+                            <option value="1280x720">1280x720 (HD)</option>
+                            <option value="1920x1080" selected>1920x1080 (Full HD)</option>
+                            <option value="2560x1440">2560x1440 (2K)</option>
+                            <option value="3840x2160">3840x2160 (4K)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="camFrameRate">Frame Rate (FPS)</label>
+                        <select id="camFrameRate" name="FrameRate">
+                            <option value="">Select FPS</option>
+                            <option value="15">15 FPS</option>
+                            <option value="24">24 FPS</option>
+                            <option value="30" selected>30 FPS</option>
+                            <option value="60">60 FPS</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FEATURES -->
+            <div class="section">
+                <h4 class="section-title">Features</h4>
+
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="EnableRecording" />
+                        <span class="checkbox-text">Enable Recording</span>
+                        <p class="checkbox-desc">Automatically record camera feed</p>
+                    </label>
+                </div>
+
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="EnableAI" checked />
+                        <span class="checkbox-text">Enable AI Monitoring</span>
+                        <p class="checkbox-desc">AI-powered motion and face detection</p>
+                    </label>
                 </div>
             </div>
 
@@ -148,6 +208,65 @@
 
     </form>
 </div>
+
+<!-- SCRIPT -->
+<script>
+function openModal() {
+    var modal = document.getElementById("cameraModal");
+    modal.classList.add("active");
+    document.getElementById("modalTitle").innerText = "Add New Camera";
+    document.getElementById("saveBtn").innerText = "Add Camera";
+    document.getElementById("cameraForm").reset();
+}
+
+function openFromGrid(id, name, location, ip, port) {
+    // This can open a detail view or edit modal
+    var modal = document.getElementById("cameraModal");
+    modal.classList.add("active");
+    document.getElementById("modalTitle").innerText = "Camera Details";
+    
+    document.getElementById("camId").value = id;
+    document.getElementById("camName").value = name;
+    document.getElementById("camLocation").value = location;
+    document.getElementById("camIp").value = ip;
+    document.getElementById("camPort").value = port;
+}
+
+function closeModal() {
+    var modal = document.getElementById("cameraModal");
+    modal.classList.remove("active");
+}
+
+function toggleFullscreen() {
+    var elem = document.getElementById("cameraView");
+    if (!document.fullscreenElement) {
+        elem.requestFullscreen().catch(err => console.log(err));
+    } else {
+        document.exitFullscreen();
+    }
+}
+
+function editSelectedCamera() {
+    alert("Edit functionality - implement as needed");
+}
+
+function showGrid() {
+    document.getElementById("gridView").style.display = "grid";
+    document.getElementById("focusView").style.display = "none";
+}
+
+function showFocus() {
+    document.getElementById("gridView").style.display = "none";
+    document.getElementById("focusView").style.display = "grid";
+}
+
+// Close modal when clicking outside
+document.getElementById("cameraModal").addEventListener("click", function(e) {
+    if (e.target === this) {
+        closeModal();
+    }
+});
+</script>
 
 @section Scripts {
 <script>

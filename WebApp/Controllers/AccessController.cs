@@ -9,29 +9,71 @@ namespace WebApp.Controllers
     {
         public IActionResult Index()
         {
-            // SAMPLE DATA (replace with DB later)
+            // SAMPLE DATA (Simulating real system logs)
             var logs = new List<AccessLog>
             {
                 new AccessLog
                 {
+                    Id = 1,
                     FullName = "Maria Santos",
                     StudentId = "QCU-2024-0123",
+                    Department = "BSIT",
+                    Email = "maria.santos@qcu.edu.ph",
+                    Phone = "09123456789",
+
+                    Room = "Room 402",
                     Location = "Computer Laboratory 1",
                     Timestamp = DateTime.Now.AddSeconds(-30),
+
+                    RFIDMatched = true,
+                    FaceMatched = true,
                     IsAuthorized = true,
+
                     ImageUrl = "/images/user1.jpg"
                 },
+
                 new AccessLog
                 {
+                    Id = 2,
                     FullName = "Juan Dela Cruz",
                     StudentId = "QCU-2024-0456",
-                    Location = "Main Entrance",
+                    Department = "Engineering",
+                    Email = "juan.delacruz@qcu.edu.ph",
+                    Phone = "09987654321",
+
+                    Room = "Main Entrance",
+                    Location = "QCU Main Building",
                     Timestamp = DateTime.Now.AddMinutes(-2),
-                    IsAuthorized = true,
+
+                    RFIDMatched = true,
+                    FaceMatched = false, // Face mismatch
+                    IsAuthorized = false,
+
                     ImageUrl = "/images/user2.jpg"
+                },
+
+                new AccessLog
+                {
+                    Id = 3,
+                    FullName = "Unknown User",
+                    StudentId = "N/A",
+                    Department = "-",
+                    Email = "-",
+                    Phone = "-",
+
+                    Room = "Restricted Room",
+                    Location = "Server Room",
+                    Timestamp = DateTime.Now.AddMinutes(-5),
+
+                    RFIDMatched = false,
+                    FaceMatched = false,
+                    IsAuthorized = false,
+
+                    ImageUrl = "/images/default-user.png"
                 }
             };
 
+            // Door Status (for IoT control)
             var door = new DoorStatus
             {
                 DoorName = "Main Entrance Door",
@@ -47,7 +89,12 @@ namespace WebApp.Controllers
         [HttpPost]
         public IActionResult UnlockDoor()
         {
-            // TODO: integrate MQTT / IoT
+            // 🔌 FUTURE: Integrate Raspberry Pi / MQTT / GPIO
+            // Example:
+            // Send unlock signal to Raspberry Pi
+
+            TempData["Message"] = "Door unlocked successfully.";
+
             return RedirectToAction("Index");
         }
     }

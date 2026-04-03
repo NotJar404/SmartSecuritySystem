@@ -1,60 +1,185 @@
 ﻿/* ============================= */
-/* LOGS */
+/* ACTIVITY LOGS - PROFESSIONAL */
 /* ============================= */
 
+/* ============================= */
+/* GLOBAL RHYTHM */
+/* ============================= */
+:root {
+    --radius-lg: 16px;
+    --radius-md: 12px;
+    --radius-sm: 10px;
+    --spacing-xs: 6px;
+    --spacing-sm: 12px;
+    --spacing-md: 16px;
+    --spacing-lg: 24px;
+    --spacing-xl: 32px;
+}
+
+/* ============================= */
+/* PAGE HEADER */
+/* ============================= */
+.page-title {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: #ffffff;
+    letter-spacing: -0.5px;
+}
+
+.subtitle {
+    font-size: 14px;
+    color: #94a3b8;
+    margin-bottom: 28px;
+}
+
+/* ============================= */
+/* LOGS CONTAINER */
+/* ============================= */
 .logs-container {
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    gap: 14px;
+    max-width: 100%;
 }
 
+/* ============================= */
+/* LOG CARD */
+/* ============================= */
 .log-card {
-    display: flex;
-    align-items: center;
-    gap: 15px;
+    display: grid;
+    grid-template-columns: 50px 1fr auto;
+    gap: 16px;
+    align-items: start;
+    padding: 18px 20px;
     background: #111827;
-    padding: 15px;
-    border-radius: 12px;
-    transition: 0.2s;
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(255,255,255,0.05);
+    transition: all 0.2s ease;
+    cursor: default;
 }
 
     .log-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 0 15px rgba(0,0,0,0.4);
+        background: #1f2937;
+        border-color: rgba(255,255,255,0.08);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
     }
 
 /* ICON */
 .log-icon {
-    font-size: 24px;
-    background: #1e293b;
+    font-size: 22px;
+    background: rgba(59, 130, 246, 0.1);
     padding: 12px;
-    border-radius: 10px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: fit-content;
+    color: #60a5fa;
+    flex-shrink: 0;
 }
 
 /* CONTENT */
 .log-content {
     flex: 1;
+    min-width: 0;
 }
 
     .log-content h3 {
         margin: 0;
+        font-size: 15px;
+        font-weight: 700;
         color: #e2e8f0;
+        margin-bottom: 4px;
     }
 
     .log-content p {
-        margin: 3px 0;
+        margin: 4px 0 0;
         color: #94a3b8;
-        font-size: 14px;
+        font-size: 13px;
+        line-height: 1.4;
+        word-break: break-word;
     }
 
 /* META */
 .log-meta {
     font-size: 12px;
     color: #64748b;
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
 }
 
 /* TIME */
 .log-time {
     font-size: 12px;
-    color: #94a3b8;
+    color: #64748b;
+    white-space: nowrap;
+    padding: 4px 10px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 6px;
+}
+
+/* ============================= */
+/* LIGHT MODE SUPPORT */
+/* ============================= */
+body.light-mode .page-title {
+    color: #0f172a;
+}
+
+body.light-mode .subtitle {
+    color: #64748b;
+}
+
+body.light-mode .log-card {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+}
+
+    body.light-mode .log-card:hover {
+        background: #f1f5f9;
+        border-color: #cbd5f5;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+
+body.light-mode .log-icon {
+    background: rgba(59, 130, 246, 0.15);
+    color: #2563eb;
+}
+
+body.light-mode .log-content h3 {
+    color: #0f172a;
+}
+
+body.light-mode .log-content p {
+    color: #475569;
+}
+
+body.light-mode .log-meta,
+body.light-mode .log-time {
+    color: #64748b;
+}
+
+body.light-mode .log-time {
+    background: rgba(15, 23, 42, 0.05);
+}
+
+/* ============================= */
+/* RESPONSIVE */
+/* ============================= */
+@media (max-width: 768px) {
+    .log-card {
+        grid-template-columns: 48px 1fr;
+    }
+
+    .log-time {
+        grid-column: 2;
+        margin-top: 8px;
+    }
+
+    .page-title {
+        font-size: 24px;
+    }
 }

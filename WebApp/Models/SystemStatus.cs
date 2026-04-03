@@ -1,34 +1,34 @@
-﻿namespace WebApp.Models
+﻿using System.Collections.Generic;
+
+namespace WebApp.Models
 {
     public class SystemStatus
     {
-        // Hardware
-        public int CpuUsage { get; set; }
-        public string MemoryUsage { get; set; }
-        public string Storage { get; set; }
-        public int GpuUsage { get; set; }
+        public List<CameraDevice> Cameras { get; set; } = new List<CameraDevice>();
 
-        // Network
-        public string ConnectionStatus { get; set; }
-        public string Bandwidth { get; set; }
-        public string Latency { get; set; }
-        public string PacketLoss { get; set; }
+        public bool NotificationsEnabled { get; set; } = true;
+        public bool RecordingEnabled { get; set; } = true;
+        public bool AiDetectionEnabled { get; set; } = true;
 
-        // Cameras
-        public int TotalCameras { get; set; }
-        public int ActiveCameras { get; set; }
-        public int OfflineCameras { get; set; }
-        public int RecordingCameras { get; set; }
+        public List<EmergencyAlarm> EmergencyAlarms { get; set; } = new List<EmergencyAlarm>();
+    }
 
-        // Storage
-        public string TotalSpace { get; set; }
-        public string UsedSpace { get; set; }
-        public int Recordings { get; set; }
-        public int RetentionDays { get; set; }
+    public class CameraDevice
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public string Location { get; set; } = "";
+        public string IpAddress { get; set; } = "";
+        public bool IsActive { get; set; } = true;
+        public bool IsRecording { get; set; } = false;
+    }
 
-        // Settings Toggles
-        public bool NotificationsEnabled { get; set; }
-        public bool RecordingEnabled { get; set; }
-        public bool AiDetectionEnabled { get; set; }
+    public class EmergencyAlarm
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string IconType { get; set; } = "";
+        public bool IsEnabled { get; set; } = false;
     }
 }
