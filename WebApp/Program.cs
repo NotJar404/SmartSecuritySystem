@@ -82,7 +82,7 @@ app.UseAuthorization();
 
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=System}/{action=Index}/{id?}"
+    pattern: "{controller=Auth}/{action=Login}/{id?}"
 );
 
 // =========================

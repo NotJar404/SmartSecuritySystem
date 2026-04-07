@@ -1,129 +1,272 @@
-﻿@model WebApp.Controllers.AdminDashboardViewModel
+﻿@using System.Security.Claims
 @{
-    Layout = "~/Views/Shared/_Layout.cshtml";
+    Layout = null;
+    var fullName = User.Claims.FirstOrDefault(c => c.Type == "FullName")?.Value ?? User.Identity.Name;
 }
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="utf-8" />
+    <title>Admin Dashboard - SecureVision</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="~/css/admindashboard.css" asp-append-version="true" />
+    <style>
+        /* This prevents the charts from collapsing or scaling weirdly when empty */
+        .chart-container {
+            position: relative;
+            height: 180px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="d-flex align-items-center gap-2">
+                    <img src="~/images/qcu-logo.png" alt="QCU" style="height: 30px;" />
+                    <div class="lh-1">
+                        <div class="fw-bold small text-white">SecureVision</div>
+                        <div class="text-white-50" style="font-size: 9px;">QCU Admin Panel</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="user-profile-box">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="avatar-circle">A</div>
+                    <div>
+                        <div class="fw-bold small text-white">@fullName</div>
+                        <div class="text-white-50 tiny">Administrator</div>
+                    </div>
+                </div>
+            </div>
 
-<link rel="stylesheet" href="~/css/admin.css" />
+            <nav class="nav flex-column mt-3">
+                <a class="nav-link active" href="#"><i class="bi bi-grid-fill"></i> Dashboard</a>
+                <a class="nav-link" href="#"><i class="bi bi-camera-video"></i> Camera View</a>
+                <a class="nav-link" href="#"><i class="bi bi-people"></i> Personnel</a>
+                <a class="nav-link" href="#"><i class="bi bi-bar-chart"></i> Analytics</a>
+                <a class="nav-link" href="#"><i class="bi bi-activity"></i> Activity Logs</a>
+                <a class="nav-link" href="#"><i class="bi bi-gear"></i> System Settings</a>
+            </nav>
 
-<div class="admin-container">
+            <div class="sidebar-footer">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span class="tiny text-white-50">Theme</span>
+                    <div class="form-check form-switch m-0">
+                        <input class="form-check-input" type="checkbox" id="themeToggle" style="cursor:pointer">
+                    </div>
+                </div>
+                <a asp-controller="Auth" asp-action="Logout" class="logout-link text-decoration-none">
+                    <i class="bi bi-box-arrow-left me-2"></i>Logout
+                </a>
+            </div>
+        </aside>
 
-    <!-- Header -->
-    <div class="dashboard-header">
-        <h1>Admin Dashboard</h1>
-        <p>Welcome back, Admin User</p>
+        <main class="main-viewport">
+            <header class="header-bar">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="header-logo-bg"><img src="~/images/qcu-logo.png" style="height: 25px;" /></div>
+                    <div>
+                        <h5 class="mb-0 fw-bold text-white">Admin Dashboard</h5>
+                        <small class="text-white-50">Welcome back, <span class="fw-bold text-white">@fullName</span></small>
+                    </div>
+                </div>
+                <div class="time-pill">
+                    <span id="liveClock" class="fw-bold text-white"></span>
+                </div>
+            </header>
+
+            <div class="dashboard-content">
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <div class="stat-card">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="icon-sq bg-primary-light"><i class="bi bi-people text-primary"></i></div>
+                                <small class="text-muted fw-bold tiny">Personnel</small>
+                            </div>
+                            <h2 class="fw-bold my-2">0</h2>
+                            <div class="text-muted tiny fw-bold">No Active Data</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-card">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="icon-sq bg-warning-light"><i class="bi bi-camera-video text-warning"></i></div>
+                                <small class="text-muted fw-bold tiny">Cameras</small>
+                            </div>
+                            <h2 class="fw-bold my-2">0</h2>
+                            <div class="text-muted tiny fw-bold">Offline</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-card">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="icon-sq bg-success-light"><i class="bi bi-activity text-success"></i></div>
+                                <small class="text-muted fw-bold tiny">Detections</small>
+                            </div>
+                            <h2 class="fw-bold my-2">0</h2>
+                            <div class="text-muted tiny fw-bold">Waiting for logs</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-card">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="icon-sq bg-danger-light"><i class="bi bi-exclamation-triangle text-danger"></i></div>
+                                <small class="text-muted fw-bold tiny">Incidents</small>
+                            </div>
+                            <h2 class="fw-bold my-2">0</h2>
+                            <div class="text-muted tiny fw-bold">Clean record</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <div class="chart-card">
+                            <h6 class="fw-bold mb-0 small"><i class="bi bi-exclamation-octagon text-danger me-2"></i>Alert Intrusion Trends</h6>
+                            <p class="text-muted tiny mb-3">No data available for this week</p>
+                            <div class="chart-container">
+                                <canvas id="intrusionChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="chart-card">
+                            <h6 class="fw-bold mb-0 small"><i class="bi bi-people text-primary me-2"></i>Access Activity</h6>
+                            <p class="text-muted tiny mb-3">No data available for this week</p>
+                            <div class="chart-container">
+                                <canvas id="accessChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <div class="chart-card">
+                            <h6 class="fw-bold mb-0 small"><i class="bi bi-activity text-info me-2"></i>Motion Detection</h6>
+                            <p class="text-muted tiny mb-3">No data available for this week</p>
+                            <div class="chart-container">
+                                <canvas id="motionChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="chart-card">
+                            <h6 class="fw-bold mb-0 small"><i class="bi bi-building text-success me-2"></i>Occupancy Monitoring</h6>
+                            <p class="text-muted tiny mb-3">No data available for this week</p>
+                            <div class="chart-container">
+                                <canvas id="occupancyChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-7">
+                        <div class="activity-card p-3">
+                            <h6 class="fw-bold mb-3 small"><i class="bi bi-lightning-charge text-primary me-2"></i>Recent Activity</h6>
+                            <div class="text-center py-4 text-muted tiny">No recent logs found.</div>
+                        </div>
+                    </div>
+                    <div class="col-md-5">
+                        <div class="quick-actions-card p-3">
+                            <h6 class="fw-bold mb-3 small"><i class="bi bi-cursor text-orange me-2"></i>Quick Actions</h6>
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-action"><i class="bi bi-person-plus text-primary"></i> <div><b class="d-block small">Add Personnel</b><span class="tiny text-muted">Create security account</span></div></button>
+                                <button class="btn btn-action"><i class="bi bi-camera-video text-success"></i> <div><b class="d-block small">View Cameras</b><span class="tiny text-muted">Monitor live feeds</span></div></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
     </div>
 
-    <!-- Stats Cards -->
-    <div class="stats-grid">
-        <div class="card">
-            <div class="icon blue"></div>
-            <div>
-                <h2>@Model?.TotalPersonnel</h2>
-                <p>Total Personnel</p>
-                <span>Registered accounts</span>
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="icon green"></div>
-            <div>
-                <h2>@Model?.ActiveUsers</h2>
-                <p>Active Users</p>
-                <span>Currently enabled</span>
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="icon yellow"></div>
-            <div>
-                <h2>@Model?.InactiveUsers</h2>
-                <p>Inactive Users</p>
-                <span>Disabled accounts</span>
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="icon red"></div>
-            <div>
-                <h2>@Model?.RecentLogins</h2>
-                <p>Recent Logins</p>
-                <span>Last 24 hours</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Quick Actions -->
-    <div class="section">
-        <h2>Quick Actions</h2>
-
-        <div class="quick-actions">
-            <div class="action-card">
-                <h3>Add Personnel</h3>
-                <p>Create new account</p>
-            </div>
-
-            <div class="action-card">
-                <h3>Manage Personnel</h3>
-                <p>View all accounts</p>
-            </div>
-
-            <div class="action-card">
-                <h3>Activity Logs</h3>
-                <p>View system logs</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Recent Personnel -->
-    <div class="section">
-        <div class="section-header">
-            <h2>Recent Personnel</h2>
-            <a href="#">View All →</a>
-        </div>
-
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Username</th>
-                    <th>Email</th>
-                    <th>Status</th>
-                    <th>Last Login</th>
-                </tr>
-            </thead>
-
-            <tbody>
-                @if (Model?.RecentPersonnel != null && Model.RecentPersonnel.Any())
-                {
-                    foreach (var user in Model.RecentPersonnel)
-                    {
-                        var statusClass = user.Status == "Active" ? "active" : "inactive";
-
-                        <tr>
-                            <td>@user.Name</td>
-                            <td>@user.Username</td>
-                            <td>@user.Email</td>
-                            <td>
-                                <span class="status @statusClass">@user.Status</span>
-                            </td>
-                            <td>
-                                @(user.LastLogin.HasValue 
-                                    ? user.LastLogin.Value.ToString("MMM dd, hh:mm tt") 
-                                    : "Never")
-                            </td>
-                        </tr>
-                    }
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            
+            // 1. REAL-TIME CLOCK
+            const clockEl = document.getElementById('liveClock');
+            function updateClock() {
+                const now = new Date();
+                if (clockEl) {
+                    clockEl.innerText = now.toLocaleTimeString('en-US', { 
+                        hour: '2-digit', 
+                        minute: '2-digit', 
+                        second: '2-digit', 
+                        hour12: true 
+                    });
                 }
-                else
-                {
-                    <tr>
-                        <td colspan="5" style="text-align:center; color:#9ca3af;">
-                            No personnel found
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
+            }
+            updateClock();
+            setInterval(updateClock, 1000);
 
-</div>
+            // 2. THEME TOGGLE
+            const themeToggle = document.getElementById('themeToggle');
+            function applyTheme(isDark) {
+                const theme = isDark ? 'dark' : 'light';
+                document.documentElement.setAttribute('data-theme', theme);
+                if (themeToggle) themeToggle.checked = isDark;
+                localStorage.setItem('sv-theme-choice', theme);
+            }
+            if (themeToggle) {
+                themeToggle.addEventListener('change', () => applyTheme(themeToggle.checked));
+            }
+            const savedTheme = localStorage.getItem('sv-theme-choice');
+            applyTheme(savedTheme === 'dark');
+
+            // 3. NO-SCALING CHARTS
+            const sharedOptions = { 
+                responsive: true, 
+                maintainAspectRatio: false,
+                animation: false,
+                plugins: { legend: { display: false } }, 
+                scales: { 
+                    y: { 
+                        beginAtZero: true, 
+                        min: 0, 
+                        max: 100, 
+                        grid: { color: 'rgba(0,0,0,0.05)' },
+                        ticks: { stepSize: 20 }
+                    }, 
+                    x: { grid: { display: false } } 
+                } 
+            };
+
+            const commonLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+            new Chart(document.getElementById('intrusionChart'), {
+                type: 'line',
+                data: { labels: commonLabels, datasets: [{ data: [], borderColor: '#ff6b00', tension: 0.4 }] },
+                options: sharedOptions
+            });
+
+            new Chart(document.getElementById('accessChart'), {
+                type: 'bar',
+                data: { labels: commonLabels, datasets: [{ data: [], backgroundColor: '#0046ad' }] },
+                options: sharedOptions
+            });
+
+            new Chart(document.getElementById('motionChart'), {
+                type: 'bar',
+                data: { labels: commonLabels, datasets: [{ data: [], backgroundColor: '#a855f7' }] },
+                options: sharedOptions
+            });
+
+            new Chart(document.getElementById('occupancyChart'), {
+                type: 'bar',
+                data: { 
+                    labels: ['Lobby', 'Floor 1', 'Server', 'Admin', 'Parking'], 
+                    datasets: [{ data: [], backgroundColor: '#10b981' }] 
+                },
+                options: sharedOptions
+            });
+        });
+    </script>
+</body>
+</html>
