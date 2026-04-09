@@ -43,14 +43,37 @@
                 </div>
             </div>
 
-            <nav class="nav flex-column mt-3">
-                <a class="nav-link active" href="#"><i class="bi bi-grid-fill"></i> Dashboard</a>
-                <a class="nav-link" href="#"><i class="bi bi-camera-video"></i> Camera View</a>
-                <a class="nav-link" href="#"><i class="bi bi-people"></i> Personnel</a>
-                <a class="nav-link" href="#"><i class="bi bi-bar-chart"></i> Analytics</a>
-                <a class="nav-link" href="#"><i class="bi bi-activity"></i> Activity Logs</a>
-                <a class="nav-link" href="#"><i class="bi bi-gear"></i> System Settings</a>
-            </nav>
+          <nav class="nav flex-column mt-3">
+    <a class="nav-link @(ViewContext.RouteData.Values["Action"]?.ToString() == "Index" ? "active" : "")" 
+       asp-controller="Admin" asp-action="Index">
+       <i class="bi bi-grid-fill"></i> Dashboard
+    </a>
+
+    <a class="nav-link @(ViewContext.RouteData.Values["Action"]?.ToString() == "Cameras" ? "active" : "")" 
+       asp-controller="Admin" asp-action="Cameras">
+       <i class="bi bi-camera-video"></i> Camera View
+    </a>
+
+    <a class="nav-link @(ViewContext.RouteData.Values["Action"]?.ToString() == "Personnel" ? "active" : "")" 
+       asp-controller="Admin" asp-action="Personnel">
+       <i class="bi bi-people"></i> Personnel
+    </a>
+
+    <a class="nav-link @(ViewContext.RouteData.Values["Action"]?.ToString() == "Analytics" ? "active" : "")" 
+       asp-controller="Admin" asp-action="Analytics">
+       <i class="bi bi-bar-chart"></i> Analytics
+    </a>
+
+    <a class="nav-link @(ViewContext.RouteData.Values["Action"]?.ToString() == "Logs" ? "active" : "")" 
+       asp-controller="Admin" asp-action="Logs">
+       <i class="bi bi-activity"></i> Activity Logs
+    </a>
+
+    <a class="nav-link @(ViewContext.RouteData.Values["Action"]?.ToString() == "Settings" ? "active" : "")" 
+       asp-controller="Admin" asp-action="Settings">
+       <i class="bi bi-gear"></i> System Settings
+    </a>
+</nav>
 
             <div class="sidebar-footer">
                 <div class="d-flex justify-content-between align-items-center mb-3">

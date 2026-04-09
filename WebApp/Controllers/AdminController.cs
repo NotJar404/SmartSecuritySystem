@@ -35,7 +35,10 @@ namespace WebApp.Controllers
                 PasswordHash = "1234"
             }
         };
-
+public IActionResult Analytics()
+{
+    return View();
+}
         // 🔥 System status (shared)
         private static SystemStatus systemStatus = new SystemStatus();
 
@@ -59,6 +62,7 @@ namespace WebApp.Controllers
 
             return View(model);
         }
+        
 
         // ------------------ PERSONNEL ------------------
         public IActionResult Personnel(string? search)

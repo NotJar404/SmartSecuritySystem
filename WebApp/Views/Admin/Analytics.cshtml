@@ -1,0 +1,293 @@
+@{
+    ViewData["Title"] = "Analytics & Reports";
+    Layout = "_Layout";
+}
+
+<style>
+    :root {
+        --qcu-blue: #002d72;
+        --qcu-light-blue: #0046ad;
+        --qcu-orange: #ff6b00;
+        --bg-main: #f8f9fc;
+        --card-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    }
+
+    body { background-color: var(--bg-main); font-family: 'Inter', sans-serif; }
+    .main-content { padding: 1.5rem; }
+
+    /* Header Banner */
+    .header-banner {
+        background: linear-gradient(90deg, #001a4d 0%, #003399 100%);
+        color: white;
+        padding: 1.25rem 2rem;
+        border-radius: 0; /* Full width align with sidebar top */
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin: -1.5rem -1.5rem 2rem -1.5rem;
+    }
+
+    .report-badge {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        font-size: 0.85rem;
+    }
+
+    /* Card & Stats Design */
+    .glass-card {
+        background: white;
+        border: 1px solid #edf2f7;
+        border-radius: 12px;
+        box-shadow: var(--card-shadow);
+        height: 100%;
+    }
+
+    .stat-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Filter Bar */
+    .filter-label { font-size: 0.8rem; font-weight: 600; color: #4a5568; margin-bottom: 0.5rem; }
+    .filter-icon-box { background: #003399; color: white; border-radius: 6px; padding: 0.4rem; margin-right: 0.75rem; }
+
+    /* Button Styles */
+    .btn-export-pdf { background-color: var(--qcu-orange); color: white; border: none; font-weight: 600; }
+    .btn-export-csv { background-color: #003399; color: white; border: none; font-weight: 600; }
+    .btn-print { background-color: #4a5568; color: white; border: none; font-weight: 600; }
+
+    /* Table Severity Badges */
+    .badge-low { background: #eef2ff; color: #4338ca; }
+    .badge-medium { background: #fffbeb; color: #b45309; }
+    .badge-high { background: #fff7ed; color: #c2410c; }
+    .badge-critical { background: #fef2f2; color: #b91c1c; }
+</style>
+
+<div class="main-content">
+    <div class="header-banner">
+        <div class="d-flex align-items-center">
+            <div class="bg-warning rounded-circle me-3 d-flex align-items-center justify-content-center" style="width: 45px; height: 45px;">
+                <img src="/logo_qcu.png" style="width: 30px;" alt="QCU">
+            </div>
+            <div>
+                <h4 class="mb-0 fw-bold">Analytics & Reports</h4>
+                <p class="mb-0 small opacity-75">Generate security reports and insights</p>
+            </div>
+        </div>
+        <div class="report-badge">
+            <i class="bi bi-bar-chart-fill me-2" style="color: #4fd1c5;"></i> Reports <span style="color: #4fd1c5; font-weight: bold;">Active</span>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="glass-card p-3 d-flex align-items-start justify-content-between">
+                <div>
+                    <div class="stat-icon mb-3" style="background: #ebf4ff; color: #3182ce;"><i class="bi bi-exclamation-triangle"></i></div>
+                    <h3 class="fw-bold mb-0">6</h3>
+                    <small class="text-muted">Total Alerts</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="glass-card p-3 d-flex align-items-start justify-content-between">
+                <div>
+                    <div class="stat-icon mb-3" style="background: #fff5f5; color: #e53e3e;"><i class="bi bi-people"></i></div>
+                    <h3 class="fw-bold mb-0">4</h3>
+                    <small class="text-muted">Access Logs</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="glass-card p-3 d-flex align-items-start justify-content-between">
+                <div>
+                    <div class="stat-icon mb-3" style="background: #faf5ff; color: #805ad5;"><i class="bi bi-camera-video"></i></div>
+                    <h3 class="fw-bold mb-0">24</h3>
+                    <small class="text-muted">Active Cameras</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="glass-card p-3 d-flex align-items-start justify-content-between">
+                <div>
+                    <div class="stat-icon mb-3" style="background: #f0fff4; color: #38a169;"><i class="bi bi-activity"></i></div>
+                    <h3 class="fw-bold mb-0">40%</h3>
+                    <small class="text-muted">Avg Occupancy</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="glass-card p-4 mb-4">
+        <div class="d-flex align-items-center mb-4">
+            <div class="filter-icon-box"><i class="bi bi-funnel"></i></div>
+            <h5 class="mb-0 fw-bold">Report Filters</h5>
+        </div>
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <label class="filter-label"><i class="bi bi-calendar-event me-2 text-primary"></i>Start Date</label>
+                <input type="date" class="form-control border-light shadow-sm" value="2026-03-23">
+            </div>
+            <div class="col-md-3">
+                <label class="filter-label"><i class="bi bi-calendar-check me-2 text-primary"></i>End Date</label>
+                <input type="date" class="form-control border-light shadow-sm" value="2026-03-30">
+            </div>
+            <div class="col-md-3">
+                <label class="filter-label"><i class="bi bi-geo-alt me-2 text-orange" style="color:var(--qcu-orange)"></i>Room/Location</label>
+                <select class="form-select border-light shadow-sm"><option>All Rooms</option></select>
+            </div>
+            <div class="col-md-3">
+                <label class="filter-label"><i class="bi bi-exclamation-circle me-2 text-orange" style="color:var(--qcu-orange)"></i>Event Type</label>
+                <select class="form-select border-light shadow-sm"><option>All Events</option></select>
+            </div>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-export-pdf px-4 py-2"><i class="bi bi-file-earmark-pdf me-2"></i>Export PDF</button>
+            <button class="btn btn-export-csv px-4 py-2"><i class="bi bi-download me-2"></i>Export CSV</button>
+            <button class="btn btn-print px-4 py-2"><i class="bi bi-printer me-2"></i>Print Graphs</button>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-6">
+            <div class="glass-card p-4">
+                <div class="d-flex align-items-center mb-3">
+                    <i class="bi bi-exclamation-triangle text-danger me-2"></i>
+                    <h6 class="mb-0 fw-bold">Alert Intrusion Trends</h6>
+                </div>
+                <p class="text-muted small mb-4">Weekly intrusion patterns</p>
+                <div style="height: 250px;"><canvas id="intrusionChart"></canvas></div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="glass-card p-4">
+                <div class="d-flex align-items-center mb-3">
+                    <i class="bi bi-people text-primary me-2"></i>
+                    <h6 class="mb-0 fw-bold">Access Activity</h6>
+                </div>
+                <p class="text-muted small mb-4">Entry and exit tracking</p>
+                <div style="height: 250px;"><canvas id="accessChart"></canvas></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="glass-card mb-4">
+        <div class="p-4 border-bottom d-flex align-items-center">
+            <i class="bi bi-bell text-danger me-2"></i>
+            <div>
+                <h6 class="mb-0 fw-bold">Recent Alerts</h6>
+                <small class="text-muted">Latest security events</small>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light">
+                    <tr class="text-muted small">
+                        <th class="ps-4">DATE</th>
+                        <th>TIME</th>
+                        <th>EVENT TYPE</th>
+                        <th>LOCATION</th>
+                        <th class="pe-4 text-end">SEVERITY</th>
+                    </tr>
+                </thead>
+                <tbody class="small">
+                    <tr>
+                        <td class="ps-4">2026-03-30</td>
+                        <td>08:45 AM</td>
+                        <td>Motion Detection</td>
+                        <td>Building A - Lobby</td>
+                        <td class="pe-4 text-end"><span class="badge badge-low px-3">Low</span></td>
+                    </tr>
+                    <tr>
+                        <td class="ps-4">2026-03-30</td>
+                        <td>09:12 AM</td>
+                        <td>Person Detection</td>
+                        <td>Parking Lot</td>
+                        <td class="pe-4 text-end"><span class="badge badge-medium px-3">Medium</span></td>
+                    </tr>
+                    <tr>
+                        <td class="ps-4">2026-03-29</td>
+                        <td>02:34 PM</td>
+                        <td>Unauthorized Access</td>
+                        <td>Server Room</td>
+                        <td class="pe-4 text-end"><span class="badge badge-high px-3">High</span></td>
+                    </tr>
+                    <tr>
+                        <td class="ps-4">2026-03-29</td>
+                        <td>05:20 PM</td>
+                        <td>Intrusion Attempt</td>
+                        <td>Building B - Floor 2</td>
+                        <td class="pe-4 text-end"><span class="badge badge-critical px-3">Critical</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="glass-card p-4">
+        <div class="d-flex align-items-center mb-4">
+            <div class="stat-icon me-3" style="background: #fff7ed; color: var(--qcu-orange);"><i class="bi bi-envelope"></i></div>
+            <div>
+                <h6 class="mb-0 fw-bold">Schedule Automated Reports</h6>
+                <p class="text-muted small mb-0">Receive reports automatically via email</p>
+            </div>
+        </div>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="small fw-bold mb-1">Email Address</label>
+                <input type="email" class="form-control" placeholder="admin@qcu.edu.ph">
+            </div>
+            <div class="col-md-3">
+                <label class="small fw-bold mb-1"><i class="bi bi-clock me-1"></i> Frequency</label>
+                <select class="form-select"><option>Weekly</option><option>Monthly</option></select>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button class="btn btn-export-pdf w-100 py-2">Schedule Report</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const sharedOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 6 } } },
+        scales: { y: { beginAtZero: true, grid: { borderDash: [5, 5] } }, x: { grid: { display: false } } }
+    };
+
+    new Chart(document.getElementById('intrusionChart'), {
+        type: 'line',
+        data: {
+            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+            datasets: [{
+                label: 'Intrusions',
+                data: [2, 3, 1, 4, 2, 1, 0],
+                borderColor: '#ff6b00',
+                backgroundColor: 'rgba(255,107,0,0.1)',
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: sharedOptions
+    });
+
+    new Chart(document.getElementById('accessChart'), {
+        type: 'bar',
+        data: {
+            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+            datasets: [
+                { label: 'Entries', data: [90, 95, 88, 105, 98, 45, 40], backgroundColor: '#003399', borderRadius: 4 },
+                { label: 'Exits', data: [85, 90, 80, 100, 95, 40, 35], backgroundColor: '#ff6b00', borderRadius: 4 }
+            ]
+        },
+        options: sharedOptions
+    });
+</script>
