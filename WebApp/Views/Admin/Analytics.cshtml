@@ -1,293 +1,266 @@
+@model WebApp.Models.AdminDashboardViewModel
+
 @{
     ViewData["Title"] = "Analytics & Reports";
     Layout = "_Layout";
 }
 
-<style>
-    :root {
-        --qcu-blue: #002d72;
-        --qcu-light-blue: #0046ad;
-        --qcu-orange: #ff6b00;
-        --bg-main: #f8f9fc;
-        --card-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-    }
+<div class="dashboard-container analytics">
 
-    body { background-color: var(--bg-main); font-family: 'Inter', sans-serif; }
-    .main-content { padding: 1.5rem; }
-
-    /* Header Banner */
-    .header-banner {
-        background: linear-gradient(90deg, #001a4d 0%, #003399 100%);
-        color: white;
-        padding: 1.25rem 2rem;
-        border-radius: 0; /* Full width align with sidebar top */
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin: -1.5rem -1.5rem 2rem -1.5rem;
-    }
-
-    .report-badge {
-        background: rgba(255, 255, 255, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        padding: 0.5rem 1rem;
-        border-radius: 8px;
-        font-size: 0.85rem;
-    }
-
-    /* Card & Stats Design */
-    .glass-card {
-        background: white;
-        border: 1px solid #edf2f7;
-        border-radius: 12px;
-        box-shadow: var(--card-shadow);
-        height: 100%;
-    }
-
-    .stat-icon {
-        width: 40px;
-        height: 40px;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    /* Filter Bar */
-    .filter-label { font-size: 0.8rem; font-weight: 600; color: #4a5568; margin-bottom: 0.5rem; }
-    .filter-icon-box { background: #003399; color: white; border-radius: 6px; padding: 0.4rem; margin-right: 0.75rem; }
-
-    /* Button Styles */
-    .btn-export-pdf { background-color: var(--qcu-orange); color: white; border: none; font-weight: 600; }
-    .btn-export-csv { background-color: #003399; color: white; border: none; font-weight: 600; }
-    .btn-print { background-color: #4a5568; color: white; border: none; font-weight: 600; }
-
-    /* Table Severity Badges */
-    .badge-low { background: #eef2ff; color: #4338ca; }
-    .badge-medium { background: #fffbeb; color: #b45309; }
-    .badge-high { background: #fff7ed; color: #c2410c; }
-    .badge-critical { background: #fef2f2; color: #b91c1c; }
-</style>
-
-<div class="main-content">
-    <div class="header-banner">
-        <div class="d-flex align-items-center">
-            <div class="bg-warning rounded-circle me-3 d-flex align-items-center justify-content-center" style="width: 45px; height: 45px;">
-                <img src="/logo_qcu.png" style="width: 30px;" alt="QCU">
-            </div>
+    <!-- ===================== -->
+    <!-- HEADER -->
+    <!-- ===================== -->
+    <div class="section analytics-header">
+        <div class="section-header">
             <div>
-                <h4 class="mb-0 fw-bold">Analytics & Reports</h4>
-                <p class="mb-0 small opacity-75">Generate security reports and insights</p>
-            </div>
-        </div>
-        <div class="report-badge">
-            <i class="bi bi-bar-chart-fill me-2" style="color: #4fd1c5;"></i> Reports <span style="color: #4fd1c5; font-weight: bold;">Active</span>
-        </div>
-    </div>
-
-    <div class="row g-4 mb-4">
-        <div class="col-md-3">
-            <div class="glass-card p-3 d-flex align-items-start justify-content-between">
-                <div>
-                    <div class="stat-icon mb-3" style="background: #ebf4ff; color: #3182ce;"><i class="bi bi-exclamation-triangle"></i></div>
-                    <h3 class="fw-bold mb-0">6</h3>
-                    <small class="text-muted">Total Alerts</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="glass-card p-3 d-flex align-items-start justify-content-between">
-                <div>
-                    <div class="stat-icon mb-3" style="background: #fff5f5; color: #e53e3e;"><i class="bi bi-people"></i></div>
-                    <h3 class="fw-bold mb-0">4</h3>
-                    <small class="text-muted">Access Logs</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="glass-card p-3 d-flex align-items-start justify-content-between">
-                <div>
-                    <div class="stat-icon mb-3" style="background: #faf5ff; color: #805ad5;"><i class="bi bi-camera-video"></i></div>
-                    <h3 class="fw-bold mb-0">24</h3>
-                    <small class="text-muted">Active Cameras</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="glass-card p-3 d-flex align-items-start justify-content-between">
-                <div>
-                    <div class="stat-icon mb-3" style="background: #f0fff4; color: #38a169;"><i class="bi bi-activity"></i></div>
-                    <h3 class="fw-bold mb-0">40%</h3>
-                    <small class="text-muted">Avg Occupancy</small>
-                </div>
+                <h3 style="margin:0;">Analytics & Reports</h3>
+                <p style="margin:2px 0 0; font-size:12px; color:#9ca3af;">
+                    Security system insights and operational monitoring
+                </p>
             </div>
         </div>
     </div>
 
-    <div class="glass-card p-4 mb-4">
-        <div class="d-flex align-items-center mb-4">
-            <div class="filter-icon-box"><i class="bi bi-funnel"></i></div>
-            <h5 class="mb-0 fw-bold">Report Filters</h5>
-        </div>
-        <div class="row g-3 mb-4">
-            <div class="col-md-3">
-                <label class="filter-label"><i class="bi bi-calendar-event me-2 text-primary"></i>Start Date</label>
-                <input type="date" class="form-control border-light shadow-sm" value="2026-03-23">
-            </div>
-            <div class="col-md-3">
-                <label class="filter-label"><i class="bi bi-calendar-check me-2 text-primary"></i>End Date</label>
-                <input type="date" class="form-control border-light shadow-sm" value="2026-03-30">
-            </div>
-            <div class="col-md-3">
-                <label class="filter-label"><i class="bi bi-geo-alt me-2 text-orange" style="color:var(--qcu-orange)"></i>Room/Location</label>
-                <select class="form-select border-light shadow-sm"><option>All Rooms</option></select>
-            </div>
-            <div class="col-md-3">
-                <label class="filter-label"><i class="bi bi-exclamation-circle me-2 text-orange" style="color:var(--qcu-orange)"></i>Event Type</label>
-                <select class="form-select border-light shadow-sm"><option>All Events</option></select>
-            </div>
-        </div>
-        <div class="d-flex gap-2">
-            <button class="btn btn-export-pdf px-4 py-2"><i class="bi bi-file-earmark-pdf me-2"></i>Export PDF</button>
-            <button class="btn btn-export-csv px-4 py-2"><i class="bi bi-download me-2"></i>Export CSV</button>
-            <button class="btn btn-print px-4 py-2"><i class="bi bi-printer me-2"></i>Print Graphs</button>
-        </div>
-    </div>
+    <!-- ===================== -->
+    <!-- STATS -->
+    <!-- ===================== -->
+    <div class="stats analytics-stats">
 
-    <div class="row g-4 mb-4">
-        <div class="col-md-6">
-            <div class="glass-card p-4">
-                <div class="d-flex align-items-center mb-3">
-                    <i class="bi bi-exclamation-triangle text-danger me-2"></i>
-                    <h6 class="mb-0 fw-bold">Alert Intrusion Trends</h6>
-                </div>
-                <p class="text-muted small mb-4">Weekly intrusion patterns</p>
-                <div style="height: 250px;"><canvas id="intrusionChart"></canvas></div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="glass-card p-4">
-                <div class="d-flex align-items-center mb-3">
-                    <i class="bi bi-people text-primary me-2"></i>
-                    <h6 class="mb-0 fw-bold">Access Activity</h6>
-                </div>
-                <p class="text-muted small mb-4">Entry and exit tracking</p>
-                <div style="height: 250px;"><canvas id="accessChart"></canvas></div>
-            </div>
-        </div>
-    </div>
-
-    <div class="glass-card mb-4">
-        <div class="p-4 border-bottom d-flex align-items-center">
-            <i class="bi bi-bell text-danger me-2"></i>
+        <div class="stat-card">
+            <div class="stat-icon red"><i class="fa fa-exclamation-triangle"></i></div>
             <div>
-                <h6 class="mb-0 fw-bold">Recent Alerts</h6>
-                <small class="text-muted">Latest security events</small>
+                <h2>@Model.ActiveIncidentCount</h2>
+                <p>Active Alerts</p>
             </div>
         </div>
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="bg-light">
-                    <tr class="text-muted small">
-                        <th class="ps-4">DATE</th>
-                        <th>TIME</th>
-                        <th>EVENT TYPE</th>
-                        <th>LOCATION</th>
-                        <th class="pe-4 text-end">SEVERITY</th>
-                    </tr>
-                </thead>
-                <tbody class="small">
-                    <tr>
-                        <td class="ps-4">2026-03-30</td>
-                        <td>08:45 AM</td>
-                        <td>Motion Detection</td>
-                        <td>Building A - Lobby</td>
-                        <td class="pe-4 text-end"><span class="badge badge-low px-3">Low</span></td>
-                    </tr>
-                    <tr>
-                        <td class="ps-4">2026-03-30</td>
-                        <td>09:12 AM</td>
-                        <td>Person Detection</td>
-                        <td>Parking Lot</td>
-                        <td class="pe-4 text-end"><span class="badge badge-medium px-3">Medium</span></td>
-                    </tr>
-                    <tr>
-                        <td class="ps-4">2026-03-29</td>
-                        <td>02:34 PM</td>
-                        <td>Unauthorized Access</td>
-                        <td>Server Room</td>
-                        <td class="pe-4 text-end"><span class="badge badge-high px-3">High</span></td>
-                    </tr>
-                    <tr>
-                        <td class="ps-4">2026-03-29</td>
-                        <td>05:20 PM</td>
-                        <td>Intrusion Attempt</td>
-                        <td>Building B - Floor 2</td>
-                        <td class="pe-4 text-end"><span class="badge badge-critical px-3">Critical</span></td>
-                    </tr>
-                </tbody>
-            </table>
+
+        <div class="stat-card">
+            <div class="stat-icon blue"><i class="fa fa-door-open"></i></div>
+            <div>
+                <h2>@Model.AccessWeekly.Sum()</h2>
+                <p>Access Logs</p>
+            </div>
         </div>
+
+        <div class="stat-card">
+            <div class="stat-icon green"><i class="fa fa-video"></i></div>
+            <div>
+                <h2>@Model.TodayDetectionCount</h2>
+                <p>Detections</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon yellow"><i class="fa fa-users"></i></div>
+            <div>
+                <h2>@Model.ActivePersonnelCount</h2>
+                <p>Personnel</p>
+            </div>
+        </div>
+
     </div>
 
-    <div class="glass-card p-4">
-        <div class="d-flex align-items-center mb-4">
-            <div class="stat-icon me-3" style="background: #fff7ed; color: var(--qcu-orange);"><i class="bi bi-envelope"></i></div>
+    <!-- ===================== -->
+    <!-- FILTERS (FIXED LAYOUT) -->
+    <!-- ===================== -->
+    <div class="section">
+
+        <div class="section-header">
+            <h3>Report Filters</h3>
+        </div>
+
+        <div class="filter-grid">
+
             <div>
-                <h6 class="mb-0 fw-bold">Schedule Automated Reports</h6>
-                <p class="text-muted small mb-0">Receive reports automatically via email</p>
+                <label class="filter-label">Start Date</label>
+                <input type="date" class="filter-input" />
             </div>
+
+            <div>
+                <label class="filter-label">End Date</label>
+                <input type="date" class="filter-input" />
+            </div>
+
+            <div>
+                <label class="filter-label">Location</label>
+                <select class="filter-select">
+                    <option>All Rooms</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="filter-label">Event Type</label>
+                <select class="filter-select">
+                    <option>All Events</option>
+                </select>
+            </div>
+
         </div>
-        <div class="row g-3">
-            <div class="col-md-6">
-                <label class="small fw-bold mb-1">Email Address</label>
-                <input type="email" class="form-control" placeholder="admin@qcu.edu.ph">
-            </div>
-            <div class="col-md-3">
-                <label class="small fw-bold mb-1"><i class="bi bi-clock me-1"></i> Frequency</label>
-                <select class="form-select"><option>Weekly</option><option>Monthly</option></select>
-            </div>
-            <div class="col-md-3 d-flex align-items-end">
-                <button class="btn btn-export-pdf w-100 py-2">Schedule Report</button>
-            </div>
+
+        <div style="margin-top:10px; display:flex; gap:8px;">
+            <button class="btn-action-analytics btn-pdf">Export PDF</button>
+            <button class="btn-action-analytics btn-csv">Export CSV</button>
+            <button class="btn-action-analytics btn-print">Print</button>
         </div>
+
     </div>
+
+    <!-- ===================== -->
+    <!-- CHARTS (FIXED HEIGHT CONTROL) -->
+    <!-- ===================== -->
+    <div class="analytics-charts">
+
+        <div class="panel">
+            <h4>Alert Trends</h4>
+            <div class="chart-container">
+                <canvas id="alertChart"></canvas>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h4>Access Activity</h4>
+            <div class="chart-container">
+                <canvas id="accessChart"></canvas>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h4>Detection Activity</h4>
+            <div class="chart-container">
+                <canvas id="motionChart"></canvas>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h4>Room Occupancy</h4>
+            <div class="chart-container">
+                <canvas id="occupancyChart"></canvas>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ===================== -->
+    <!-- SCHEDULE REPORTS -->
+    <!-- ===================== -->
+    <div class="section">
+
+        <div class="section-header">
+            <h3>Schedule Automated Reports</h3>
+        </div>
+
+        <p style="margin-top:-6px; font-size:12px; color:#9ca3af;">
+            Receive reports automatically via email
+        </p>
+
+        <div class="filter-grid">
+
+            <div style="grid-column: span 2;">
+                <label class="filter-label">Email Address</label>
+                <input type="email" class="filter-input" placeholder="admin@security.com" />
+            </div>
+
+            <div>
+                <label class="filter-label">Frequency</label>
+                <select class="filter-select">
+                    <option>Weekly</option>
+                    <option>Monthly</option>
+                    <option>Daily</option>
+                </select>
+            </div>
+
+            <div style="display:flex; align-items:end;">
+                <button class="btn-action-analytics btn-pdf" style="width:100%;">
+                    Schedule
+                </button>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- ===================== -->
+    <!-- RECENT ALERTS -->
+    <!-- ===================== -->
+    <div class="section">
+
+        <div class="section-header">
+            <h3>Recent Alerts</h3>
+        </div>
+
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Event</th>
+                    <th>Location</th>
+                    <th style="text-align:right;">Severity</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                <tr>
+                    <td colspan="5" style="color:#9ca3af;">
+                        Connected to database — alerts will appear here
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+    </div>
+
 </div>
 
+<!-- ===================== -->
+<!-- CHART JS -->
+<!-- ===================== -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <script>
-    const sharedOptions = {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 6 } } },
-        scales: { y: { beginAtZero: true, grid: { borderDash: [5, 5] } }, x: { grid: { display: false } } }
-    };
+    const labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Labels ?? new List<string>()));
 
-    new Chart(document.getElementById('intrusionChart'), {
-        type: 'line',
-        data: {
-            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-            datasets: [{
-                label: 'Intrusions',
-                data: [2, 3, 1, 4, 2, 1, 0],
-                borderColor: '#ff6b00',
-                backgroundColor: 'rgba(255,107,0,0.1)',
-                fill: true,
-                tension: 0.4
-            }]
-        },
-        options: sharedOptions
-    });
+    function createChart(id, type, data, color) {
+        const ctx = document.getElementById(id);
+        if (!ctx) return;
 
-    new Chart(document.getElementById('accessChart'), {
-        type: 'bar',
-        data: {
-            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-            datasets: [
-                { label: 'Entries', data: [90, 95, 88, 105, 98, 45, 40], backgroundColor: '#003399', borderRadius: 4 },
-                { label: 'Exits', data: [85, 90, 80, 100, 95, 40, 35], backgroundColor: '#ff6b00', borderRadius: 4 }
-            ]
-        },
-        options: sharedOptions
-    });
+        new Chart(ctx, {
+            type: type,
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    borderColor: color,
+                    backgroundColor: color + "33",
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    createChart("alertChart", "line",
+        @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AlertWeekly)),
+        "#ef4444");
+
+    createChart("accessChart", "bar",
+        @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AccessWeekly)),
+        "#3b82f6");
+
+    createChart("motionChart", "bar",
+        @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.MotionWeekly)),
+        "#a855f7");
+
+    createChart("occupancyChart", "bar",
+        @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.OccupancyWeekly)),
+        "#22c55e");
 </script>

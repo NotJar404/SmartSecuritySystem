@@ -1,294 +1,422 @@
-﻿
-/* ========================================================= */
-/* ==================== CAMERA UI (UPDATED) ================= */
+﻿/* ========================================================= */
+/* ===================== BASE PAGE ========================= */
 /* ========================================================= */
 
 .camera-page {
     color: #e5e7eb;
     padding: 20px;
+    background: #020617;
+    min-height: 100vh;
 }
 
 /* ========================================================= */
-/* ===================== HEADER ============================= */
+/* ===================== TOP BAR =========================== */
 /* ========================================================= */
 
-.camera-topbar {
+.topbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 28px;
+    margin-bottom: 24px;
 }
 
-    .camera-topbar h1 {
-        font-size: 22px;
-        font-weight: 600;
-        margin: 0;
-    }
+.topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
 
-    .camera-topbar p {
-        color: #64748b;
-        font-size: 13px;
-        margin-top: 4px;
-    }
+.app-icon {
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    border-radius: 10px;
+}
 
-/* ACTIONS */
+.app-icon i {
+    color: #2563eb;
+    font-size: 18px;
+}
 
-.top-actions {
+.topbar h1 {
+    font-size: 20px;
+    margin: 0;
+    font-weight: 600;
+}
+
+.topbar p {
+    margin: 2px 0 0;
+    font-size: 13px;
+    color: #64748b;
+}
+
+.topbar-right {
     display: flex;
     align-items: center;
     gap: 10px;
 }
 
-    .top-actions button {
-        background: #0f172a;
-        border: 1px solid #1e293b;
-        color: #cbd5f5;
-        padding: 8px 14px;
-        border-radius: 10px;
-        cursor: pointer;
-        transition: 0.2s;
-    }
-
-        .top-actions button:hover {
-            background: #1e293b;
-        }
-
-.add-btn {
-    background: #2563eb !important;
+.btn-add {
+    background: #2563eb;
     color: white;
     border: none;
-    padding: 10px 18px;
-    border-radius: 12px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    cursor: pointer;
     font-weight: 500;
 }
 
-    .add-btn:hover {
-        background: #1d4ed8 !important;
-    }
+.btn-add:hover {
+    background: #1d4ed8;
+}
+
+.view-toggle button {
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    color: #cbd5f5;
+    padding: 8px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.view-toggle button:hover {
+    background: #1e293b;
+}
+
+.live-pill {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.count-pill {
+    background: rgba(255,255,255,0.05);
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+}
 
 /* ========================================================= */
-/* ===================== GRID VIEW ========================== */
+/* ===================== GRID VIEW ========================= */
 /* ========================================================= */
 
-.live-grid {
+.grid-view {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
 }
 
 /* CARD */
-
-.live-card {
+.grid-card {
     background: linear-gradient(145deg, #0f172a, #020617);
-    border: 1px solid #1e293b;
-    border-radius: 18px;
-    padding: 16px;
-    cursor: pointer;
-    transition: all 0.25s ease;
-}
-
-    .live-card:hover {
-        transform: translateY(-4px);
-        border-color: #2563eb;
-        box-shadow: 0 10px 30px rgba(37, 99, 235, 0.2);
-    }
-
-/* TOP */
-
-.live-top {
-    display: flex;
-    align-items: center;
-    margin-bottom: 12px;
-}
-
-    .live-top span:first-child {
-        font-weight: 600;
-    }
-
-.status {
-    margin-left: auto;
-    background: rgba(34,197,94,0.15);
-    color: #22c55e;
-    font-size: 11px;
-    padding: 4px 10px;
-    border-radius: 999px;
-}
-
-/* BODY */
-
-.live-body {
-    height: 200px;
-    border-radius: 14px;
-    background: radial-gradient(circle, #111827, #020617);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    gap: 10px;
-}
-
-    .live-body i {
-        font-size: 40px;
-        opacity: 0.15;
-    }
-
-    .live-body div {
-        font-size: 13px;
-        color: #64748b;
-    }
-
-/* FOOTER */
-
-.live-footer {
-    margin-top: 10px;
-    font-size: 12px;
-    color: #94a3b8;
-}
-
-/* ========================================================= */
-/* ===================== FOCUS VIEW ========================= */
-/* ========================================================= */
-
-.camera-layout {
-    display: flex;
-    gap: 24px;
-}
-
-/* LEFT PANEL */
-
-.camera-list {
-    width: 300px;
-}
-
-.camera-card {
-    background: #020617;
     border: 1px solid #1e293b;
     border-radius: 14px;
     padding: 14px;
-    margin-bottom: 12px;
     cursor: pointer;
     transition: 0.2s;
 }
 
-    .camera-card:hover {
-        border-color: #2563eb;
-    }
-
-    .camera-card.active {
-        background: linear-gradient(145deg, #2563eb, #1d4ed8);
-        border: none;
-    }
-
-/* ========================================================= */
-/* ===================== RIGHT VIEW ========================= */
-/* ========================================================= */
-
-.camera-view {
-    flex: 1;
+.grid-card:hover {
+    transform: translateY(-4px);
+    border-color: #2563eb;
+    box-shadow: 0 10px 25px rgba(37,99,235,0.15);
 }
 
-/* HEADER */
-
-.view-header {
+.grid-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
+    margin-bottom: 10px;
 }
 
-    .view-header h2 {
-        margin: 0;
-        font-size: 18px;
-    }
-
-    .view-header p {
-        font-size: 13px;
-        color: #64748b;
-    }
-
-    /* FULLSCREEN BUTTON */
-
-    .view-header button {
-        background: #0f172a;
-        border: none;
-        padding: 10px;
-        border-radius: 10px;
-        color: white;
-        cursor: pointer;
-    }
-
-/* ========================================================= */
-/* ===================== VIDEO ============================== */
-/* ========================================================= */
-
-.video-container {
-    height: 380px;
-    border-radius: 18px;
-    background: radial-gradient(circle at center, #111827, #020617);
-    border: 1px solid #1e293b;
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-/* LIVE BADGE */
-
-.live-badge {
-    position: absolute;
-    top: 16px;
-    left: 16px;
-    background: #ef4444;
-    padding: 6px 12px;
-    border-radius: 999px;
-    font-size: 12px;
+.grid-title {
     font-weight: 600;
 }
 
-/* TIME */
+.live-badge {
+    background: rgba(34,197,94,0.15);
+    color: #22c55e;
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 999px;
+}
 
-.time {
+.grid-body {
+    height: 160px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle, #111827, #020617);
+    border-radius: 12px;
+}
+
+.grid-body i {
+    font-size: 40px;
+    opacity: 0.12;
+}
+
+.grid-footer {
+    margin-top: 10px;
+    font-size: 12px;
+    color: #94a3b8;
+    display: flex;
+    justify-content: space-between;
+}
+
+/* ========================================================= */
+/* ===================== FOCUS VIEW ======================== */
+/* ========================================================= */
+
+.focus-layout {
+    display: flex;
+    gap: 16px;
+    height: calc(100vh - 140px);
+}
+
+/* SIDEBAR (fixed width, never affected by zoom) */
+.sidebar {
+    width: 300px;
+    flex-shrink: 0;
+    background: rgba(15,23,42,0.6);
+    border: 1px solid #1e293b;
+    border-radius: 12px;
+    padding: 12px;
+    overflow-y: auto;
+}
+
+.sidebar-title {
+    font-size: 12px;
+    color: #94a3b8;
+    margin-bottom: 10px;
+    font-weight: 600;
+}
+
+/* ========================================================= */
+/* ============== CAMERA ITEM (FIGMA MATCH) ================ */
+/* ========================================================= */
+
+.camera-item {
+    position: relative;
+    padding: 14px 14px 12px 14px;
+    border-radius: 14px;
+    border: 1px solid #1e293b;
+    background: #0f172a;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    overflow: hidden;
+}
+
+/* hover state (subtle lift like Figma) */
+.camera-item:hover {
+    transform: translateY(-2px);
+    border-color: #334155;
+}
+
+/* ========================================================= */
+/* ACTIVE STATE (ORANGE CARD - EXACT LOOK) */
+/* ========================================================= */
+
+.camera-item.active {
+    background: linear-gradient(135deg, #ff7a00 0%, #ff5a00 100%);
+    border: none;
+    color: #ffffff;
+    box-shadow: 0 10px 25px rgba(255, 122, 0, 0.25);
+}
+
+/* icon + name row */
+.camera-item-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 14px;
+    color: inherit;
+}
+
+/* camera icon */
+.camera-item-header i {
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+/* location text (Front Door) */
+.camera-location {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+/* owner row */
+.camera-owner {
+    margin-top: 10px;
+    font-size: 12px;
+    color: #cbd5f5;
+    opacity: 0.9;
+}
+
+/* divider line (like Figma subtle separation) */
+.camera-item::after {
+    content: "";
     position: absolute;
-    top: 16px;
-    right: 16px;
-    background: black;
-    padding: 6px 12px;
+    left: 14px;
+    right: 14px;
+    top: 62px;
+    height: 1px;
+    background: rgba(148, 163, 184, 0.15);
+}
+
+/* ========================================================= */
+/* ACTIVE OVERRIDES (IMPORTANT FOR FIGMA MATCH) */
+/* ========================================================= */
+
+.camera-item.active .camera-location,
+.camera-item.active .camera-owner {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.camera-item.active::after {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+/* small icon contrast fix */
+.camera-item.active i {
+    color: #fff;
+}
+
+/* ========================================================= */
+/* ===================== VIEWER ============================ */
+/* ========================================================= */
+
+.viewer {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+/* HEADER */
+.viewer-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.viewer-header h2 {
+    margin: 0;
+}
+
+.viewer-actions button {
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    color: #cbd5f5;
+    padding: 8px 10px;
     border-radius: 8px;
+    cursor: pointer;
+}
+
+/* ========================================================= */
+/* ===================== VIEWER BODY ======================= */
+/* ========================================================= */
+
+.viewer-body {
+    flex: 1;
+    position: relative;
+    border-radius: 14px;
+    background: radial-gradient(circle, #111827, #020617);
+    border: 1px solid #1e293b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+/* LIVE BADGE */
+.rec-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: #ef4444;
+    color: white;
+    padding: 6px 10px;
+    border-radius: 999px;
     font-size: 12px;
 }
 
-/* CAMERA ICON */
+/* TIME */
+.timestamp {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    font-size: 12px;
+    background: rgba(0,0,0,0.5);
+    padding: 6px 10px;
+    border-radius: 8px;
+}
 
+/* PLACEHOLDER */
 .camera-placeholder i {
-    font-size: 70px;
+    font-size: 80px;
     opacity: 0.1;
 }
 
 /* OVERLAY */
-
-.camera-overlay {
+.overlay {
     position: absolute;
-    bottom: 16px;
-    left: 16px;
-    background: rgba(0,0,0,0.6);
-    padding: 12px;
-    border-radius: 10px;
+    bottom: 12px;
+    left: 12px;
+    background: rgba(0,0,0,0.5);
+    padding: 10px;
+    border-radius: 8px;
     font-size: 12px;
 }
 
-/* RECORDING */
+/* ========================================================= */
+/* ===================== ZOOM MODE (IMPORTANT) ============ */
+/* ========================================================= */
+/*
+   THIS is your "fake fullscreen / zoom"
+   ONLY expands viewer, NOT sidebar
+*/
 
-.recording {
-    position: absolute;
-    bottom: 16px;
-    right: 16px;
-    color: #ef4444;
-    font-size: 13px;
-    font-weight: 600;
+.viewer.zoomed {
+    position: relative;
+}
+
+.viewer.zoomed .viewer-body {
+    position: fixed;
+    top: 80px;          /* keeps topbar visible */
+    left: 320px;        /* keeps sidebar visible */
+    right: 20px;
+    bottom: 20px;
+    z-index: 50;
+    border-radius: 14px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+}
+
+/* optional dark backdrop when zoomed */
+.viewer.zoomed::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 40;
+}
+
+/* keep sidebar ALWAYS above backdrop */
+.sidebar {
+    position: relative;
+    z-index: 60;
 }
 
 /* ========================================================= */
-/* ===================== MODAL ============================== */
+/* ===================== MODAL ============================= */
 /* ========================================================= */
 
 .modal {
@@ -301,471 +429,173 @@
     z-index: 9999;
 }
 
+/* show modal */
 .modal.active {
-    display: flex !important;
+    display: flex;
 }
 
 .modal-content {
     width: 90%;
-    max-width: 500px;
-    max-height: 85vh;
+    max-width: 480px;
     background: #0f172a;
-    border-radius: 16px;
-    border: 1px solid rgba(255,255,255,0.08);
-    display: flex;
-    flex-direction: column;
+    border-radius: 14px;
+    border: 1px solid #1e293b;
     overflow: hidden;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    animation: pop 0.2s ease;
 }
 
-/* HEADER */
+/* animation */
+@keyframes pop {
+    from { transform: scale(0.95); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
 
-.modal-header {
-    padding: 24px 28px;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
+/* HEADER + FOOTER */
+.modal-header,
+.modal-footer {
+    padding: 16px;
+    border-bottom: 1px solid #1e293b;
     display: flex;
     justify-content: space-between;
     align-items: center;
 }
 
-.modal-header h2 {
-    margin: 0;
-    font-size: 18px;
-    font-weight: 700;
-    color: #e2e8f0;
-}
-
-.close {
-    cursor: pointer;
-    font-size: 24px;
-    color: #cbd5f5;
-    transition: all 0.2s ease;
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 8px;
-}
-
-.close:hover {
-    background: rgba(239, 68, 68, 0.1);
-    color: #ef4444;
-}
-
-/* BODY */
-
-/* BODY */
-
-.modal-body {
-    padding: 24px 28px;
-    overflow-y: auto;
-    flex: 1;
-}
-
-/* SECTIONS */
-.section {
-    margin-bottom: 24px;
-    padding-bottom: 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-}
-
-.section:last-child {
-    border-bottom: none;
-    margin-bottom: 0;
-    padding-bottom: 0;
-}
-
-.section-title {
-    margin: 0 0 16px 0;
-    font-size: 12px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: #94a3b8;
-}
-
-/* FORM GROUPS */
-.form-group {
-    margin-bottom: 16px;
-}
-
-.form-group:last-child {
-    margin-bottom: 0;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 8px;
-    font-size: 13px;
-    font-weight: 600;
-    color: #cbd5f5;
-}
-
-.required {
-    color: #ef4444;
-}
-
-.form-group input,
-.form-group select {
-    width: 100%;
-    background: #111827;
-    border: 1px solid rgba(255,255,255,0.08);
-    color: #e2e8f0;
-    padding: 10px 12px;
-    border-radius: 8px;
-    font-size: 13px;
-    transition: all 0.2s ease;
-    font-family: inherit;
-}
-
-.form-group input::placeholder,
-.form-group select::placeholder {
-    color: #64748b;
-}
-
-.form-group input:focus,
-.form-group select:focus {
-    outline: none;
-    border-color: #2563eb;
-    background: #0f172a;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-/* FORM GRID */
-.form-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-}
-
-/* CHECKBOX GROUP */
-.checkbox-group {
-    margin-bottom: 12px;
-    padding: 12px;
-    background: rgba(255,255,255,0.02);
-    border: 1px solid rgba(255,255,255,0.05);
-    border-radius: 8px;
-    transition: all 0.2s ease;
-}
-
-.checkbox-group:hover {
-    background: rgba(255,255,255,0.04);
-    border-color: rgba(255,255,255,0.08);
-}
-
-.checkbox-label {
-    display: flex;
-    align-items: flex-start;
+.modal-footer {
+    border-top: 1px solid #1e293b;
+    justify-content: flex-end;
     gap: 10px;
-    cursor: pointer;
 }
 
-.checkbox-label input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
-    margin-top: 2px;
-    cursor: pointer;
-    accent-color: #2563eb;
+/* BODY */
+.modal-body {
+    padding: 16px;
 }
 
-.checkbox-text {
-    font-size: 13px;
-    font-weight: 600;
-    color: #cbd5f5;
+/* FORM INPUTS */
+.form-group {
+    margin-bottom: 14px;
 }
 
-.checkbox-desc {
+label {
+    display: block;
     font-size: 12px;
-    color: #64748b;
-    margin: 4px 0 0 0;
+    color: #94a3b8;
+    margin-bottom: 6px;
 }
 
 /* INPUTS */
-
-input, select {
+input,
+select {
     width: 100%;
-    background: #111827;
-    border: 1px solid rgba(255,255,255,0.08);
-    color: #e2e8f0;
-    padding: 10px 12px;
+    padding: 10px;
     border-radius: 8px;
-    margin-bottom: 0;
-    font-size: 13px;
-    transition: all 0.2s ease;
-}
-
-input:focus, select:focus {
+    background: #111827;
+    border: 1px solid #1e293b;
+    color: white;
     outline: none;
-    border-color: #2563eb;
-    background: #0f172a;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
-.grid-2 {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
+/* small helper text (for Stream Source info) */
+small {
+    display: block;
+    margin-top: 6px;
+    font-size: 11px;
+    color: #64748b;
 }
 
-.grid-2 > div {
+/* CHECKBOX ROW */
+.form-grid {
     display: flex;
-    flex-direction: column;
+    justify-content: space-between;
+    gap: 10px;
 }
 
-.grid-2 label {
-    margin-top: 0 !important;
+.form-grid .form-group {
+    flex: 1;
 }
 
-/* FOOTER */
-
-.modal-footer {
-    padding: 16px 28px;
-    border-top: 1px solid rgba(255,255,255,0.05);
-    display: flex;
-    justify-content: flex-end;
-    gap: 12px;
-}
-
+/* BUTTONS */
 button.cancel {
     background: #334155;
-    color: #e2e8f0;
-    padding: 10px 24px;
-    border-radius: 8px;
+    color: white;
+    padding: 8px 14px;
     border: none;
+    border-radius: 8px;
     cursor: pointer;
-    font-weight: 600;
-    font-size: 13px;
-    transition: all 0.2s ease;
-}
-
-button.cancel:hover {
-    background: #475569;
-    transform: translateY(-1px);
 }
 
 button.save {
-    background: #ff6b35;
+    background: #2563eb;
     color: white;
-    padding: 10px 28px;
-    border-radius: 8px;
+    padding: 8px 14px;
     border: none;
+    border-radius: 8px;
     cursor: pointer;
-    font-weight: 600;
-    font-size: 13px;
-    transition: all 0.2s ease;
 }
 
 button.save:hover {
-    background: #ff5a1a;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+    background: #1d4ed8;
 }
 
-/* ============================= */
-/* LIGHT MODE SUPPORT */
-/* ============================= */
-body.light-mode .camera-page {
-    color: #0f172a;
+/* close button */
+.close {
+    cursor: pointer;
+    font-size: 18px;
+    color: #94a3b8;
 }
 
-body.light-mode .camera-topbar h1 {
-    color: #0f172a;
-}
-
-body.light-mode .camera-topbar p {
-    color: #64748b;
-}
-
-body.light-mode .top-actions button {
-    background: #f1f5f9;
-    border-color: #e2e8f0;
-    color: #334155;
-}
-
-    body.light-mode .top-actions button:hover {
-        background: #e2e8f0;
-    }
-
-body.light-mode .add-btn {
-    background: #2563eb !important;
+.close:hover {
     color: white;
 }
 
-body.light-mode .live-card {
-    background: #ffffff;
-    border-color: #e2e8f0;
-}
+/* ========================================================= */
+/* ===================== RESPONSIVE ======================== */
+/* ========================================================= */
 
-    body.light-mode .live-card:hover {
-        border-color: #cbd5f5;
-        box-shadow: 0 10px 30px rgba(37, 99, 235, 0.1);
-    }
-
-body.light-mode .live-card .live-top,
-body.light-mode .live-card .live-body,
-body.light-mode .live-card .live-footer {
-    color: #0f172a;
-}
-
-body.light-mode .status {
-    background: rgba(34, 197, 94, 0.2);
-    color: #16a34a;
-}
-
-body.light-mode .camera-list {
-    background: #f8fafc;
-    border-right-color: #e2e8f0;
-}
-
-body.light-mode .camera-card {
-    background: #ffffff;
-    color: #0f172a;
-    border-color: #e2e8f0;
-}
-
-    body.light-mode .camera-card:hover {
-        background: #f1f5f9;
-        border-color: #cbd5f5;
-    }
-
-body.light-mode .view-header {
-    background: #f8fafc;
-    border-bottom-color: #e2e8f0;
-    color: #0f172a;
-}
-
-body.light-mode .video-container {
-    background: #e2e8f0;
-}
-
-body.light-mode .camera-placeholder {
-    color: #cbd5f5;
-}
-
-body.light-mode .camera-overlay {
-    background: rgba(15, 23, 42, 0.9);
-}
-
-body.light-mode .modal-content {
-    background: #ffffff;
-    border-color: #e2e8f0;
-}
-
-body.light-mode .modal-header {
-    border-bottom-color: #e2e8f0;
-}
-
-body.light-mode .modal-header h2 {
-    color: #0f172a;
-}
-
-body.light-mode .close {
-    color: #64748b;
-}
-
-body.light-mode .modal-body {
-    color: #0f172a;
-}
-
-body.light-mode .modal-body label {
-    color: #334155;
-}
-
-body.light-mode .modal-body input,
-body.light-mode .modal-body select {
-    background: #f8fafc;
-    border-color: #e2e8f0;
-    color: #0f172a;
-}
-
-    body.light-mode .modal-body input:focus,
-    body.light-mode .modal-body select:focus {
-        background: #ffffff;
-        border-color: #2563eb;
-    }
-
-body.light-mode .section-title {
-    color: #64748b;
-}
-
-body.light-mode .modal-body hr {
-    border-color: #e2e8f0;
-}
-
-body.light-mode .modal-footer {
-    border-top-color: #e2e8f0;
-}
-
-body.light-mode button.cancel {
-    background: #e2e8f0;
-    color: #334155;
-}
-
-    body.light-mode button.cancel:hover {
-        background: #cbd5f5;
-    }
-
-/* ============================= */
-/* RESPONSIVE */
-/* ============================= */
 @media (max-width: 1024px) {
-    .live-grid {
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-        gap: 16px;
-    }
-
-    .camera-layout {
-        grid-template-columns: 1fr;
-    }
-
-    .camera-list {
-        height: auto;
-        max-height: 150px;
-        overflow-x: auto;
-        flex-direction: row;
-        margin-bottom: 16px;
-    }
-}
-
-@media (max-width: 768px) {
-    .camera-page {
-        padding: 16px;
-    }
-
-    .camera-topbar {
+    .focus-layout {
         flex-direction: column;
-        align-items: flex-start;
-        gap: 16px;
-        margin-bottom: 20px;
     }
 
-    .top-actions {
+    .sidebar {
         width: 100%;
-        flex-wrap: wrap;
+        display: flex;
+        gap: 10px;
+        overflow-x: auto;
     }
 
-    .top-actions button {
-        flex: 1;
-        min-width: 100px;
-    }
-
-    .live-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .modal-content {
-        width: 95%;
-        max-height: 90vh;
-    }
-
-    .modal-header,
-    .modal-body,
-    .modal-footer {
-        padding: 16px 20px;
-    }
-
-    .grid-2 {
-        grid-template-columns: 1fr;
+    .viewer.zoomed .viewer-body {
+        position: fixed;
+        left: 10px;
+        right: 10px;
+        top: 100px;
+        bottom: 10px;
     }
 }
+
+/* Fullscreen docked sidebar styles when focusView is fullscreen */
+#focusView.fs-docked { display:flex !important; }
+#focusView.fs-docked .sidebar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 320px;
+    z-index: 40;
+    border-radius: 0;
+    padding: 12px;
+}
+
+#focusView.fs-docked .camera-list {
+    max-height: calc(3 * 130px);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+#focusView.fs-docked .camera-item { min-height: 120px }
+
+#focusView.fs-docked .viewer { margin-left: 320px }
+
+#focusView.fs-docked .viewer-body { height: 100vh }

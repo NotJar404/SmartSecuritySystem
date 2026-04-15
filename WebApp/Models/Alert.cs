@@ -1,34 +1,48 @@
 ﻿using System;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace WebApp.Models
 {
+    [Table("alerts")]
     public class Alert
     {
-        public int Id { get; set; }
+        [Key]
+        [Column("alert_id")]
+        public int AlertId { get; set; }
 
-        public string Title { get; set; }           // Example: "Unauthorized Person"
-        public string Description { get; set; }     // Example: "Unknown person detected at main entrance"
-        public string Location { get; set; }        // Example: "Front Door", "Back Yard"
+        [Column("type")]
+        public string Type { get; set; } = string.Empty;
 
-        // Use enum for Severity
+        [Column("description")]
+        public string? Description { get; set; }
+
+        [Column("severity")]
         public SeverityLevel Severity { get; set; } = SeverityLevel.WARNING;
 
-        // Use enum for Status
-        public AlertStatus Status { get; set; } = AlertStatus.Active;
+        [Column("room_id")]
+        public int? RoomId { get; set; }
 
-        public DateTime CreatedAt { get; set; } = DateTime.Now;
+        [Column("timestamp")]
+        public DateTime Timestamp { get; set; } = DateTime.UtcNow;
 
-        // Computed property: minutes since creation
-        public int MinutesAgo => (int)(DateTime.Now - CreatedAt).TotalMinutes;
+        [Column("status")]
+        public AlertStatus Status { get; set; } = AlertStatus.New;
 
-        // Computed property: true if alert is critical
+        // UI ONLY
+        [NotMapped]
+        public int MinutesAgo => (int)(DateTime.UtcNow - Timestamp).TotalMinutes;
+
+        [NotMapped]
         public bool IsCritical => Severity == SeverityLevel.CRITICAL;
 
-        // Computed property: true if alert is resolved
+        [NotMapped]
         public bool IsResolved => Status == AlertStatus.Resolved;
+
+        [NotMapped]
+        public bool IsActive => Status == AlertStatus.New;
     }
 
-    // Enums for safer values
     public enum SeverityLevel
     {
         WARNING,
@@ -37,7 +51,7 @@ namespace WebApp.Models
 
     public enum AlertStatus
     {
-        Active,
+        New,
         Acknowledged,
         Resolved
     }

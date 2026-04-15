@@ -1,4 +1,6 @@
-﻿@{
+﻿@model WebApp.Models.DashboardViewModel
+
+@{
     Layout = "~/Views/Shared/_Layout.cshtml";
     ViewData["Title"] = "Dashboard";
 }
@@ -16,10 +18,10 @@
                 <span class="stat-label">Active Cameras</span>
             </div>
 
-            <h2>1 / 1</h2>
+            <h2>@Model.ActiveCameraCount / @Model.TotalCameraCount</h2>
             <p>Active Cameras</p>
 
-            <span class="stat-change positive">+0%</span>
+            <span class="stat-change neutral">Live</span>
         </div>
 
         <div class="stat-card">
@@ -28,10 +30,10 @@
                 <span class="stat-label">Detections Today</span>
             </div>
 
-            <h2>23</h2>
+            <h2>@Model.TodayDetectionCount</h2>
             <p>Detections Today</p>
 
-            <span class="stat-change positive">+12%</span>
+            <span class="stat-change positive">Updated</span>
         </div>
 
         <div class="stat-card">
@@ -40,10 +42,10 @@
                 <span class="stat-label">Active Alerts</span>
             </div>
 
-            <h2>2</h2>
+            <h2>@Model.ActiveAlertCount</h2>
             <p>Active Alerts</p>
 
-            <span class="stat-change negative">-50%</span>
+            <span class="stat-change negative">Attention</span>
         </div>
 
         <div class="stat-card">
@@ -52,7 +54,7 @@
                 <span class="stat-label">Access Requests</span>
             </div>
 
-            <h2>4</h2>
+            <h2>@Model.PendingAccessCount</h2>
             <p>Access Requests</p>
 
             <span class="stat-change neutral">Pending</span>
@@ -87,7 +89,7 @@
                     <div>
                         <h4>
                             Access Monitoring
-                            <span class="badge red">4 Pending</span>
+                            <span class="badge red">@Model.PendingAccessCount Pending</span>
                         </h4>
                         <p>Review RFID access requests</p>
                     </div>
@@ -103,7 +105,7 @@
                     <div>
                         <h4>
                             Security Alerts
-                            <span class="badge red">2 Active</span>
+                            <span class="badge red">@Model.ActiveAlertCount Active</span>
                         </h4>
                         <p>Check active security alerts</p>
                     </div>
@@ -141,21 +143,41 @@
                 <a href="#">View All</a>
             </div>
 
-            <div class="event-item">
-                <div class="event-icon blue"><i class="fa fa-eye"></i></div>
-                <div>
-                    <h4>Motion Detected</h4>
-                    <p>Main Entrance • 14:32:15</p>
-                </div>
-            </div>
-
-            <div class="event-item">
-                <div class="event-icon orange"><i class="fa fa-user"></i></div>
-                <div>
-                    <h4>Person Detected</h4>
-                    <p>Backyard • 14:28:43</p>
-                </div>
-            </div>
+            @if (Model.RecentEvents != null && Model.RecentEvents.Any())
+            {
+                @foreach (var item in Model.RecentEvents)
+                {
+                    <div class="event-item">
+                        <div class="event-icon blue">
+                            <i class="fa fa-eye"></i>
+                        </div>
+                        <div>
+                            <h4>
+                                @(item.DetectionType switch
+                                {
+                                    "motion" => "Motion Detected",
+                                    "human" => "Person Detected",
+                                    "intrusion" => "Intrusion Alert",
+                                    "face" => "Face Detected",
+                                    _ => item.DetectionType
+                                })
+                            </h4>
+                            <p>
+                                @(
+                                    item.Camera != null
+                                        ? (item.Camera.RoomName ?? item.Camera.Location)
+                                        : $"Camera ID: {item.CameraId}"
+                                )
+                                • @item.Timestamp.ToLocalTime().ToString("HH:mm:ss")
+                            </p>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <p>No recent events.</p>
+            }
         </div>
 
         <!-- CAMERA STATUS -->
@@ -165,28 +187,26 @@
                 <a href="#">View Live</a>
             </div>
 
-            <div class="camera-item">
-                <div>
-                    <span class="dot online"></span>
-                    <div>
-                        <strong>Main Entrance Camera</strong>
-                        <p>Front Door</p>
+            @if (Model.Cameras != null && Model.Cameras.Any())
+            {
+                @foreach (var cam in Model.Cameras)
+                {
+                    <div class="camera-item">
+                        <div>
+                            <span class="dot @(cam.Status == "active" ? "online" : "offline")"></span>
+                            <div>
+                                <strong>@cam.Name</strong>
+                                <p>@(cam.RoomName ?? cam.Location)</p>
+                            </div>
+                        </div>
+                        <span class="status-badge">@cam.Status</span>
                     </div>
-                </div>
-                <span class="status-badge">online</span>
-            </div>
-
-            <div class="camera-item">
-                <div>
-                    <span class="dot online"></span>
-                    <div>
-                        <strong>Backyard Camera</strong>
-                        <p>Garden Area</p>
-                    </div>
-                </div>
-                <span class="status-badge">online</span>
-            </div>
-
+                }
+            }
+            else
+            {
+                <p>No cameras found.</p>
+            }
         </div>
 
     </div>

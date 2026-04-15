@@ -3,10 +3,18 @@
     public class LogEntry
     {
         public int Id { get; set; }
-        public string Action { get; set; }      // "Login", "Camera Added"
-        public string User { get; set; }        // "John Doe"
-        public string Details { get; set; }     // Extra info
-        public string IpAddress { get; set; }
-        public DateTime Timestamp { get; set; }
+
+        public string? Action { get; set; } = string.Empty;
+
+        public string? User { get; set; } = string.Empty;
+
+        public string? Details { get; set; } = string.Empty;
+
+        public string? IpAddress { get; set; } = string.Empty;
+
+        public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+
+        // 🔥 IMPORTANT: used for filtering UI (Login / Access / Detection / Alert)
+        public string Type { get; set; } = string.Empty;
     }
 }

@@ -9,36 +9,33 @@ namespace WebApp.Models
         // =========================
         // USER INFORMATION
         // =========================
-        public string Name { get; set; }
+        public string FullName { get; set; } = string.Empty;
 
-        public string Username { get; set; }
+        public string Username { get; set; } = string.Empty;
 
-        public string Email { get; set; } // read-only in view
-        public string Role { get; set; }  // read-only in view
+        public string Email { get; set; } = string.Empty;
+
+        public string Role { get; set; } = string.Empty;
 
         // =========================
         // PROFILE IMAGE
         // =========================
-        public string ProfileImagePath { get; set; } = "/images/default-profile.png"; // default image
+        public string ProfileImagePath { get; set; } = "/images/default-profile.png";
 
-        public IFormFile ProfileImage { get; set; } // for upload
+        public IFormFile? ProfileImage { get; set; }
 
         // =========================
-        // CONSTRUCTOR
+        // CONSTRUCTORS
         // =========================
-        public Profile()
-        {
-            // default constructor
-        }
+        public Profile() { }
 
-        public Profile(int id, string name, string username, string email, string role)
+        public Profile(int id, string fullName, string username, string email, string role)
         {
             Id = id;
-            Name = name;
+            FullName = fullName;
             Username = username;
             Email = email;
             Role = role;
-            ProfileImagePath = "/images/default-profile.png";
         }
     }
 }

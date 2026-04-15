@@ -1,32 +1,41 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using WebApp.Models;  // Profile & Changepass
-using WebApp.Services; // AuthService
-using System.IO;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using SmartSecuritySystem.Models;
+using WebApp.Models;
+using WebApp.Data;
+using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace SmartSecuritySystem.Controllers
 {
+    [Authorize] // ✅ IMPORTANT: protects all actions
     public class ProfileController : Controller
     {
-        private readonly AuthService _authService;
+        private readonly AppDbContext _context;
 
-        public ProfileController(AuthService authService)
+        public ProfileController(AppDbContext context)
         {
-            _authService = authService;
+            _context = context;
         }
 
         // =========================
         // GET: PROFILE
         // =========================
         [HttpGet]
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
-            var user = _authService.GetCurrentUser(HttpContext);
-            if (user == null) return RedirectToAction("Login", "Auth");
+            var userId = GetUserId();
+
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+                return RedirectToAction("Login", "Auth");
 
             var model = new Profile
             {
                 Id = user.Id,
-                Name = user.Name,
+                FullName = user.FullName,
                 Username = user.Username,
                 Email = user.Email,
                 Role = user.Role,
@@ -42,31 +51,50 @@ namespace SmartSecuritySystem.Controllers
         // UPDATE PROFILE
         // =========================
         [HttpPost]
-        public IActionResult UpdateProfile(Profile model)
+        public async Task<IActionResult> UpdateProfile(Profile model)
         {
-            var user = _authService.GetCurrentUser(HttpContext);
-            if (user == null) return RedirectToAction("Login", "Auth");
+            var userId = GetUserId();
+            var user = await _context.Users.FindAsync(userId);
 
-            user.Name = model.Name;
+            if (user == null)
+                return RedirectToAction("Login", "Auth");
+
+            user.FullName = model.FullName;
             user.Username = model.Username;
+            user.Email = model.Email;
+            user.UpdatedAt = DateTime.UtcNow;
 
-            // Handle image upload
+            // ✅ IMAGE UPLOAD (SAFER)
             if (model.ProfileImage != null && model.ProfileImage.Length > 0)
             {
-                var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/images/profiles");
+                var uploadsFolder = Path.Combine(
+                    Directory.GetCurrentDirectory(),
+                    "wwwroot/images/profiles"
+                );
+
                 if (!Directory.Exists(uploadsFolder))
                     Directory.CreateDirectory(uploadsFolder);
 
-                var fileName = Guid.NewGuid().ToString() + Path.GetExtension(model.ProfileImage.FileName);
+                var extension = Path.GetExtension(model.ProfileImage.FileName);
+
+                // 🔒 basic validation
+                var allowedExtensions = new[] { ".jpg", ".jpeg", ".png" };
+                if (!allowedExtensions.Contains(extension.ToLower()))
+                {
+                    TempData["Error"] = "Only JPG and PNG files are allowed.";
+                    return RedirectToAction("Index");
+                }
+
+                var fileName = Guid.NewGuid() + extension;
                 var filePath = Path.Combine(uploadsFolder, fileName);
 
-                using (var stream = new FileStream(filePath, FileMode.Create))
-                {
-                    model.ProfileImage.CopyTo(stream);
-                }
+                using var stream = new FileStream(filePath, FileMode.Create);
+                await model.ProfileImage.CopyToAsync(stream);
 
                 user.ProfileImagePath = "/images/profiles/" + fileName;
             }
+
+            await _context.SaveChangesAsync();
 
             TempData["Success"] = "Profile updated successfully.";
             return RedirectToAction("Index");
@@ -76,12 +104,15 @@ namespace SmartSecuritySystem.Controllers
         // CHANGE PASSWORD
         // =========================
         [HttpPost]
-        public IActionResult ChangePassword(Changepass model)
+        public async Task<IActionResult> ChangePassword(Changepass model)
         {
-            var user = _authService.GetCurrentUser(HttpContext);
-            if (user == null) return RedirectToAction("Login", "Auth");
+            var userId = GetUserId();
+            var user = await _context.Users.FindAsync(userId);
 
-            if (!_authService.VerifyPassword(user, model.CurrentPassword))
+            if (user == null)
+                return RedirectToAction("Login", "Auth");
+
+            if (!VerifyPassword(model.CurrentPassword, user.PasswordHash))
             {
                 TempData["PasswordError"] = "Current password is incorrect.";
                 return RedirectToAction("Index");
@@ -99,10 +130,39 @@ namespace SmartSecuritySystem.Controllers
                 return RedirectToAction("Index");
             }
 
-            _authService.UpdatePassword(user.Id, model.NewPassword);
+            user.PasswordHash = HashPassword(model.NewPassword);
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
 
             TempData["PasswordSuccess"] = "Password updated successfully.";
             return RedirectToAction("Index");
+        }
+
+        // =========================
+        // CLAIM HELPER (FIXED)
+        // =========================
+        private int GetUserId()
+        {
+            var claim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (claim == null)
+                throw new InvalidOperationException("User ID claim not found.");
+            return int.Parse(claim.Value);
+        }
+
+        // =========================
+        // SECURITY HELPERS
+        // =========================
+        private static string HashPassword(string password)
+        {
+            using var sha = SHA256.Create();
+            var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(password));
+            return Convert.ToBase64String(bytes);
+        }
+
+        private static bool VerifyPassword(string password, string hash)
+        {
+            return HashPassword(password) == hash;
         }
     }
 }

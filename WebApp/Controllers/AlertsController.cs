@@ -1,121 +1,119 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
+using WebApp.Data;
 using WebApp.Models;
-using System.Collections.Generic;
 using System.Linq;
-using System;
+using System.Threading.Tasks;
 
 namespace WebApp.Controllers
 {
     [Authorize(Roles = "Admin,Security")]
     public class AlertsController : Controller
     {
-        // TEMP DATA (Replace with DB later)
-        private static List<Alert> alerts = new List<Alert>
-        {
-            new Alert {
-                Id = 1,
-                Title = "Unauthorized Person",
-                Description = "Unknown person detected at main entrance",
-                Location = "Front Door",
-                Severity = SeverityLevel.CRITICAL,
-                Status = AlertStatus.Active,
-                CreatedAt = DateTime.Now.AddMinutes(-5)
-            },
-            new Alert {
-                Id = 2,
-                Title = "Motion Detected",
-                Description = "Movement detected in restricted area",
-                Location = "Back Yard",
-                Severity = SeverityLevel.WARNING,
-                Status = AlertStatus.Active,
-                CreatedAt = DateTime.Now.AddMinutes(-15)
-            },
-            new Alert {
-                Id = 3,
-                Title = "Door Open",
-                Description = "Garage door opened outside normal hours",
-                Location = "Garage",
-                Severity = SeverityLevel.WARNING,
-                Status = AlertStatus.Resolved,
-                CreatedAt = DateTime.Now.AddMinutes(-30)
-            }
-        };
+        private readonly AppDbContext _context;
 
-        // 📋 VIEW ALERTS WITH FILTERING
-        public IActionResult Index(string filter = "All")
+        public AlertsController(AppDbContext context)
         {
-            IEnumerable<Alert> data = alerts;
+            _context = context;
+        }
 
-            switch (filter)
+        // =========================
+        // VIEW ALERTS WITH FILTER
+        // =========================
+        public async Task<IActionResult> Index(string filter = "all")
+        {
+            filter = filter?.ToLower() ?? "all";
+
+            IQueryable<WebApp.Models.Alert> query = _context.Alerts;
+
+            query = filter switch
             {
-                case "Active":
-                    data = data.Where(a => a.Status == AlertStatus.Active);
-                    break;
-
-                case "Acknowledged":
-                    data = data.Where(a => a.Status == AlertStatus.Acknowledged);
-                    break;
-
-                case "Resolved":
-                    data = data.Where(a => a.Status == AlertStatus.Resolved);
-                    break;
-
-                default:
-                    break;
-            }
+                "new" => query.Where(a => a.Status == WebApp.Models.AlertStatus.New),
+                "acknowledged" => query.Where(a => a.Status == WebApp.Models.AlertStatus.Acknowledged),
+                "resolved" => query.Where(a => a.Status == WebApp.Models.AlertStatus.Resolved),
+                _ => query
+            };
 
             ViewBag.Filter = filter;
-            return View(data.ToList());
+
+            var data = await query
+                .OrderByDescending(a => a.Timestamp)
+                .AsNoTracking()
+                .ToListAsync();
+
+            return View(data);
         }
 
-        // 🟡 ACKNOWLEDGE ALERT
+        // =========================
+        // ACKNOWLEDGE ALERT
+        // =========================
         [HttpPost]
-        public IActionResult Acknowledge(int id)
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Acknowledge(int id)
         {
-            var alert = alerts.FirstOrDefault(a => a.Id == id);
+            var alert = await _context.Alerts
+                .FirstOrDefaultAsync(a => a.AlertId == id);
 
-            if (alert != null && alert.Status == AlertStatus.Active)
+            if (alert == null)
+                return NotFound();
+
+            if (alert.Status == WebApp.Models.AlertStatus.New)
             {
-                alert.Status = AlertStatus.Acknowledged;
+                alert.Status = WebApp.Models.AlertStatus.Acknowledged;
+                await _context.SaveChangesAsync();
             }
 
-            return RedirectToAction("Index");
+            return RedirectToAction(nameof(Index));
         }
 
-        // ✅ RESOLVE ALERT
+        // =========================
+        // RESOLVE ALERT
+        // =========================
         [HttpPost]
-        public IActionResult Resolve(int id)
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Resolve(int id)
         {
-            var alert = alerts.FirstOrDefault(a => a.Id == id);
+            var alert = await _context.Alerts
+                .FirstOrDefaultAsync(a => a.AlertId == id);
 
-            if (alert != null)
+            if (alert == null)
+                return NotFound();
+
+            if (alert.Status != WebApp.Models.AlertStatus.Resolved)
             {
-                alert.Status = AlertStatus.Resolved;
+                alert.Status = WebApp.Models.AlertStatus.Resolved;
+                await _context.SaveChangesAsync();
             }
 
-            return RedirectToAction("Index");
+            return RedirectToAction(nameof(Index));
         }
 
-        // 🔴 ESCALATE ALERT
+        // =========================
+        // ESCALATE ALERT
+        // =========================
         [HttpPost]
-        public IActionResult Escalate(int id)
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Escalate(int id)
         {
-            var alert = alerts.FirstOrDefault(a => a.Id == id);
+            var alert = await _context.Alerts
+                .FirstOrDefaultAsync(a => a.AlertId == id);
 
-            if (alert != null)
+            if (alert == null)
+                return NotFound();
+
+            // escalate severity
+            alert.Severity = WebApp.Models.SeverityLevel.CRITICAL;
+
+            // only reset status if not resolved
+            if (alert.Status != WebApp.Models.AlertStatus.Resolved)
             {
-                // Increase severity to CRITICAL
-                alert.Severity = SeverityLevel.CRITICAL;
-
-                // Optional: if not resolved, bring back to active priority
-                if (alert.Status != AlertStatus.Resolved)
-                {
-                    alert.Status = AlertStatus.Active;
-                }
+                alert.Status = WebApp.Models.AlertStatus.New;
             }
 
-            return RedirectToAction("Index");
+            await _context.SaveChangesAsync();
+
+            return RedirectToAction(nameof(Index));
         }
     }
 }

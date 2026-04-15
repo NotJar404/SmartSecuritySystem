@@ -1,54 +1,67 @@
-﻿using System;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace WebApp.Models
 {
+    [Table("camera_devices")]
     public class Camera
     {
+        // =========================
+        // PRIMARY KEY
+        // =========================
+        [Key]
+        [Column("camera_id")]
         public int Id { get; set; }
 
-        // ===============================
-        // BASIC INFO
-        // ===============================
-        [Required]
+        // =========================
+        // CAMERA NAME
+        // =========================
+        [Required(ErrorMessage = "Camera name is required.")]
         [StringLength(100)]
-        public string Name { get; set; }
+        [Column("camera_name")]
+        public string Name { get; set; } = string.Empty;
 
+        // =========================
+        // ROOM ID (FIXED ✅)
+        // =========================
+        // 🔥 Changed from int? → int (CRITICAL FIX)
+        [Required(ErrorMessage = "Room is required.")]
+        [Range(1, int.MaxValue, ErrorMessage = "Please select a valid room.")]
+        [Column("room_id")]
+        public int RoomId { get; set; }
+
+        // Navigation Property
+        [ForeignKey("RoomId")]
+        public Room? Room { get; set; }
+
+        // =========================
+        // STREAM URL
+        // =========================
+        [Required(ErrorMessage = "Stream URL is required.")]
+        [StringLength(500)]
+        [Column("stream_url")]
+        public string StreamUrl { get; set; } = string.Empty;
+
+        // =========================
+        // LOCATION
+        // =========================
+        [Required(ErrorMessage = "Location is required.")]
+        [StringLength(100)]
+        [Column("location")]
+        public string Location { get; set; } = string.Empty;
+
+        // =========================
+        // STATUS
+        // =========================
         [Required]
-        [StringLength(150)]
-        public string Location { get; set; }
+        [StringLength(20)]
+        [Column("status")]
+        public string Status { get; set; } = "active";
 
-        // ===============================
-        // NETWORK
-        // ===============================
-        [Display(Name = "IP Address")]
-        [RegularExpression(@"^(\d{1,3}\.){3}\d{1,3}$", ErrorMessage = "Invalid IP format")]
-        public string IpAddress { get; set; }
-
-        [Range(1, 65535)]
-        public int Port { get; set; } = 554;
-
-        // ===============================
-        // VIDEO SETTINGS
-        // ===============================
-        public string Resolution { get; set; } = "1920x1080";
-
-        [Display(Name = "FPS")]
-        [Range(1, 120)]
-        public int Fps { get; set; } = 30;
-
-        // ===============================
-        // FEATURES
-        // ===============================
-        public bool Recording { get; set; } = true;
-
-        public bool Motion { get; set; } = true;
-
-        // ===============================
-        // SYSTEM
-        // ===============================
-        public bool IsOnline { get; set; } = true;
-
-        public DateTime CreatedAt { get; set; } = DateTime.Now;
+        // =========================
+        // DISPLAY ONLY
+        // =========================
+        [NotMapped]
+        public string RoomName => Room?.RoomName ?? "";
     }
 }

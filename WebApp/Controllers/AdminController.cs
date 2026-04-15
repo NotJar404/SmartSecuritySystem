@@ -1,142 +1,224 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
+using WebApp.Data;
 using SmartSecuritySystem.Models;
 using WebApp.Models;
 using System;
-using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace WebApp.Controllers
 {
     [Authorize(Roles = "Admin")]
     public class AdminController : Controller
     {
-        // 🔥 In-memory users (temporary storage)
-        private static List<User> users = new List<User>
-        {
-            new User {
-                Id = 1,
-                Name = "John Doe",
-                Username = "johndoe",
-                Email = "john.doe@securevision.com",
-                Status = "Active",
-                LastLogin = DateTime.Now.AddHours(-5),
-                Role = "Security",
-                PasswordHash = "1234"
-            },
-            new User {
-                Id = 2,
-                Name = "Jane Smith",
-                Username = "janesmith",
-                Email = "jane.smith@securevision.com",
-                Status = "Active",
-                LastLogin = DateTime.Now.AddDays(-1),
-                Role = "Security",
-                PasswordHash = "1234"
-            }
-        };
-public IActionResult Analytics()
-{
-    return View();
-}
-        // 🔥 System status (shared)
-        private static SystemStatus systemStatus = new SystemStatus();
+        private readonly AppDbContext _context;
 
-        // ------------------ DASHBOARD ------------------
-        public IActionResult Index()
+        public AdminController(AppDbContext context)
         {
-            var model = new AdminDashboardViewModel
-            {
-                TotalPersonnel = users.Count,
-                ActiveUsers = users.Count(u => u.Status == "Active"),
-                InactiveUsers = users.Count(u => u.Status != "Active"),
-                RecentLogins = users.Count(u =>
-                    u.LastLogin.HasValue &&
-                    (DateTime.Now - u.LastLogin.Value).TotalHours <= 24
-                ),
-                RecentPersonnel = users
-                    .OrderByDescending(u => u.LastLogin ?? DateTime.MinValue)
-                    .Take(5)
-                    .ToList()
-            };
+            _context = context;
+        }
 
+        // =========================
+        // DASHBOARD
+        // =========================
+        public async Task<IActionResult> Index()
+        {
+            var model = await BuildDashboardModel();
             return View(model);
         }
-        
 
-        // ------------------ PERSONNEL ------------------
-        public IActionResult Personnel(string? search)
+        // =========================
+        // ANALYTICS
+        // =========================
+        public async Task<IActionResult> Analytics()
         {
-            IEnumerable<User> filtered = users;
+            var model = await BuildDashboardModel();
+            return View(model);
+        }
+
+        // =========================
+        // CORE DASHBOARD BUILDER (SAFE - NO PARALLEL EF)
+        // =========================
+        private async Task<AdminDashboardViewModel> BuildDashboardModel()
+        {
+            var now = DateTime.UtcNow;
+
+            // =========================
+            // METRICS (SEQUENTIAL SAFE QUERIES)
+            // =========================
+            var users = await _context.Users
+                .Where(u => u.Status == "Active")
+                .CountAsync();
+
+            var cameras = await _context.CameraDevices
+                .Where(c => c.Status == "active")
+                .CountAsync();
+
+            var alertsActive = await _context.Alerts
+                .Where(a =>
+                    a.Status == AlertStatus.New ||
+                    a.Status == AlertStatus.Acknowledged)
+                .CountAsync();
+
+            var detectionToday = await _context.DetectionLogs
+                .Where(d => d.Timestamp.Date == now.Date)
+                .CountAsync();
+
+            // =========================
+            // TIME SERIES DATA
+            // =========================
+            var alertDates = await _context.Alerts
+                .Select(a => a.Timestamp)
+                .ToListAsync();
+
+            var accessDates = await _context.AccessLogs
+                .Select(a => a.Timestamp)
+                .ToListAsync();
+
+            var motionDates = await _context.DetectionLogs
+                .Select(d => d.Timestamp)
+                .ToListAsync();
+
+            var occupancy = await SafeLoadRoomOccupancy();
+
+            // =========================
+            // RETURN VIEW MODEL
+            // =========================
+            return new AdminDashboardViewModel
+            {
+                ActivePersonnelCount = users,
+                ActiveCameraCount = cameras,
+                ActiveIncidentCount = alertsActive,
+                TodayDetectionCount = detectionToday,
+
+                AlertWeekly = GroupByWeek(alertDates),
+                AccessWeekly = GroupByWeek(accessDates),
+                MotionWeekly = GroupByWeek(motionDates),
+                OccupancyWeekly = GroupByWeek(occupancy.Select(o => o.Timestamp)),
+
+                // Optional safety fallback (if your view uses labels)
+                Labels = new List<string>
+                {
+                    "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"
+                }
+            };
+        }
+
+        // =========================
+        // SAFE OCCUPANCY LOADER
+        // =========================
+        private async Task<List<RoomOccupancy>> SafeLoadRoomOccupancy()
+        {
+            try
+            {
+                return await _context.RoomOccupancy
+                    .AsNoTracking()
+                    .ToListAsync();
+            }
+            catch
+            {
+                return new List<RoomOccupancy>();
+            }
+        }
+
+        // =========================
+        // WEEK GROUPING (MON - SUN)
+        // =========================
+        private List<int> GroupByWeek(IEnumerable<DateTime> dates)
+        {
+            var grouped = dates
+                .GroupBy(d => d.DayOfWeek)
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            return new List<int>
+            {
+                grouped.GetValueOrDefault(DayOfWeek.Monday),
+                grouped.GetValueOrDefault(DayOfWeek.Tuesday),
+                grouped.GetValueOrDefault(DayOfWeek.Wednesday),
+                grouped.GetValueOrDefault(DayOfWeek.Thursday),
+                grouped.GetValueOrDefault(DayOfWeek.Friday),
+                grouped.GetValueOrDefault(DayOfWeek.Saturday),
+                grouped.GetValueOrDefault(DayOfWeek.Sunday)
+            };
+        }
+
+        // =========================
+        // PERSONNEL
+        // =========================
+        public async Task<IActionResult> Personnel(string? search)
+        {
+            var query = _context.Users.AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(search))
             {
                 search = search.Trim();
 
-                filtered = users.Where(u =>
-                    (!string.IsNullOrEmpty(u.Name) && u.Name.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
-                    (!string.IsNullOrEmpty(u.Username) && u.Username.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
-                    (!string.IsNullOrEmpty(u.Email) && u.Email.Contains(search, StringComparison.OrdinalIgnoreCase))
-                );
+                query = query.Where(u =>
+                    u.Username.Contains(search) ||
+                    u.Email.Contains(search) ||
+                    u.FullName.Contains(search));
             }
 
-            return View(filtered.ToList());
+            return View(await query.AsNoTracking().ToListAsync());
         }
 
-        // ------------------ ADD USER ------------------
+        // =========================
+        // ADD USER
+        // =========================
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Add(User user)
+        public async Task<IActionResult> Add(User user)
         {
             if (!ModelState.IsValid)
-            {
-                return RedirectToAction("Personnel");
-            }
+                return RedirectToAction(nameof(Personnel));
 
-            user.Id = users.Any() ? users.Max(u => u.Id) + 1 : 1;
+            user.Role = string.IsNullOrWhiteSpace(user.Role) ? "Security" : user.Role;
             user.Status = "Active";
-            user.LastLogin = null;
-            user.Role = string.IsNullOrEmpty(user.Role) ? "Security" : user.Role;
 
-            // ⚠️ NOTE: In real apps, hash passwords!
-            if (string.IsNullOrEmpty(user.PasswordHash))
-            {
-                user.PasswordHash = "1234"; // fallback (dev only)
-            }
+            if (string.IsNullOrWhiteSpace(user.PasswordHash))
+                user.PasswordHash = "1234";
 
-            users.Add(user);
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync();
 
-            return RedirectToAction("Personnel");
+            return RedirectToAction(nameof(Personnel));
         }
 
-        // ------------------ DELETE USER ------------------
+        // =========================
+        // DELETE USER
+        // =========================
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Delete(int id)
+        public async Task<IActionResult> Delete(int id)
         {
-            var user = users.FirstOrDefault(u => u.Id == id);
+            var user = await _context.Users.FindAsync(id);
 
             if (user == null)
-            {
                 return NotFound();
-            }
 
-            users.Remove(user);
+            _context.Users.Remove(user);
+            await _context.SaveChangesAsync();
 
-            return RedirectToAction("Personnel");
+            return RedirectToAction(nameof(Personnel));
         }
 
-        // ------------------ SYSTEM SETTINGS ------------------
+        // =========================
+        // SYSTEM SETTINGS
+        // =========================
+        private static SystemStatus systemStatus = new SystemStatus();
+
         public IActionResult System()
         {
             return View(systemStatus);
         }
 
         [HttpPost]
-        [ValidateAntiForgeryToken]
         public IActionResult UpdateSetting(string setting, bool value)
         {
-            if (string.IsNullOrEmpty(setting))
+            if (string.IsNullOrWhiteSpace(setting))
                 return BadRequest();
 
             switch (setting)
@@ -159,16 +241,5 @@ public IActionResult Analytics()
 
             return Ok(new { success = true });
         }
-    }
-
-    // ------------------ VIEWMODEL ------------------
-    public class AdminDashboardViewModel
-    {
-        public int TotalPersonnel { get; set; }
-        public int ActiveUsers { get; set; }
-        public int InactiveUsers { get; set; }
-        public int RecentLogins { get; set; }
-
-        public List<User> RecentPersonnel { get; set; } = new List<User>();
     }
 }

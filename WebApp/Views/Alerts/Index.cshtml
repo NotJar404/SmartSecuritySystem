@@ -1,36 +1,43 @@
-﻿@model List<WebApp.Models.Alert>
+﻿@using WebApp.Models
+@using System.Text.Json
+@model List<Alert>
 
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
     ViewData["Title"] = "Alerts";
-    var filter = ViewBag.Filter as string ?? "All";
+    var filter = (ViewBag.Filter as string ?? "all").ToLower();
 }
 <link rel="stylesheet" href="~/css/alert.css" />
 
 <h1 class="page-title">Alerts</h1>
-<p class="subtitle">@Model.Count(a => a.Status == WebApp.Models.AlertStatus.Active) active alerts</p>
+
+<p class="subtitle">
+    @Model.Count(a => a.Status != AlertStatus.Resolved) active alerts
+</p>
 
 <!-- FILTER BUTTONS -->
 <div class="alert-filters">
-    <a asp-action="Index" asp-route-filter="All"
-       class="filter-btn @(filter=="All"?"active":"")">
+
+    <a asp-action="Index" asp-route-filter="all"
+       class="filter-btn @(filter == "all" ? "active" : "")">
         All (@Model.Count)
     </a>
 
-    <a asp-action="Index" asp-route-filter="Active"
-       class="filter-btn @(filter=="Active"?"active":"")">
-        Active (@Model.Count(a => a.Status == WebApp.Models.AlertStatus.Active))
+    <a asp-action="Index" asp-route-filter="new"
+       class="filter-btn @(filter == "new" ? "active" : "")">
+        New (@Model.Count(a => a.Status == AlertStatus.New))
     </a>
 
-    <a asp-action="Index" asp-route-filter="Acknowledged"
-       class="filter-btn @(filter=="Acknowledged"?"active":"")">
-        Acknowledged (@Model.Count(a => a.Status == WebApp.Models.AlertStatus.Acknowledged))
+    <a asp-action="Index" asp-route-filter="acknowledged"
+       class="filter-btn @(filter == "acknowledged" ? "active" : "")">
+        Acknowledged (@Model.Count(a => a.Status == AlertStatus.Acknowledged))
     </a>
 
-    <a asp-action="Index" asp-route-filter="Resolved"
-       class="filter-btn @(filter=="Resolved"?"active":"")">
-        Resolved (@Model.Count(a => a.Status == WebApp.Models.AlertStatus.Resolved))
+    <a asp-action="Index" asp-route-filter="resolved"
+       class="filter-btn @(filter == "resolved" ? "active" : "")">
+        Resolved (@Model.Count(a => a.Status == AlertStatus.Resolved))
     </a>
+
 </div>
 
 <!-- ALERT LIST -->
@@ -38,59 +45,57 @@
 
 @foreach (var alert in Model)
 {
-    var isCritical = alert.Severity == WebApp.Models.SeverityLevel.CRITICAL;
-    var isResolved = alert.Status == WebApp.Models.AlertStatus.Resolved;
+    var isCritical = alert.Severity == SeverityLevel.CRITICAL;
+    var isResolved = alert.Status == AlertStatus.Resolved;
 
     <div class="alert-card @(isCritical ? "critical" : "warning") @(isResolved ? "resolved" : "")"
-         onclick="openModal(
-            '@alert.Id',
-            '@alert.Title',
-            '@alert.Description',
-            '@alert.Location',
-            '@alert.Severity',
-            '@alert.CreatedAt.ToString("g")',
-            '@alert.Status'
-         )">
+         onclick='openModal(
+            @JsonSerializer.Serialize(alert.AlertId),
+            @JsonSerializer.Serialize(alert.Type ?? ""),
+            @JsonSerializer.Serialize(alert.Description ?? ""),
+            @JsonSerializer.Serialize(alert.RoomId?.ToString() ?? ""),
+            @JsonSerializer.Serialize(alert.Severity.ToString()),
+            @JsonSerializer.Serialize(alert.Timestamp.ToString("g")),
+            @JsonSerializer.Serialize(alert.Status.ToString())
+         )'>
 
-        <!-- ICON -->
         <div class="alert-icon">⚠</div>
 
-        <!-- CONTENT -->
         <div class="alert-content">
             <div class="alert-header">
-                <h3>@alert.Title</h3>
+                <h3>@alert.Type</h3>
 
                 <span class="badge @(isCritical ? "red" : "yellow")">
-                    @alert.Severity.ToString()
+                    @alert.Severity
                 </span>
 
                 <span class="badge">
-                    @alert.Status.ToString()
+                    @alert.Status
                 </span>
             </div>
 
             <p>@alert.Description</p>
 
             <div class="alert-meta">
-                📍 @alert.Location
+                Room: @alert.RoomId
                 • ⏱ @alert.MinutesAgo m ago
-                • @alert.CreatedAt.ToString("g")
+                • @alert.Timestamp.ToString("g")
             </div>
         </div>
 
-        <!-- QUICK RESOLVE BUTTON -->
         <div class="alert-actions">
+
             @if (!isResolved)
             {
                 <form method="post" asp-action="Resolve" onclick="event.stopPropagation();">
-                    <input type="hidden" name="id" value="@alert.Id" />
+                    <input type="hidden" name="id" value="@alert.AlertId" />
                     <button type="submit">Resolve</button>
                 </form>
             }
 
             <button onclick="event.stopPropagation();">✕</button>
-        </div>
 
+        </div>
     </div>
 }
 
@@ -103,94 +108,60 @@
 
         <h2 id="modalTitle"></h2>
 
-        <!-- ALERT INFORMATION SECTION -->
         <div class="section">
-            <div class="info-row">
-                <span class="info-label">Status:</span>
-                <span id="modalStatus"></span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Severity:</span>
-                <span id="modalSeverity"></span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Location:</span>
-                <span id="modalLocation"></span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Time:</span>
-                <span id="modalTime"></span>
-            </div>
+            <p><b>Status:</b> <span id="modalStatus"></span></p>
+            <p><b>Severity:</b> <span id="modalSeverity"></span></p>
+            <p><b>Room:</b> <span id="modalLocation"></span></p>
+            <p><b>Time:</b> <span id="modalTime"></span></p>
         </div>
 
-        <!-- DESCRIPTION SECTION -->
         <div class="section">
-            <h4 class="section-title">Description</h4>
+            <h4>Description</h4>
             <p id="modalDescription"></p>
         </div>
 
-        <!-- SNAPSHOT SECTION -->
-        <div class="section">
-            <h4 class="section-title">Snapshot</h4>
-            <img src="/images/sample.jpg" alt="snapshot" width="100%" />
-        </div>
-
-        <!-- ACTION BUTTONS SECTION -->
         <div class="section section-actions">
+
             <form method="post" asp-action="Acknowledge">
                 <input type="hidden" name="id" class="modalAlertId" />
-                <button type="submit" class="btn-acknowledge">Acknowledge</button>
+                <button type="submit">Acknowledge</button>
             </form>
 
             <form method="post" asp-action="Resolve">
                 <input type="hidden" name="id" class="modalAlertId" />
-                <button type="submit" class="btn-resolve">Resolve</button>
+                <button type="submit">Resolve</button>
             </form>
 
             <form method="post" asp-action="Escalate">
                 <input type="hidden" name="id" class="modalAlertId" />
-                <button type="submit" class="btn-escalate">Escalate</button>
+                <button type="submit">Escalate</button>
             </form>
 
-            <button onclick="viewLive()" class="btn-live">View Live</button>
         </div>
     </div>
 </div>
 
-<!-- SCRIPT -->
 <script>
-function openModal(id, title, desc, location, severity, time, status) {
-    var modal = document.getElementById("alertModal");
-    modal.classList.add("active");
+function openModal(id, type, desc, room, severity, time, status) {
+    document.getElementById("alertModal").classList.add("active");
 
-    // Set all hidden inputs
-    document.querySelectorAll(".modalAlertId").forEach(input => {
-        input.value = id;
-    });
+    document.querySelectorAll(".modalAlertId").forEach(x => x.value = id);
 
-    document.getElementById("modalTitle").innerText = title;
+    document.getElementById("modalTitle").innerText = type;
     document.getElementById("modalDescription").innerText = desc;
-    document.getElementById("modalLocation").innerText = location;
+    document.getElementById("modalLocation").innerText = room;
     document.getElementById("modalSeverity").innerText = severity;
     document.getElementById("modalTime").innerText = time;
     document.getElementById("modalStatus").innerText = status;
 }
 
 function closeModal() {
-    var modal = document.getElementById("alertModal");
-    modal.classList.remove("active");
+    document.getElementById("alertModal").classList.remove("active");
 }
 
-function viewLive() {
-    window.location.href = '/Cameras';
-}
-
-// Close modal when clicking outside
-document.getElementById("alertModal").addEventListener("click", function(e) {
-    if (e.target === this) {
+document.getElementById("alertModal").addEventListener("click", function (e) {
+    if (e.target === document.getElementById("alertModal")) {
         closeModal();
     }
 });
-</script>
-</script>
 </script>

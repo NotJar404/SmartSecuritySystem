@@ -11,7 +11,11 @@
 
     <!-- LEFT -->
     <div class="profile-left">
-        <img src="@Model.ProfileImagePath ?? "/images/default.png"" class="profile-img" />
+
+        <img src="@(string.IsNullOrEmpty(Model.ProfileImagePath) 
+            ? "/images/default.png" 
+            : Model.ProfileImagePath)" 
+            class="profile-img" />
 
         <form asp-action="UpdateProfile" method="post" enctype="multipart/form-data">
             <input type="hidden" asp-for="Id" />
@@ -29,8 +33,8 @@
             <input type="hidden" asp-for="Id" />
 
             <div class="form-group">
-                <label>Name</label>
-                <input asp-for="Name" />
+                <label>Full Name</label>
+                <input asp-for="FullName" />
             </div>
 
             <div class="form-group">

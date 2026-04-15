@@ -1,120 +1,88 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
-using WebApp.Services;
+using Microsoft.EntityFrameworkCore;
+using WebApp.Data;
 using WebApp.Models;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace WebApp.Controllers
 {
     [Authorize(Roles = "Admin")]
     public class SystemController : Controller
     {
-        private readonly SystemService _systemService;
+        private readonly AppDbContext _context;
 
-        // 🔹 FOR DATABASE INTEGRATION:
-        //    - Inject ILogger<SystemController> for error handling
-        //    - Inject IMapper for DTO conversions if needed
-        //    - All action results should return DTO objects (not domain models directly)
-        //    - Add try-catch blocks around service calls for exception handling
-
-        public SystemController(SystemService systemService)
+        public SystemController(AppDbContext context)
         {
-            _systemService = systemService ?? throw new ArgumentNullException(nameof(systemService));
+            _context = context;
         }
 
-        /// <summary>
-        /// Displays the system settings page with current camera and alarm configurations
-        /// 🔹 DATABASE: Currently loads from in-memory service
-        /// 🔹 TODO: Call async method GetSystemStatusAsync() when database is ready
-        /// </summary>
-        public IActionResult Index()
+        // =========================
+        // SYSTEM PAGE (NO SERVICE, NO VIEWMODEL)
+        // =========================
+        public async Task<IActionResult> Index()
         {
-            var status = _systemService.GetSystemStatus();
-            status.Cameras ??= new List<CameraDevice>();
-            status.EmergencyAlarms ??= new List<EmergencyAlarm>();
-            return View(status);
+            var cameras = await _context.CameraDevices
+                .Include(c => c.Room)
+                .ToListAsync();
+
+            // Temporary alarms (since no DB table yet)
+            var alarms = new List<EmergencyAlarm>
+            {
+                new EmergencyAlarm { Id = 1, Name = "Intruder Alert", Description = "Triggered when an intruder is detected", IconType = "intruder", IsEnabled = false },
+                new EmergencyAlarm { Id = 2, Name = "Fire Alarm", Description = "Triggered when smoke/fire detected", IconType = "fire", IsEnabled = false },
+                new EmergencyAlarm { Id = 3, Name = "Earthquake Drill", Description = "Simulation mode", IconType = "earthquake", IsEnabled = false },
+                new EmergencyAlarm { Id = 4, Name = "Emergency Drill", Description = "General emergency drill", IconType = "ambulance", IsEnabled = false }
+            };
+
+            // Send directly to View using dynamic container
+            ViewBag.Cameras = cameras;
+            ViewBag.Alarms = alarms;
+
+            return View();
         }
 
-        /// <summary>
-        /// Updates system settings (Notifications, Recording, AI Detection)
-        /// 🔹 DATABASE: Persist changes to SystemSettings table
-        /// 🔹 TODO: Add logging and error handling after database integration
-        /// </summary>
+        // =========================
+        // UPDATE CAMERA
+        // =========================
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult UpdateSetting(string setting, bool value)
+        public async Task<IActionResult> UpdateCamera(int id, string name, string location, string ipAddress)
         {
-            try
-            {
-                _systemService.UpdateSetting(setting, value);
-                // 🔹 TODO: Log the change for audit trail
-                return Json(new { success = true, message = $"{setting} updated successfully" });
-            }
-            catch (Exception ex)
-            {
-                // 🔹 TODO: Log exception properly
-                return Json(new { success = false, message = ex.Message });
-            }
+            var camera = await _context.CameraDevices
+                .FirstOrDefaultAsync(c => c.Id == id);
+
+            if (camera == null)
+                return Json(new { success = false, message = "Camera not found" });
+
+            camera.Name = name;
+            camera.Location = location;
+
+            await _context.SaveChangesAsync();
+
+            return Json(new { success = true, message = "Camera updated successfully" });
         }
 
-        /// <summary>
-        /// Updates camera configuration (Name, Location, IP Address)
-        /// 🔹 DATABASE: Update CameraDevices table, validate IP format
-        /// 🔹 TODO: Add IP validation, test connection to camera endpoint
-        /// </summary>
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public IActionResult UpdateCamera(int id, string name, string location, string ipAddress)
-        {
-            try
-            {
-                // 🔹 TODO: Add validation for IP address format
-                // if (!IsValidIPAddress(ipAddress)) return Json(new { success = false, message = "Invalid IP address" });
-
-                var cam = new CameraDevice
-                {
-                    Id = id,
-                    Name = name ?? "",
-                    Location = location ?? "",
-                    IpAddress = ipAddress ?? ""
-                };
-
-                _systemService.UpdateCamera(id, cam);
-                // 🔹 TODO: Test connection to the camera at the new IP
-                return Json(new { success = true, message = "Camera updated successfully" });
-            }
-            catch (Exception ex)
-            {
-                return Json(new { success = false, message = ex.Message });
-            }
-        }
-
-        /// <summary>
-        /// Toggles emergency alarm on/off (only one alarm can be active at a time)
-        /// 🔹 DATABASE: Update EmergencyAlarms table, trigger notifications if enabled
-        /// 🔹 TODO: Send alerts to connected devices when alarm is activated
-        /// 🔹 TODO: Add audit log for alarm state changes
-        /// </summary>
+        // =========================
+        // TOGGLE ALARM (TEMP ONLY)
+        // =========================
         [HttpPost]
         [ValidateAntiForgeryToken]
         public IActionResult ToggleAlarm(int alarmId, bool isEnabled)
         {
-            try
-            {
-                _systemService.ToggleEmergencyAlarm(alarmId, isEnabled);
-                
-                // 🔹 TODO: If enabled, trigger alarm system and send notifications
-                // if (isEnabled)
-                // {
-                //     await _notificationService.SendAlertAsync($"Alarm {alarmId} has been activated");
-                //     await _iotController.TriggerAlarmAsync(alarmId);
-                // }
+            // No DB yet
+            return Json(new { success = true });
+        }
 
-                return Json(new { success = true, message = "Alarm state updated" });
-            }
-            catch (Exception ex)
-            {
-                return Json(new { success = false, message = ex.Message });
-            }
+        // =========================
+        // SETTINGS (PLACEHOLDER)
+        // =========================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult UpdateSetting(string setting, bool value)
+        {
+            return Json(new { success = true });
         }
     }
 }

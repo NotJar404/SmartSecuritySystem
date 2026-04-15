@@ -1,43 +1,80 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using WebApp.Models;
+using WebApp.Data;
+using System.Linq;
 
 namespace WebApp.Controllers
 {
-    [Authorize(Roles = "Admin,Security")] // 🔥 ADD THIS
+    [Authorize(Roles = "Admin,Security")]
     public class LogsController : Controller
     {
-        private static List<LogEntry> logs = new List<LogEntry>
+        private readonly AppDbContext _context;
+
+        public LogsController(AppDbContext context)
         {
-            new LogEntry {
-                Id = 1,
-                Action = "User Login",
-                User = "John Doe",
-                Details = "Logged into system",
-                IpAddress = "192.168.1.100",
-                Timestamp = DateTime.Now.AddMinutes(-5)
-            },
-            new LogEntry {
-                Id = 2,
-                Action = "Camera Added",
-                User = "Admin",
-                Details = "Added Front Door Camera",
-                IpAddress = "192.168.1.101",
-                Timestamp = DateTime.Now.AddMinutes(-20)
-            },
-            new LogEntry {
-                Id = 3,
-                Action = "Alert Resolved",
-                User = "John Doe",
-                Details = "Resolved Unauthorized Person alert",
-                IpAddress = "192.168.1.102",
-                Timestamp = DateTime.Now.AddMinutes(-40)
-            }
-        };
+            _context = context;
+        }
 
         public IActionResult Index()
         {
-            return View(logs.OrderByDescending(x => x.Timestamp).ToList());
+            var logs = new List<LogEntry>();
+
+            // 🔐 LOGIN LOGS (from Users table)
+            logs.AddRange(_context.Users
+                .Where(u => u.LastLogin != null)
+                .Select(u => new LogEntry
+                {
+                    Id = u.Id,
+                    Action = "User Login",
+                    User = u.Username,
+                    Details = "User logged into system",
+                    IpAddress = "N/A",
+                    Timestamp = u.LastLogin ?? DateTime.UtcNow,
+                    Type = "Login"
+                }));
+
+            // 🚪 ACCESS LOGS
+            logs.AddRange(_context.AccessLogs.Select(a => new LogEntry
+            {
+                Id = a.LogId,
+                Action = a.AccessResult == "granted" ? "Access Granted" : "Access Denied",
+                User = "Personnel",
+                Details = $"RFID: {a.RfidValid}, Face: {a.FaceVerified}",
+                IpAddress = "N/A",
+                Timestamp = a.Timestamp,
+                Type = "Access"
+            }));
+
+            // 👁 DETECTION LOGS
+            logs.AddRange(_context.DetectionLogs.Select(d => new LogEntry
+            {
+                Id = d.DetectionId,
+                Action = d.DetectionType,
+                User = "System",
+                Details = $"Detected {d.DetectedCount} (Confidence: {d.Confidence})",
+                IpAddress = "Camera",
+                Timestamp = d.Timestamp,
+                Type = "Detection"
+            }));
+
+            // 🚨 ALERTS
+            logs.AddRange(_context.Alerts.Select(a => new LogEntry
+            {
+                Id = a.AlertId,
+                Action = a.Type,
+                User = "System",
+                Details = $"{a.Description} (Severity: {a.Severity})",
+                IpAddress = "N/A",
+                Timestamp = a.Timestamp,
+                Type = "Alert"
+            }));
+
+            var orderedLogs = logs
+                .OrderByDescending(x => x.Timestamp)
+                .ToList();
+
+            return View(orderedLogs);
         }
     }
 }

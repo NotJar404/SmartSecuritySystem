@@ -1,16 +1,28 @@
 ﻿using Microsoft.AspNetCore.Authentication.Cookies;
-using WebApp.Services;
+using Microsoft.EntityFrameworkCore;
+using WebApp.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // =========================
-// ADD SERVICES
+// SERVICES 
 // =========================
 
-// Add MVC
+// MVC
 builder.Services.AddControllersWithViews();
 
-// Session
+// =========================
+// DATABASE (POSTGRESQL)
+// =========================
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("DefaultConnection")
+    )
+);
+
+// =========================
+// SESSION (OPTIONAL)
+// =========================
 builder.Services.AddSession(options =>
 {
     options.IdleTimeout = TimeSpan.FromMinutes(30);
@@ -18,48 +30,39 @@ builder.Services.AddSession(options =>
     options.Cookie.IsEssential = true;
 });
 
-// Authentication (Cookies)
+// =========================
+// AUTHENTICATION (COOKIE)
+// =========================
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
         options.LoginPath = "/Auth/Login";
         options.AccessDeniedPath = "/Auth/Login";
+
+        // 🔥 IMPORTANT FIXES
+        options.Cookie.Name = "SmartSecurityAuth";
+        options.Cookie.HttpOnly = true;
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(60);
+        options.SlidingExpiration = true;
+
+        // Prevent weird redirect loops
+        options.ReturnUrlParameter = "returnUrl";
+
+        // Helps avoid cookie issues
+        options.Cookie.SameSite = SameSiteMode.Lax;
     });
 
 // Authorization
 builder.Services.AddAuthorization();
 
 // =========================
-// 🔥 IMPORTANT: SERVICES
-// =========================
-
-// Auth (in-memory is fine)
-builder.Services.AddSingleton<AuthService>();
-
-// ✅ FIXED: MUST BE SINGLETON (NOT SCOPED)
-// 🔹 FOR DATABASE INTEGRATION:
-//    - Change to AddScoped<SystemService>() when using DbContext
-//    - Add DbContext: builder.Services.AddDbContext<SecurityDbContext>()
-//    - Inject repositories: AddScoped(typeof(IRepository<>), typeof(GenericRepository<>))
-//    - Replace in-memory data with database queries
-builder.Services.AddSingleton<SystemService>();
-
-// 🔹 TODO: Add these when database is ready:
-// builder.Services.AddDbContext<SecurityDbContext>(options =>
-//     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-// builder.Services.AddScoped(typeof(IRepository<>), typeof(GenericRepository<>));
-// builder.Services.AddScoped<ISystemRepository, SystemRepository>();
-
-// =========================
 // BUILD APP
 // =========================
-
 var app = builder.Build();
 
 // =========================
 // MIDDLEWARE
 // =========================
-
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
@@ -71,22 +74,17 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
-// 🔥 ORDER IS IMPORTANT
-app.UseSession();
-app.UseAuthentication();
+// 🔥 ORDER IS CRITICAL (YOURS WAS GOOD)
+app.UseSession();          // optional
+app.UseAuthentication();   // MUST come before Authorization
 app.UseAuthorization();
 
 // =========================
-// ROUTING
+// ROUTES
 // =========================
-
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Auth}/{action=Login}/{id?}"
 );
-
-// =========================
-// RUN
-// =========================
 
 app.Run();

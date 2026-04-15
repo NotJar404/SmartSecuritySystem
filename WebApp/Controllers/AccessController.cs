@@ -1,101 +1,94 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using System;
-using System.Collections.Generic;
+using Microsoft.EntityFrameworkCore;
+using System.Linq;
+using System.Threading.Tasks;
 using WebApp.Models;
+using WebApp.Data;
 
 namespace WebApp.Controllers
 {
     public class AccessController : Controller
     {
-        public IActionResult Index()
+        private readonly AppDbContext _context;
+
+        public AccessController(AppDbContext context)
         {
-            // SAMPLE DATA (Simulating real system logs)
-            var logs = new List<AccessLog>
+            _context = context;
+        }
+
+        // =========================
+        // MAIN PAGE
+        // =========================
+        public async Task<IActionResult> Index()
+        {
+            var logs = await _context.AccessLogs
+                .OrderByDescending(x => x.Timestamp)
+                .Take(50)
+                .ToListAsync(); // ✅ Fetch first
+
+            // ✅ Populate UI-only fields safely
+            foreach (var log in logs)
             {
-                new AccessLog
-                {
-                    Id = 1,
-                    FullName = "Maria Santos",
-                    StudentId = "QCU-2024-0123",
-                    Department = "BSIT",
-                    Email = "maria.santos@qcu.edu.ph",
-                    Phone = "09123456789",
+                log.FullName = log.FullName ?? "Unknown User";
+                log.StudentId = log.StudentId ?? "N/A";
+                log.Department = log.Department ?? "-";
+                log.Email = log.Email ?? "-";
+                log.Phone = log.Phone ?? "-";
+                log.Room = log.Room ?? "Unknown Room";
+                log.Location = log.Location ?? "Unknown Location";
+                log.ImageUrl = log.ImageUrl ?? "/images/default-user.png";
+            }
 
-                    Room = "Room 402",
-                    Location = "Computer Laboratory 1",
-                    Timestamp = DateTime.Now.AddSeconds(-30),
-
-                    RFIDMatched = true,
-                    FaceMatched = true,
-                    IsAuthorized = true,
-
-                    ImageUrl = "/images/user1.jpg"
-                },
-
-                new AccessLog
-                {
-                    Id = 2,
-                    FullName = "Juan Dela Cruz",
-                    StudentId = "QCU-2024-0456",
-                    Department = "Engineering",
-                    Email = "juan.delacruz@qcu.edu.ph",
-                    Phone = "09987654321",
-
-                    Room = "Main Entrance",
-                    Location = "QCU Main Building",
-                    Timestamp = DateTime.Now.AddMinutes(-2),
-
-                    RFIDMatched = true,
-                    FaceMatched = false, // Face mismatch
-                    IsAuthorized = false,
-
-                    ImageUrl = "/images/user2.jpg"
-                },
-
-                new AccessLog
-                {
-                    Id = 3,
-                    FullName = "Unknown User",
-                    StudentId = "N/A",
-                    Department = "-",
-                    Email = "-",
-                    Phone = "-",
-
-                    Room = "Restricted Room",
-                    Location = "Server Room",
-                    Timestamp = DateTime.Now.AddMinutes(-5),
-
-                    RFIDMatched = false,
-                    FaceMatched = false,
-                    IsAuthorized = false,
-
-                    ImageUrl = "/images/default-user.png"
-                }
-            };
-
-            // Door Status (for IoT control)
-            var door = new DoorStatus
+            // ✅ Door status
+            ViewBag.Door = new DoorStatus
             {
                 DoorName = "Main Entrance Door",
                 Location = "QCU Main Building",
                 IsLocked = true
             };
 
-            ViewBag.Door = door;
-
             return View(logs);
         }
 
+        // =========================
+        // UNLOCK DOOR (POST)
+        // =========================
         [HttpPost]
         public IActionResult UnlockDoor()
         {
-            // 🔌 FUTURE: Integrate Raspberry Pi / MQTT / GPIO
-            // Example:
-            // Send unlock signal to Raspberry Pi
+            // 🔌 Future IoT integration here
 
             TempData["Message"] = "Door unlocked successfully.";
+            return RedirectToAction(nameof(Index));
+        }
 
-            return RedirectToAction("Index");
+        // =========================
+        // API: GET LATEST LOGS
+        // =========================
+        [HttpGet]
+        public async Task<IActionResult> GetLatestLogs()
+        {
+            var logs = await _context.AccessLogs
+                .OrderByDescending(x => x.Timestamp)
+                .Take(20)
+                .ToListAsync(); // ✅ IMPORTANT FIX
+
+            // ✅ Now safe to use NotMapped fields
+            var result = logs.Select(log => new
+            {
+                FullName = log.FullName ?? "Unknown User",
+                StudentId = log.StudentId ?? "N/A",
+                Department = log.Department ?? "-",
+                Email = log.Email ?? "-",
+                Phone = log.Phone ?? "-",
+                Room = log.Room ?? "Unknown Room",
+                Location = log.Location ?? "Unknown Location",
+                Time = log.Timestamp.ToString("hh:mm tt"),
+                ImageUrl = log.ImageUrl ?? "/images/default-user.png",
+                Status = log.Status
+            });
+
+            return Json(result);
         }
     }
 }

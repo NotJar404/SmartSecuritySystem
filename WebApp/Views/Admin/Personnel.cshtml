@@ -1,4 +1,5 @@
 ﻿@model List<SmartSecuritySystem.Models.User>
+@using System.Linq
 
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
@@ -9,19 +10,13 @@
 
 <div class="page">
 
-    <!-- HEADER -->
-    <div class="header">
-        <h1>Personnel Management</h1>
-        <p>Manage security personnel accounts</p>
-    </div>
-
-    <!-- SEARCH + ADD -->
+    <!-- TOOLBAR -->
     <div class="toolbar">
-        <form method="get">
+        <form method="get" asp-action="Index" asp-controller="Personnel">
             <input type="text" name="search" placeholder="Search personnel..." />
         </form>
 
-        <button onclick="toggleModal()" class="btn-primary">
+        <button type="button" onclick="openAddModal()" class="btn-primary">
             <i class="fa fa-user-plus"></i> Add Personnel
         </button>
     </div>
@@ -31,10 +26,11 @@
         <table>
             <thead>
                 <tr>
-                    <th>Name</th>
+                    <th>Full Name</th>
                     <th>Username</th>
                     <th>Email</th>
                     <th>Status</th>
+                    <th>Created At</th>
                     <th>Last Login</th>
                     <th>Actions</th>
                 </tr>
@@ -44,25 +40,44 @@
                 @foreach (var user in Model)
                 {
                     <tr>
-                        <td>@user.Name</td>
+                        <td>@user.FullName</td>
                         <td>@user.Username</td>
                         <td>@user.Email</td>
 
                         <td>
-                            <span class="status active">@user.Status</span>
+                            <span class="status @(user.Status?.ToLower() == "active" ? "active"
+                                : user.Status?.ToLower() == "locked" ? "locked"
+                                : "inactive")">
+                                @user.Status
+                            </span>
                         </td>
 
                         <td>
-                            @(user.LastLogin.HasValue 
-                                ? user.LastLogin.Value.ToString("MMM dd, hh:mm tt") 
+                            @(user.CreatedAt.HasValue
+                                ? user.CreatedAt.Value.ToString("MMM dd, yyyy hh:mm tt")
+                                : "N/A")
+                        </td>
+
+                        <td>
+                            @(user.LastLogin.HasValue
+                                ? user.LastLogin.Value.ToString("MMM dd, yyyy hh:mm tt")
                                 : "Never")
                         </td>
 
                         <td class="actions">
-                            <a href="#" class="edit"><i class="fa fa-pen"></i></a>
-                            <a asp-action="Delete" asp-route-id="@user.Id" class="delete">
-                                <i class="fa fa-trash"></i>
+                            <a href="javascript:void(0)"
+                               onclick="openEditModal(@user.Id, '@user.FullName', '@user.Username', '@user.Email', '@user.Status')"
+                               class="edit">
+                                <i class="fa fa-pen"></i>
                             </a>
+
+                            <form method="post" asp-action="Delete" asp-controller="Personnel" style="display:inline;">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@user.Id" />
+                                <button type="submit" class="delete" onclick="return confirm('Delete this user?')">
+                                    <i class="fa fa-trash"></i>
+                                </button>
+                            </form>
                         </td>
                     </tr>
                 }
@@ -71,24 +86,100 @@
     </div>
 </div>
 
-<!-- ADD MODAL -->
+<!-- MODAL -->
 <div id="modal" class="modal">
-    <div class="modal-content">
-        <h2>Add Personnel</h2>
+    <div class="modal-box">
 
-        <form method="post" asp-action="Add">
-            <input name="Name" placeholder="Full Name" required />
-            <input name="Username" placeholder="Username" required />
-            <input name="Email" placeholder="Email" required />
-            <input name="PasswordHash" placeholder="Password" required />
+        <div class="modal-header">
+            <h2 id="modalTitle">Add Personnel</h2>
+            <span class="close" onclick="closeModal()">&times;</span>
+        </div>
 
-            <button type="submit" class="btn-primary">Create</button>
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div class="error-summary">
+                @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                {
+                    <div class="error">@error.ErrorMessage</div>
+                }
+            </div>
+        }
+
+        <form method="post" id="userForm" asp-action="Add" asp-controller="Personnel">
+            @Html.AntiForgeryToken()
+
+            <input type="hidden" name="Id" id="userId" value="0" />
+
+            <div class="form-group">
+                <label>Full Name *</label>
+                <input name="FullName" id="fullName" required />
+            </div>
+
+            <div class="form-group">
+                <label>Username *</label>
+                <input name="Username" id="username" required />
+            </div>
+
+            <div class="form-group">
+                <label>Email *</label>
+                <input name="Email" id="email" required type="email" />
+            </div>
+
+            <!-- ❌ REMOVED STATUS FROM ADD -->
+
+            <div class="form-group">
+                <label>Password *</label>
+                <div class="password-field">
+                    <input type="password" name="PasswordHash" id="password" />
+                    <i class="fa fa-eye" onclick="togglePassword()"></i>
+                </div>
+            </div>
+
+            <input type="hidden" name="Role" value="Security" />
+
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="btn-primary">Save</button>
+            </div>
         </form>
+
     </div>
 </div>
 
 <script>
-    function toggleModal() {
-        document.getElementById("modal").classList.toggle("show");
+    function openAddModal() {
+        document.getElementById("modal").classList.add("show");
+        document.getElementById("modalTitle").innerText = "Add Personnel";
+
+        const form = document.getElementById("userForm");
+        form.action = "/Personnel/Add";
+        form.reset();
+
+        document.getElementById("userId").value = "0";
+    }
+
+    function openEditModal(id, fullName, username, email, status) {
+        document.getElementById("modal").classList.add("show");
+        document.getElementById("modalTitle").innerText = "Edit Personnel";
+
+        const form = document.getElementById("userForm");
+        form.action = "/Personnel/Edit";
+
+        document.getElementById("userId").value = id;
+        document.getElementById("fullName").value = fullName || "";
+        document.getElementById("username").value = username || "";
+        document.getElementById("email").value = email || "";
+        document.getElementById("password").value = "";
+
+        // status handled ONLY in edit (you can add dropdown later if needed)
+    }
+
+    function closeModal() {
+        document.getElementById("modal").classList.remove("show");
+    }
+
+    function togglePassword() {
+        const input = document.getElementById("password");
+        input.type = input.type === "password" ? "text" : "password";
     }
 </script>

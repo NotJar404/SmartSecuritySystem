@@ -1,295 +1,203 @@
-﻿@using System.Security.Claims
+﻿@model WebApp.Models.AdminDashboardViewModel
+
 @{
-    Layout = null;
-    var fullName = User.Claims.FirstOrDefault(c => c.Type == "FullName")?.Value ?? User.Identity.Name;
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    ViewData["Title"] = "Admin Dashboard";
 }
-<!DOCTYPE html>
-<html lang="en" data-theme="light">
-<head>
-    <meta charset="utf-8" />
-    <title>Admin Dashboard - SecureVision</title>
-    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="~/css/admindashboard.css" asp-append-version="true" />
-    <style>
-        /* This prevents the charts from collapsing or scaling weirdly when empty */
-        .chart-container {
-            position: relative;
-            height: 180px;
-            width: 100%;
-        }
-    </style>
-</head>
-<body>
-    <div class="dashboard-layout">
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <div class="d-flex align-items-center gap-2">
-                    <img src="~/images/qcu-logo.png" alt="QCU" style="height: 30px;" />
-                    <div class="lh-1">
-                        <div class="fw-bold small text-white">SecureVision</div>
-                        <div class="text-white-50" style="font-size: 9px;">QCU Admin Panel</div>
-                    </div>
-                </div>
+
+<div class="dashboard-container">
+
+    <!-- ===================== -->
+    <!-- STATS -->
+    <!-- ===================== -->
+    <div class="stats">
+
+        <div class="stat-card">
+            <div class="stat-icon blue">
+                <i class="fa fa-users"></i>
             </div>
-            
-            <div class="user-profile-box">
-                <div class="d-flex align-items-center gap-3">
-                    <div class="avatar-circle">A</div>
-                    <div>
-                        <div class="fw-bold small text-white">@fullName</div>
-                        <div class="text-white-50 tiny">Administrator</div>
-                    </div>
-                </div>
+            <div>
+                <h2>@Model.ActivePersonnelCount</h2>
+                <p>Active Personnel</p>
             </div>
+        </div>
 
-          <nav class="nav flex-column mt-3">
-    <a class="nav-link @(ViewContext.RouteData.Values["Action"]?.ToString() == "Index" ? "active" : "")" 
-       asp-controller="Admin" asp-action="Index">
-       <i class="bi bi-grid-fill"></i> Dashboard
-    </a>
-
-    <a class="nav-link @(ViewContext.RouteData.Values["Action"]?.ToString() == "Cameras" ? "active" : "")" 
-       asp-controller="Admin" asp-action="Cameras">
-       <i class="bi bi-camera-video"></i> Camera View
-    </a>
-
-    <a class="nav-link @(ViewContext.RouteData.Values["Action"]?.ToString() == "Personnel" ? "active" : "")" 
-       asp-controller="Admin" asp-action="Personnel">
-       <i class="bi bi-people"></i> Personnel
-    </a>
-
-    <a class="nav-link @(ViewContext.RouteData.Values["Action"]?.ToString() == "Analytics" ? "active" : "")" 
-       asp-controller="Admin" asp-action="Analytics">
-       <i class="bi bi-bar-chart"></i> Analytics
-    </a>
-
-    <a class="nav-link @(ViewContext.RouteData.Values["Action"]?.ToString() == "Logs" ? "active" : "")" 
-       asp-controller="Admin" asp-action="Logs">
-       <i class="bi bi-activity"></i> Activity Logs
-    </a>
-
-    <a class="nav-link @(ViewContext.RouteData.Values["Action"]?.ToString() == "Settings" ? "active" : "")" 
-       asp-controller="Admin" asp-action="Settings">
-       <i class="bi bi-gear"></i> System Settings
-    </a>
-</nav>
-
-            <div class="sidebar-footer">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <span class="tiny text-white-50">Theme</span>
-                    <div class="form-check form-switch m-0">
-                        <input class="form-check-input" type="checkbox" id="themeToggle" style="cursor:pointer">
-                    </div>
-                </div>
-                <a asp-controller="Auth" asp-action="Logout" class="logout-link text-decoration-none">
-                    <i class="bi bi-box-arrow-left me-2"></i>Logout
-                </a>
+        <div class="stat-card">
+            <div class="stat-icon yellow">
+                <i class="fa fa-video"></i>
             </div>
-        </aside>
-
-        <main class="main-viewport">
-            <header class="header-bar">
-                <div class="d-flex align-items-center gap-3">
-                    <div class="header-logo-bg"><img src="~/images/qcu-logo.png" style="height: 25px;" /></div>
-                    <div>
-                        <h5 class="mb-0 fw-bold text-white">Admin Dashboard</h5>
-                        <small class="text-white-50">Welcome back, <span class="fw-bold text-white">@fullName</span></small>
-                    </div>
-                </div>
-                <div class="time-pill">
-                    <span id="liveClock" class="fw-bold text-white"></span>
-                </div>
-            </header>
-
-            <div class="dashboard-content">
-                <div class="row g-3 mb-4">
-                    <div class="col-md-3">
-                        <div class="stat-card">
-                            <div class="d-flex justify-content-between align-items-start">
-                                <div class="icon-sq bg-primary-light"><i class="bi bi-people text-primary"></i></div>
-                                <small class="text-muted fw-bold tiny">Personnel</small>
-                            </div>
-                            <h2 class="fw-bold my-2">0</h2>
-                            <div class="text-muted tiny fw-bold">No Active Data</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card">
-                            <div class="d-flex justify-content-between align-items-start">
-                                <div class="icon-sq bg-warning-light"><i class="bi bi-camera-video text-warning"></i></div>
-                                <small class="text-muted fw-bold tiny">Cameras</small>
-                            </div>
-                            <h2 class="fw-bold my-2">0</h2>
-                            <div class="text-muted tiny fw-bold">Offline</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card">
-                            <div class="d-flex justify-content-between align-items-start">
-                                <div class="icon-sq bg-success-light"><i class="bi bi-activity text-success"></i></div>
-                                <small class="text-muted fw-bold tiny">Detections</small>
-                            </div>
-                            <h2 class="fw-bold my-2">0</h2>
-                            <div class="text-muted tiny fw-bold">Waiting for logs</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card">
-                            <div class="d-flex justify-content-between align-items-start">
-                                <div class="icon-sq bg-danger-light"><i class="bi bi-exclamation-triangle text-danger"></i></div>
-                                <small class="text-muted fw-bold tiny">Incidents</small>
-                            </div>
-                            <h2 class="fw-bold my-2">0</h2>
-                            <div class="text-muted tiny fw-bold">Clean record</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="row g-3 mb-4">
-                    <div class="col-md-6">
-                        <div class="chart-card">
-                            <h6 class="fw-bold mb-0 small"><i class="bi bi-exclamation-octagon text-danger me-2"></i>Alert Intrusion Trends</h6>
-                            <p class="text-muted tiny mb-3">No data available for this week</p>
-                            <div class="chart-container">
-                                <canvas id="intrusionChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="chart-card">
-                            <h6 class="fw-bold mb-0 small"><i class="bi bi-people text-primary me-2"></i>Access Activity</h6>
-                            <p class="text-muted tiny mb-3">No data available for this week</p>
-                            <div class="chart-container">
-                                <canvas id="accessChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="row g-3 mb-4">
-                    <div class="col-md-6">
-                        <div class="chart-card">
-                            <h6 class="fw-bold mb-0 small"><i class="bi bi-activity text-info me-2"></i>Motion Detection</h6>
-                            <p class="text-muted tiny mb-3">No data available for this week</p>
-                            <div class="chart-container">
-                                <canvas id="motionChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="chart-card">
-                            <h6 class="fw-bold mb-0 small"><i class="bi bi-building text-success me-2"></i>Occupancy Monitoring</h6>
-                            <p class="text-muted tiny mb-3">No data available for this week</p>
-                            <div class="chart-container">
-                                <canvas id="occupancyChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="row g-3 mb-4">
-                    <div class="col-md-7">
-                        <div class="activity-card p-3">
-                            <h6 class="fw-bold mb-3 small"><i class="bi bi-lightning-charge text-primary me-2"></i>Recent Activity</h6>
-                            <div class="text-center py-4 text-muted tiny">No recent logs found.</div>
-                        </div>
-                    </div>
-                    <div class="col-md-5">
-                        <div class="quick-actions-card p-3">
-                            <h6 class="fw-bold mb-3 small"><i class="bi bi-cursor text-orange me-2"></i>Quick Actions</h6>
-                            <div class="d-grid gap-2">
-                                <button class="btn btn-action"><i class="bi bi-person-plus text-primary"></i> <div><b class="d-block small">Add Personnel</b><span class="tiny text-muted">Create security account</span></div></button>
-                                <button class="btn btn-action"><i class="bi bi-camera-video text-success"></i> <div><b class="d-block small">View Cameras</b><span class="tiny text-muted">Monitor live feeds</span></div></button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <div>
+                <h2>@Model.ActiveCameraCount</h2>
+                <p>Active Cameras</p>
             </div>
-        </main>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon red">
+                <i class="fa fa-exclamation-triangle"></i>
+            </div>
+            <div>
+                <h2>@Model.ActiveIncidentCount</h2>
+                <p>Active Alerts</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon green">
+                <i class="fa fa-chart-bar"></i>
+            </div>
+            <div>
+                <h2>@Model.TodayDetectionCount</h2>
+                <p>Today Detections</p>
+            </div>
+        </div>
+
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            
-            // 1. REAL-TIME CLOCK
-            const clockEl = document.getElementById('liveClock');
-            function updateClock() {
-                const now = new Date();
-                if (clockEl) {
-                    clockEl.innerText = now.toLocaleTimeString('en-US', { 
-                        hour: '2-digit', 
-                        minute: '2-digit', 
-                        second: '2-digit', 
-                        hour12: true 
-                    });
+<!-- ===================== -->
+<!-- QUICK ACTIONS -->
+<!-- ===================== -->
+<div class="section">
+
+    <div class="section-header">
+        <h3>Quick Actions</h3>
+    </div>
+
+    <div class="quick-grid">
+
+        <div class="quick-card">
+            <div class="quick-icon"><i class="fa fa-user-plus"></i></div>
+            <div class="quick-text">
+                <h4>Add Personnel</h4>
+                <p>Create security account</p>
+            </div>
+        </div>
+
+        <div class="quick-card">
+            <div class="quick-icon"><i class="fa fa-video"></i></div>
+            <div class="quick-text">
+                <h4>Monitor Cameras</h4>
+                <p>View live feeds</p>
+            </div>
+        </div>
+
+        <div class="quick-card">
+            <div class="quick-icon"><i class="fa fa-bell"></i></div>
+            <div class="quick-text">
+                <h4>View Alerts</h4>
+                <p>Security incidents</p>
+            </div>
+        </div>
+
+        <div class="quick-card">
+            <div class="quick-icon"><i class="fa fa-chart-line"></i></div>
+            <div class="quick-text">
+                <h4>Analytics</h4>
+                <p>System reports</p>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+    <!-- ===================== -->
+    <!-- CHARTS -->
+    <!-- ===================== -->
+    <div class="grid-2">
+
+        <div class="panel chart-panel">
+            <h4>Alert Trends</h4>
+            <div class="chart-wrapper">
+                <canvas id="alertChart"></canvas>
+            </div>
+        </div>
+
+        <div class="panel chart-panel">
+            <h4>Access Activity</h4>
+            <div class="chart-wrapper">
+                <canvas id="accessChart"></canvas>
+            </div>
+        </div>
+
+        <div class="panel chart-panel">
+            <h4>Detection Activity</h4>
+            <div class="chart-wrapper">
+                <canvas id="motionChart"></canvas>
+            </div>
+        </div>
+
+        <div class="panel chart-panel">
+            <h4>Room Occupancy</h4>
+            <div class="chart-wrapper">
+                <canvas id="occupancyChart"></canvas>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ===================== -->
+<!-- CHART.JS -->
+<!-- ===================== -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    const labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Labels ?? new List<string>()));
+
+    const alertData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AlertWeekly ?? new List<int>()));
+    const accessData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AccessWeekly ?? new List<int>()));
+    const motionData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.MotionWeekly ?? new List<int>()));
+    const occupancyData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.OccupancyWeekly ?? new List<int>()));
+
+    function createChart(id, type, label, data, color) {
+        const ctx = document.getElementById(id);
+        if (!ctx) return;
+
+        new Chart(ctx, {
+            type: type,
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: label,
+                    data: data,
+                    backgroundColor: color + "55",
+                    borderColor: color,
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { precision: 0 }
+                    }
                 }
             }
-            updateClock();
-            setInterval(updateClock, 1000);
-
-            // 2. THEME TOGGLE
-            const themeToggle = document.getElementById('themeToggle');
-            function applyTheme(isDark) {
-                const theme = isDark ? 'dark' : 'light';
-                document.documentElement.setAttribute('data-theme', theme);
-                if (themeToggle) themeToggle.checked = isDark;
-                localStorage.setItem('sv-theme-choice', theme);
-            }
-            if (themeToggle) {
-                themeToggle.addEventListener('change', () => applyTheme(themeToggle.checked));
-            }
-            const savedTheme = localStorage.getItem('sv-theme-choice');
-            applyTheme(savedTheme === 'dark');
-
-            // 3. NO-SCALING CHARTS
-            const sharedOptions = { 
-                responsive: true, 
-                maintainAspectRatio: false,
-                animation: false,
-                plugins: { legend: { display: false } }, 
-                scales: { 
-                    y: { 
-                        beginAtZero: true, 
-                        min: 0, 
-                        max: 100, 
-                        grid: { color: 'rgba(0,0,0,0.05)' },
-                        ticks: { stepSize: 20 }
-                    }, 
-                    x: { grid: { display: false } } 
-                } 
-            };
-
-            const commonLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-            new Chart(document.getElementById('intrusionChart'), {
-                type: 'line',
-                data: { labels: commonLabels, datasets: [{ data: [], borderColor: '#ff6b00', tension: 0.4 }] },
-                options: sharedOptions
-            });
-
-            new Chart(document.getElementById('accessChart'), {
-                type: 'bar',
-                data: { labels: commonLabels, datasets: [{ data: [], backgroundColor: '#0046ad' }] },
-                options: sharedOptions
-            });
-
-            new Chart(document.getElementById('motionChart'), {
-                type: 'bar',
-                data: { labels: commonLabels, datasets: [{ data: [], backgroundColor: '#a855f7' }] },
-                options: sharedOptions
-            });
-
-            new Chart(document.getElementById('occupancyChart'), {
-                type: 'bar',
-                data: { 
-                    labels: ['Lobby', 'Floor 1', 'Server', 'Admin', 'Parking'], 
-                    datasets: [{ data: [], backgroundColor: '#10b981' }] 
-                },
-                options: sharedOptions
-            });
         });
-    </script>
-</body>
-</html>
+    }
+
+    createChart("alertChart", "line", "Alerts", alertData, "#ef4444");
+    createChart("accessChart", "bar", "Access Logs", accessData, "#3b82f6");
+    createChart("motionChart", "bar", "Detections", motionData, "#a855f7");
+
+    new Chart(document.getElementById("occupancyChart"), {
+        type: "bar",
+        data: {
+            labels: ["Lobby", "Floor 1", "Server Room", "Admin", "Parking"],
+            datasets: [{
+                label: "Occupancy",
+                data: occupancyData,
+                backgroundColor: "#22c55e"
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+</script>

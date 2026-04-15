@@ -1,119 +1,214 @@
-﻿.page {
-    padding: 30px;
-    color: white;
+﻿body {
+    background: #0b0f14;
+    font-family: 'Segoe UI', sans-serif;
+    color: #e5e7eb;
 }
 
-/* HEADER */
-.header h1 {
-    font-size: 28px;
-}
-
-.header p {
-    color: #9ca3af;
+/* PAGE (reduce side spacing) */
+.page {
+    padding: 15px 12px;
 }
 
 /* TOOLBAR */
 .toolbar {
-    margin-top: 20px;
     display: flex;
     justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    width: 100%;
 }
 
-    .toolbar input {
-        width: 300px;
-        padding: 12px;
-        border-radius: 10px;
-        border: none;
-        background: #111827;
-        color: white;
-    }
+.toolbar input {
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #1f2937;
+    background: #111827;
+    color: white;
+    width: 240px;
+    font-size: 13px;
+}
 
 /* BUTTON */
 .btn-primary {
-    background: #2563eb;
-    padding: 12px 20px;
-    border-radius: 10px;
-    color: white;
+    background: #f97316;
     border: none;
+    padding: 8px 14px;
+    border-radius: 8px;
+    color: white;
     cursor: pointer;
+    font-size: 13px;
 }
 
-/* TABLE */
+.btn-primary:hover {
+    background: #ea580c;
+}
+
+/* TABLE CONTAINER (FULL WIDTH, NO OUTER PADDING) */
 .table-container {
-    margin-top: 20px;
+    width: 100%;
+    margin-top: 10px;
     background: #111827;
-    border-radius: 16px;
+    border-radius: 12px;
     overflow: hidden;
 }
 
+/* TABLE */
 table {
     width: 100%;
     border-collapse: collapse;
 }
 
+/* HEADER */
 th {
     text-align: left;
-    padding: 15px;
+    padding: 12px 16px; /* internal spacing */
+    font-size: 11px;
     color: #9ca3af;
+    font-weight: 500;
 }
 
+/* ROWS */
 td {
-    padding: 15px;
+    padding: 12px 16px; /* internal spacing */
+    font-size: 13px;
     border-top: 1px solid #1f2937;
+}
+
+/* ROW HOVER */
+tbody tr:hover {
+    background: #0f172a;
+}
+
+/* NAME EMPHASIS */
+.name {
+    font-weight: 500;
+}
+
+/* MUTED TEXT */
+.muted {
+    color: #9ca3af;
+    font-size: 12px;
 }
 
 /* STATUS */
 .status {
-    padding: 5px 12px;
+    padding: 4px 10px;
+    font-size: 11px;
     border-radius: 999px;
-    font-size: 12px;
 }
 
-    .status.active {
-        background: rgba(59,130,246,0.2);
-        color: #3b82f6;
-    }
+.status.active {
+    background: rgba(34,197,94,0.15);
+    color: #22c55e;
+}
 
 /* ACTIONS */
 .actions i {
-    margin-right: 10px;
+    margin-left: 10px;
     cursor: pointer;
+    font-size: 13px;
+    transition: 0.2s;
 }
 
-.actions .edit {
-    color: #3b82f6;
+.actions i:hover {
+    opacity: 0.7;
 }
 
-.actions .delete {
-    color: #ef4444;
+.text-right {
+    text-align: right;
 }
 
-/* MODAL */
+.edit { color: #3b82f6; }
+.delete { color: #ef4444; }
+
+/* MODAL BACKDROP */
 .modal {
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.6);
+    background: rgba(0,0,0,0.65);
 }
 
-    .modal.show {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
+.modal.show {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
 
-.modal-content {
+/* MODAL BOX */
+.modal-box {
     background: #111827;
-    padding: 25px;
+    width: 360px;
     border-radius: 12px;
-    width: 300px;
+    padding: 16px;
 }
 
-    .modal-content input {
-        width: 100%;
-        margin-bottom: 10px;
-        padding: 10px;
-        background: #0b0f14;
-        border: none;
-        color: white;
-    }
+/* MODAL HEADER */
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.modal-header h2 {
+    font-size: 16px;
+}
+
+.close {
+    cursor: pointer;
+    font-size: 18px;
+}
+
+/* FORM */
+.modal-box label {
+    font-size: 12px;
+    color: #9ca3af;
+    margin-top: 8px;
+    display: block;
+}
+
+.modal-box input {
+    width: 100%;
+    padding: 8px;
+    margin-top: 4px;
+    border-radius: 8px;
+    border: 1px solid #1f2937;
+    background: #0b0f14;
+    color: white;
+    font-size: 13px;
+}
+
+/* PASSWORD */
+.password-field {
+    display: flex;
+    align-items: center;
+}
+
+.password-field i {
+    margin-left: -25px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+/* RADIO */
+.radio-group {
+    margin-top: 8px;
+    font-size: 13px;
+}
+
+/* MODAL FOOTER */
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 15px;
+    gap: 8px;
+}
+
+.btn-secondary {
+    background: #374151;
+    border: none;
+    padding: 7px 12px;
+    border-radius: 8px;
+    color: white;
+    font-size: 12px;
+}

@@ -52,57 +52,84 @@
     <div class="right-panel">
         <div class="login-container">
 
-            <h2>Sign In</h2>
-            <p class="subtitle">Enter your credentials to access the system</p>
+            <!-- LOGIN FORM -->
+            <div id="loginForm">
+                <h2>Sign In</h2>
+                <p class="subtitle">Enter your credentials to access the system</p>
 
-            <form method="post" asp-action="Login">
+                <form method="post" asp-action="Login">
 
-                <!-- USERNAME -->
-                <label>Username</label>
-                <div class="input-group">
-                    <i class="fa fa-user"></i>
-                    <input type="text" name="username" placeholder="Enter your username" required />
+                    <label>Username</label>
+                    <div class="input-group">
+                        <i class="fa fa-user"></i>
+                        <input type="text" name="username" placeholder="Enter your username" required />
+                    </div>
+
+                    <label>Password</label>
+                    <div class="input-group">
+                        <i class="fa fa-lock"></i>
+                        <input type="password" id="password" name="password" placeholder="Enter your password" required />
+                        <i class="fa fa-eye right-icon" onclick="togglePassword()"></i>
+                    </div>
+
+                    <div class="options">
+                        <label class="remember-me">
+                            <input type="checkbox" name="rememberMe" />
+                            <span>Remember me</span>
+                        </label>
+
+                        <a href="#" onclick="showForgot()">Forgot password?</a>
+                    </div>
+
+                    <button type="submit">
+                        <i class="fa fa-lock"></i> Sign In
+                    </button>
+                </form>
+
+                <div class="demo">
+                    Demo: admin / 1234
                 </div>
 
-                <!-- PASSWORD -->
-                <label>Password</label>
-                <div class="input-group">
-                    <i class="fa fa-lock"></i>
-                    <input type="password" id="password" name="password" placeholder="Enter your password" required />
-                    <i class="fa fa-eye right-icon" onclick="togglePassword()"></i>
-                </div>
-
-                <!-- OPTIONS -->
-                <div class="options">
-
-                    <!-- REMEMBER ME -->
-                    <label class="remember-me">
-                        <input type="checkbox" name="rememberMe" />
-                        <span>Remember me</span>
-                    </label>
-
-                    <!-- FORGOT PASSWORD -->
-                    <a asp-controller="Auth" asp-action="ForgotPassword">
-                        Forgot password?
-                    </a>
-
-                </div>
-
-                <!-- BUTTON -->
-                <button type="submit">
-                    <i class="fa fa-lock"></i> Sign In
-                </button>
-
-            </form>
-
-            <div class="demo">
-                Demo: admin / 1234
+                @if (ViewBag.Error != null)
+                {
+                    <p class="error">@ViewBag.Error</p>
+                }
             </div>
 
-            @if (ViewBag.Error != null)
-            {
-                <p class="error">@ViewBag.Error</p>
-            }
+            <!-- FORGOT PASSWORD FORM -->
+            <div id="forgotForm" style="display:none;">
+                <h2>Forgot Password</h2>
+                <p class="subtitle">
+                    Enter your email and we’ll send you a reset link
+                </p>
+
+                <form method="post" asp-action="ForgotPassword">
+
+                    <label>Email</label>
+                    <div class="input-group">
+                        <i class="fa fa-envelope"></i>
+                        <input type="email" name="email" placeholder="Enter your email" required />
+                    </div>
+
+                    <button type="submit">
+                        <i class="fa fa-paper-plane"></i> Send Reset Link
+                    </button>
+                </form>
+
+                <div class="options" style="margin-top:15px;">
+                    <a href="#" onclick="showLogin()">← Back to Login</a>
+                </div>
+
+                @if (ViewBag.Message != null)
+                {
+                    <p style="color:lightgreen">@ViewBag.Message</p>
+                }
+
+                @if (ViewBag.Error != null)
+                {
+                    <p class="error">@ViewBag.Error</p>
+                }
+            </div>
 
         </div>
     </div>
@@ -113,6 +140,24 @@
     function togglePassword() {
         const input = document.getElementById("password");
         input.type = input.type === "password" ? "text" : "password";
+    }
+
+    function showForgot() {
+        document.getElementById("loginForm").style.display = "none";
+        document.getElementById("forgotForm").style.display = "block";
+    }
+
+    function showLogin() {
+        document.getElementById("loginForm").style.display = "block";
+        document.getElementById("forgotForm").style.display = "none";
+    }
+
+    // Optional: auto-switch if coming from ForgotPassword with message/error
+    window.onload = function () {
+        const hasMessage = '@ViewBag.Message';
+        if (hasMessage) {
+            showForgot();
+        }
     }
 </script>
 
