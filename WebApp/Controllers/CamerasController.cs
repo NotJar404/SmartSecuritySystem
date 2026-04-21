@@ -17,11 +17,15 @@ namespace WebApp.Controllers
         }
 
         // ===============================
-        // LOAD INDEX
+        // LIVE MONITORING (WITH AUTO-SELECT)
         // ===============================
-        public IActionResult Index()
+        public IActionResult Index(int? selectedId)
         {
             LoadRooms();
+
+            // PASS SELECTED CAMERA TO VIEW
+            ViewBag.SelectedCameraId = selectedId;
+
             return View(GetCameras());
         }
 
@@ -34,29 +38,20 @@ namespace WebApp.Controllers
         {
             LoadRooms();
 
-            LogCamera("ADD CAMERA", camera);
-
-            // 🔥 SHOW EXACT MODEL ERRORS
             if (!ModelState.IsValid)
             {
-                LogModelErrors();
                 return View("Index", GetCameras());
             }
 
-            // VALIDATE ROOM
-            if (!_context.Rooms.Any(r => r.RoomId == camera.RoomId))
+            NormalizeStream(camera);
+
+            if (!IsValidRoom(camera.RoomId))
             {
                 ModelState.AddModelError("", "Invalid room selected.");
                 return View("Index", GetCameras());
             }
 
-            // CHECK DUPLICATE
-            bool duplicate = _context.CameraDevices.Any(c =>
-                c.RoomId == camera.RoomId &&
-                c.StreamUrl == camera.StreamUrl
-            );
-
-            if (duplicate)
+            if (IsDuplicate(camera))
             {
                 ModelState.AddModelError("", "Camera already exists in this room.");
                 return View("Index", GetCameras());
@@ -69,13 +64,10 @@ namespace WebApp.Controllers
                 _context.CameraDevices.Add(camera);
                 _context.SaveChanges();
 
-                Console.WriteLine("✅ CAMERA SAVED");
-
                 return RedirectToAction(nameof(Index));
             }
             catch (Exception ex)
             {
-                LogException(ex);
                 ModelState.AddModelError("", ex.InnerException?.Message ?? ex.Message);
                 return View("Index", GetCameras());
             }
@@ -90,35 +82,25 @@ namespace WebApp.Controllers
         {
             LoadRooms();
 
-            LogCamera("EDIT CAMERA", camera);
-
             if (!ModelState.IsValid)
             {
-                LogModelErrors();
                 return View("Index", GetCameras());
             }
 
-            var existing = _context.CameraDevices
-                .FirstOrDefault(c => c.Id == camera.Id);
+            var existing = _context.CameraDevices.FirstOrDefault(c => c.Id == camera.Id);
 
             if (existing == null)
                 return RedirectToAction(nameof(Index));
 
-            // VALIDATE ROOM
-            if (!_context.Rooms.Any(r => r.RoomId == camera.RoomId))
+            if (!IsValidRoom(camera.RoomId))
             {
                 ModelState.AddModelError("", "Invalid room.");
                 return View("Index", GetCameras());
             }
 
-            // CHECK DUPLICATE
-            bool duplicate = _context.CameraDevices.Any(c =>
-                c.Id != camera.Id &&
-                c.RoomId == camera.RoomId &&
-                c.StreamUrl == camera.StreamUrl
-            );
+            NormalizeStream(camera);
 
-            if (duplicate)
+            if (IsDuplicate(camera, true))
             {
                 ModelState.AddModelError("", "Duplicate camera found.");
                 return View("Index", GetCameras());
@@ -126,7 +108,6 @@ namespace WebApp.Controllers
 
             try
             {
-                // UPDATE FIELDS
                 existing.Name = camera.Name;
                 existing.RoomId = camera.RoomId;
                 existing.StreamUrl = camera.StreamUrl;
@@ -135,13 +116,10 @@ namespace WebApp.Controllers
 
                 _context.SaveChanges();
 
-                Console.WriteLine("✅ CAMERA UPDATED");
-
                 return RedirectToAction(nameof(Index));
             }
             catch (Exception ex)
             {
-                LogException(ex);
                 ModelState.AddModelError("", ex.InnerException?.Message ?? ex.Message);
                 return View("Index", GetCameras());
             }
@@ -160,7 +138,6 @@ namespace WebApp.Controllers
             {
                 _context.CameraDevices.Remove(cam);
                 _context.SaveChanges();
-                Console.WriteLine("🗑 CAMERA DELETED");
             }
 
             return RedirectToAction(nameof(Index));
@@ -181,40 +158,25 @@ namespace WebApp.Controllers
             ViewBag.Rooms = _context.Rooms.ToList();
         }
 
-        private void LogCamera(string title, Camera cam)
+        private void NormalizeStream(Camera camera)
         {
-            Console.WriteLine($"=== {title} ===");
-            Console.WriteLine($"Id: {cam.Id}");
-            Console.WriteLine($"Name: {cam.Name}");
-            Console.WriteLine($"RoomId: {cam.RoomId}");
-            Console.WriteLine($"StreamUrl: {cam.StreamUrl}");
-            Console.WriteLine($"Location: {cam.Location}");
-            Console.WriteLine($"Status: {cam.Status}");
+            if (string.IsNullOrWhiteSpace(camera.StreamUrl))
+                camera.StreamUrl = null;
         }
 
-        private void LogModelErrors()
+        private bool IsValidRoom(int roomId)
         {
-            Console.WriteLine("❌ MODELSTATE ERRORS:");
-
-            foreach (var key in ModelState.Keys)
-            {
-                var state = ModelState[key];
-
-                if (state != null)
-                {
-                    foreach (var error in state.Errors)
-                    {
-                        Console.WriteLine($"Field: {key} | Error: {error.ErrorMessage}");
-                    }
-                }
-            }
+            return _context.Rooms.Any(r => r.RoomId == roomId);
         }
 
-        private void LogException(Exception ex)
+        private bool IsDuplicate(Camera camera, bool isEdit = false)
         {
-            Console.WriteLine("🔥 EXCEPTION:");
-            Console.WriteLine(ex.Message);
-            Console.WriteLine(ex.InnerException?.Message);
+            return _context.CameraDevices.Any(c =>
+                (!isEdit || c.Id != camera.Id) &&
+                c.RoomId == camera.RoomId &&
+                !string.IsNullOrEmpty(camera.StreamUrl) &&
+                c.StreamUrl == camera.StreamUrl
+            );
         }
     }
 }

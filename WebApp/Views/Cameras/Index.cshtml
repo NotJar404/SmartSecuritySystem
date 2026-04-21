@@ -128,7 +128,15 @@
                 <div class="rec-badge">● REC</div>
                 <div class="timestamp" id="camTime"></div>
 
-                <video id="videoPlayer" autoplay controls style="width:100%; height:100%;"></video>
+                @* =========================================================
+                   VIDEO PLAYER (Raspberry Pi + StreamUrl + Future Webcam Support)
+                   ========================================================= *@
+                <video id="videoPlayer"
+                       autoplay
+                       controls
+                       playsinline
+                       style="width:100%; height:100%; background:black;">
+                </video>
 
                 <div class="overlay">
                     <strong id="overlayName"></strong><br />
@@ -152,9 +160,7 @@
 
         @Html.AntiForgeryToken()
 
-        <!-- 🔥 FIXED HERE -->
         <input type="hidden" id="camId" name="Id" value="0" />
-
         <input type="hidden" name="Status" value="active" />
 
         <div class="modal-header">
@@ -190,7 +196,18 @@
 
             <div class="form-group">
                 <label>Stream URL</label>
-                <input type="text" id="camSource" name="StreamUrl" required />
+
+                <input type="text"
+                    id="camSource"
+                    name="StreamUrl"
+                    placeholder="Enter Raspberry Pi / IP camera URL (or leave empty for webcam test)"
+                    />
+
+                <small style="color:gray; display:block; margin-top:5px;">
+                    ✔ Raspberry Pi: http://192.168.x.x:xxxx<br />
+                    ✔ IP Camera / OBS stream supported<br />
+                    ✔ Leave EMPTY for laptop webcam (TEST MODE ONLY)
+                </small>
             </div>
 
         </div>
@@ -222,8 +239,6 @@ function el(id) {
 
 const gridView = el("gridView");
 const focusView = el("focusView");
-const cameraModal = el("cameraModal");
-const cameraForm = el("cameraForm");
 
 const camTitle = el("camTitle");
 const camSubtitle = el("camSubtitle");
@@ -233,13 +248,7 @@ const overlayName = el("overlayName");
 const overlayLocation = el("overlayLocation");
 const overlaySource = el("overlaySource");
 
-const camId = el("camId");
-const camName = el("camName");
-const camLocation = el("camLocation");
-const camSource = el("camSource");
-const camRoom = el("camRoom");
-
-const modalTitle = el("modalTitle");
+const video = el("videoPlayer");
 
 function showGrid() {
     gridView.style.display = "grid";
@@ -264,11 +273,40 @@ function selectCamera(cam) {
 
     overlayName.innerText = cam.Name || "";
     overlayLocation.innerText = cam.Location || "";
-    overlaySource.innerText = cam.StreamUrl || "";
-
-    el("videoPlayer").src = cam.StreamUrl || "";
 
     startClock();
+
+    // =====================================================
+    // PRIORITY SYSTEM:
+    // 1. Raspberry Pi / StreamUrl (PRIMARY)
+    // 2. Future local webcam (ONLY if StreamUrl is empty)
+    // =====================================================
+
+    if (cam.StreamUrl && cam.StreamUrl.trim() !== "") {
+
+        overlaySource.innerText = "Raspberry Pi / Stream Stream";
+
+        video.srcObject = null;
+        video.src = cam.StreamUrl;
+        video.load();
+
+        video.play().catch(err => {
+            console.log("Stream failed:", err);
+        });
+
+    } else {
+
+        overlaySource.innerText = "Local Webcam (TEST MODE)";
+
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                video.srcObject = stream;
+                video.play();
+            })
+            .catch(err => {
+                console.log("Webcam blocked:", err);
+            });
+    }
 }
 
 function startClock() {
@@ -279,12 +317,17 @@ function startClock() {
     }, 1000);
 }
 
+function toggleFullscreen() {
+    const view = focusView;
+
+    if (!document.fullscreenElement) {
+        view.requestFullscreen();
+    } else {
+        document.exitFullscreen();
+    }
+}
+
 function openModal() {
-    cameraForm.action = "/Cameras/Add";
-    modalTitle.innerText = "Add Camera";
-
-    camId.value = 0; // 🔥 CRITICAL FIX
-
     cameraForm.reset();
     cameraModal.style.display = "flex";
 }
@@ -301,7 +344,6 @@ function editSelectedCamera() {
     if (!selectedCamera) return;
 
     cameraForm.action = "/Cameras/Edit";
-    modalTitle.innerText = "Edit Camera";
 
     camId.value = selectedCamera.Id || 0;
     camName.value = selectedCamera.Name || "";
@@ -310,16 +352,6 @@ function editSelectedCamera() {
     camRoom.value = selectedCamera.RoomId || "";
 
     cameraModal.style.display = "flex";
-}
-
-function toggleFullscreen() {
-    const view = focusView;
-
-    if (!document.fullscreenElement) {
-        view.requestFullscreen();
-    } else {
-        document.exitFullscreen();
-    }
 }
 
 </script>

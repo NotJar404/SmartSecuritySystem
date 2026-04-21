@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Http;
+using System;
 
 namespace WebApp.Models
 {
@@ -16,6 +17,17 @@ namespace WebApp.Models
         public string Email { get; set; } = string.Empty;
 
         public string Role { get; set; } = string.Empty;
+
+        // =========================
+        // SECURITY INFORMATION
+        // =========================
+        public string Status { get; set; } = "Active";
+
+        public DateTime? LastLogin { get; set; }
+
+        public DateTime? CreatedAt { get; set; }
+
+        public DateTime? UpdatedAt { get; set; }
 
         // =========================
         // PROFILE IMAGE

@@ -12,43 +12,15 @@ namespace WebApp.Data
         }
 
         // =========================
-        // USERS
+        // DBSets
         // =========================
         public DbSet<User> Users { get; set; }
-
-        // =========================
-        // LOGIN LOGS ✅ (ADDED FIX)
-        // =========================
         public DbSet<LoginLog> LoginLogs { get; set; }
-
-        // =========================
-        // ROOMS
-        // =========================
         public DbSet<Room> Rooms { get; set; }
-
-        // =========================
-        // CAMERAS
-        // =========================
         public DbSet<Camera> CameraDevices { get; set; }
-
-        // =========================
-        // ALERTS
-        // =========================
         public DbSet<Alert> Alerts { get; set; }
-
-        // =========================
-        // ACCESS LOGS
-        // =========================
         public DbSet<AccessLog> AccessLogs { get; set; }
-
-        // =========================
-        // DETECTION LOGS
-        // =========================
         public DbSet<DetectionLog> DetectionLogs { get; set; }
-
-        // =========================
-        // OCCUPANCY
-        // =========================
         public DbSet<RoomOccupancy> RoomOccupancy { get; set; }
 
         // =========================
@@ -70,9 +42,16 @@ namespace WebApp.Data
                 .Property(c => c.Status)
                 .HasDefaultValue("active");
 
-            // ALERTS
+            // =========================
+            // ALERTS (IMPORTANT FIX AREA)
+            // =========================
             modelBuilder.Entity<Alert>()
                 .ToTable("alerts");
+
+            // FIX: store enums as STRING (prevents InvalidCastException)
+            modelBuilder.Entity<Alert>()
+                .Property(a => a.Type)
+                .HasConversion<string>();
 
             modelBuilder.Entity<Alert>()
                 .Property(a => a.Severity)
@@ -82,19 +61,27 @@ namespace WebApp.Data
                 .Property(a => a.Status)
                 .HasConversion<string>();
 
+            // =========================
             // ACCESS LOGS
+            // =========================
             modelBuilder.Entity<AccessLog>()
                 .ToTable("access_logs");
 
+            // =========================
             // DETECTION LOGS
+            // =========================
             modelBuilder.Entity<DetectionLog>()
                 .ToTable("detection_logs");
 
+            // =========================
             // OCCUPANCY
+            // =========================
             modelBuilder.Entity<RoomOccupancy>()
                 .ToTable("room_occupancy");
 
-            // LOGIN LOGS ✅ (ADDED TABLE MAPPING)
+            // =========================
+            // LOGIN LOGS
+            // =========================
             modelBuilder.Entity<LoginLog>()
                 .ToTable("login_logs");
         }

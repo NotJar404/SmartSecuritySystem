@@ -1,21 +1,22 @@
 ﻿@using WebApp.Models
-@using System.Text.Json
 @model List<Alert>
 
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
     ViewData["Title"] = "Alerts";
     var filter = (ViewBag.Filter as string ?? "all").ToLower();
+    var activeCount = Model.Count(a => a.Status != AlertStatus.Resolved);
 }
+
 <link rel="stylesheet" href="~/css/alert.css" />
 
-<h1 class="page-title">Alerts</h1>
+<h1 class="page-title">Security Alerts</h1>
 
 <p class="subtitle">
-    @Model.Count(a => a.Status != AlertStatus.Resolved) active alerts
+    <strong>@activeCount</strong> active alerts requiring attention
 </p>
 
-<!-- FILTER BUTTONS -->
+<!-- FILTERS -->
 <div class="alert-filters">
 
     <a asp-action="Index" asp-route-filter="all"
@@ -43,57 +44,97 @@
 <!-- ALERT LIST -->
 <div class="alerts-container">
 
-@foreach (var alert in Model)
+@foreach (var alert in Model
+    .OrderByDescending(a => a.Severity)
+    .ThenByDescending(a => a.Timestamp))
 {
     var isCritical = alert.Severity == SeverityLevel.CRITICAL;
+    var isWarning = alert.Severity == SeverityLevel.WARNING;
     var isResolved = alert.Status == AlertStatus.Resolved;
 
-    <div class="alert-card @(isCritical ? "critical" : "warning") @(isResolved ? "resolved" : "")"
-         onclick='openModal(
-            @JsonSerializer.Serialize(alert.AlertId),
-            @JsonSerializer.Serialize(alert.Type ?? ""),
-            @JsonSerializer.Serialize(alert.Description ?? ""),
-            @JsonSerializer.Serialize(alert.RoomId?.ToString() ?? ""),
-            @JsonSerializer.Serialize(alert.Severity.ToString()),
-            @JsonSerializer.Serialize(alert.Timestamp.ToString("g")),
-            @JsonSerializer.Serialize(alert.Status.ToString())
-         )'>
+    var cardClass = "alert-card";
+    cardClass += isCritical ? " critical" :
+                 isWarning ? " warning" : " info";
 
-        <div class="alert-icon">⚠</div>
+    if (isResolved) cardClass += " resolved";
 
+    <div class="@cardClass"
+         data-id="@alert.AlertId"
+         data-type="@alert.Type"
+         data-desc="@(alert.Description ?? "No description")"
+         data-room="@(alert.RoomId?.ToString() ?? "N/A")"
+         data-severity="@alert.Severity"
+         data-time="@alert.Timestamp.ToString("yyyy-MM-dd HH:mm")"
+         data-status="@alert.Status">
+
+        <!-- ICON -->
+        <div class="alert-icon">
+            @(isCritical ? "🚨" : isWarning ? "⚠️" : "ℹ️")
+        </div>
+
+        <!-- CONTENT (STRICT STACK ORDER) -->
         <div class="alert-content">
-            <div class="alert-header">
-                <h3>@alert.Type</h3>
 
-                <span class="badge @(isCritical ? "red" : "yellow")">
-                    @alert.Severity
-                </span>
+            <!-- 1. TYPE (TOP MOST) -->
+            <div class="alert-title">@alert.Type</div>
 
-                <span class="badge">
-                    @alert.Status
-                </span>
+            <!-- 2. STATUS (UNDER TYPE) -->
+            <div class="alert-status">@alert.Status</div>
+
+            <!-- 3. DESCRIPTION -->
+            <div class="alert-description">
+                @(alert.Description ?? "No description")
             </div>
 
-            <p>@alert.Description</p>
-
+            <!-- 4. META -->
             <div class="alert-meta">
-                Room: @alert.RoomId
+                Room: @(alert.RoomId?.ToString() ?? "N/A")
                 • ⏱ @alert.MinutesAgo m ago
                 • @alert.Timestamp.ToString("g")
             </div>
+
         </div>
 
+        <!-- ACTIONS -->
         <div class="alert-actions">
 
             @if (!isResolved)
             {
-                <form method="post" asp-action="Resolve" onclick="event.stopPropagation();">
-                    <input type="hidden" name="id" value="@alert.AlertId" />
-                    <button type="submit">Resolve</button>
-                </form>
+                if (alert.Status == AlertStatus.New)
+                {
+                    <form method="post" asp-action="Acknowledge">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@alert.AlertId" />
+                        <button type="submit">Acknowledge</button>
+                    </form>
+                }
+
+                if (alert.Status == AlertStatus.Acknowledged)
+                {
+                    <form method="post" asp-action="Resolve">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@alert.AlertId" />
+                        <button type="submit">Resolve</button>
+                    </form>
+
+                    <form method="post" asp-action="Escalate">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@alert.AlertId" />
+                        <button type="submit">Escalate</button>
+                    </form>
+                }
+
+                if (alert.Status == AlertStatus.Escalated)
+                {
+                    <form method="post" asp-action="Resolve">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@alert.AlertId" />
+                        <button type="submit">Resolve</button>
+                    </form>
+                }
             }
 
-            <button onclick="event.stopPropagation();">✕</button>
+            <button type="button" class="details-btn">Details</button>
 
         </div>
     </div>
@@ -101,67 +142,112 @@
 
 </div>
 
-<!-- MODAL -->
+<!-- ================= MODAL ================= -->
 <div id="alertModal">
-    <div>
-        <span onclick="closeModal()" style="cursor:pointer;">&times;</span>
+    <div class="modal-content">
 
-        <h2 id="modalTitle"></h2>
+        <span class="close-btn">&times;</span>
 
-        <div class="section">
-            <p><b>Status:</b> <span id="modalStatus"></span></p>
-            <p><b>Severity:</b> <span id="modalSeverity"></span></p>
-            <p><b>Room:</b> <span id="modalLocation"></span></p>
-            <p><b>Time:</b> <span id="modalTime"></span></p>
+        <div class="modal-header">
+            <h2 id="modalTitle"></h2>
         </div>
 
-        <div class="section">
-            <h4>Description</h4>
-            <p id="modalDescription"></p>
+        <div class="modal-body">
+
+            <div class="modal-info">
+
+                <div class="field">
+                    <label>Status</label>
+                    <input type="text" id="modalStatus" readonly />
+                </div>
+
+                <div class="field">
+                    <label>Severity</label>
+                    <input type="text" id="modalSeverity" readonly />
+                </div>
+
+                <div class="field">
+                    <label>Room</label>
+                    <input type="text" id="modalLocation" readonly />
+                </div>
+
+                <div class="field">
+                    <label>Time</label>
+                    <input type="text" id="modalTime" readonly />
+                </div>
+
+                <div class="field">
+                    <label>Description</label>
+                    <p class="description-box" id="modalDescription"></p>
+                </div>
+
+            </div>
+
         </div>
 
-        <div class="section section-actions">
+        <div class="section-actions">
 
             <form method="post" asp-action="Acknowledge">
+                @Html.AntiForgeryToken()
                 <input type="hidden" name="id" class="modalAlertId" />
                 <button type="submit">Acknowledge</button>
             </form>
 
             <form method="post" asp-action="Resolve">
+                @Html.AntiForgeryToken()
                 <input type="hidden" name="id" class="modalAlertId" />
                 <button type="submit">Resolve</button>
             </form>
 
             <form method="post" asp-action="Escalate">
+                @Html.AntiForgeryToken()
                 <input type="hidden" name="id" class="modalAlertId" />
                 <button type="submit">Escalate</button>
             </form>
 
         </div>
+
     </div>
 </div>
 
+<!-- ================= SCRIPT ================= -->
 <script>
-function openModal(id, type, desc, room, severity, time, status) {
-    document.getElementById("alertModal").classList.add("active");
+const modal = document.getElementById("alertModal");
 
-    document.querySelectorAll(".modalAlertId").forEach(x => x.value = id);
+document.querySelectorAll(".alert-card").forEach(card => {
 
-    document.getElementById("modalTitle").innerText = type;
-    document.getElementById("modalDescription").innerText = desc;
-    document.getElementById("modalLocation").innerText = room;
-    document.getElementById("modalSeverity").innerText = severity;
-    document.getElementById("modalTime").innerText = time;
-    document.getElementById("modalStatus").innerText = status;
-}
+    card.addEventListener("click", (e) => {
+        if (e.target.closest("form") || e.target.closest("button")) return;
+        openModal(card.dataset);
+    });
 
-function closeModal() {
-    document.getElementById("alertModal").classList.remove("active");
-}
-
-document.getElementById("alertModal").addEventListener("click", function (e) {
-    if (e.target === document.getElementById("alertModal")) {
-        closeModal();
+    const btn = card.querySelector(".details-btn");
+    if (btn) {
+        btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            openModal(card.dataset);
+        });
     }
+});
+
+function openModal(data) {
+    modal.classList.add("active");
+
+    document.querySelectorAll(".modalAlertId").forEach(x => x.value = data.id);
+
+    document.getElementById("modalTitle").innerText = data.type || "Alert";
+    document.getElementById("modalDescription").innerText = data.desc || "No description";
+    document.getElementById("modalLocation").value = data.room || "N/A";
+    document.getElementById("modalSeverity").value = data.severity || "UNKNOWN";
+    document.getElementById("modalTime").value = data.time || "N/A";
+    document.getElementById("modalStatus").value = data.status || "UNKNOWN";
+}
+
+document.querySelector(".close-btn").addEventListener("click", () => {
+    modal.classList.remove("active");
+});
+
+modal.addEventListener("click", e => {
+    if (e.target === modal) modal.classList.remove("active");
 });
 </script>

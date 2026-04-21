@@ -1,19 +1,38 @@
 ﻿/* ============================= */
-/* ALERT PAGE - PROFESSIONAL DESIGN */
+/* ALERT SYSTEM - PROFESSIONAL UI */
 /* ============================= */
 
 /* ============================= */
-/* GLOBAL RHYTHM */
+/* DESIGN TOKENS */
 /* ============================= */
 :root {
     --radius-lg: 16px;
     --radius-md: 12px;
-    --radius-sm: 10px;
+    --radius-sm: 8px;
+
     --spacing-xs: 6px;
-    --spacing-sm: 12px;
+    --spacing-sm: 10px;
     --spacing-md: 16px;
-    --spacing-lg: 24px;
-    --spacing-xl: 32px;
+    --spacing-lg: 22px;
+    --spacing-xl: 30px;
+
+    --transition-fast: 0.15s ease;
+    --transition-med: 0.25s ease;
+
+    --bg-main: #0f172a;
+    --bg-card: #111827;
+    --bg-hover: #1f2937;
+
+    --text-main: #e5e7eb;
+    --text-muted: #94a3b8;
+    --text-dim: #64748b;
+
+    --border-soft: rgba(255,255,255,0.06);
+
+    --critical: #ef4444;
+    --warning: #f59e0b;
+    --info: #3b82f6;
+    --resolved: #10b981;
 }
 
 /* ============================= */
@@ -22,595 +41,411 @@
 .page-title {
     font-size: 28px;
     font-weight: 700;
-    margin-bottom: 8px;
-    color: #ffffff;
+    color: #fff;
+    margin-bottom: 6px;
     letter-spacing: -0.5px;
 }
 
 .subtitle {
     font-size: 14px;
-    color: #94a3b8;
-    margin-bottom: 24px;
+    color: var(--text-muted);
+    margin-bottom: var(--spacing-lg);
 }
 
-/* ----------------------------- */
+/* ============================= */
 /* FILTER BUTTONS */
-/* ----------------------------- */
+/* ============================= */
 .alert-filters {
     display: flex;
     gap: 10px;
-    margin-bottom: 32px;
     flex-wrap: wrap;
+    margin-bottom: var(--spacing-lg);
 }
 
 .filter-btn {
-    padding: 10px 18px;
-    background: #111827;
-    border-radius: var(--radius-md);
-    color: #cbd5f5;
-    text-decoration: none;
-    font-weight: 500;
+    padding: 8px 14px;
     font-size: 13px;
-    border: 1px solid rgba(255,255,255,0.05);
-    cursor: pointer;
-    transition: all 0.2s ease-in-out;
+    border-radius: 999px;
+    text-decoration: none;
+    color: var(--text-muted);
+    background: rgba(255,255,255,0.04);
+    border: 1px solid transparent;
+    transition: var(--transition-fast);
 }
 
-    .filter-btn:hover {
-        background: #1f2937;
-        color: #f1f5f9;
-        border-color: rgba(255,255,255,0.1);
-        transform: translateY(-1px);
-    }
+.filter-btn:hover {
+    background: rgba(255,255,255,0.08);
+    color: #fff;
+}
 
-    .filter-btn.active {
-        background: #2563eb;
-        color: #ffffff;
-        border-color: #2563eb;
-        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
-    }
+.filter-btn.active {
+    background: rgba(59,130,246,0.15);
+    color: #60a5fa;
+    border-color: rgba(59,130,246,0.3);
+}
 
-/* ----------------------------- */
-/* ALERT LIST CONTAINER */
-/* ----------------------------- */
+/* ============================= */
+/* ALERT LIST */
+/* ============================= */
 .alerts-container {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 14px;
 }
 
-/* ----------------------------- */
+/* ============================= */
 /* ALERT CARD */
-/* ----------------------------- */
+/* ============================= */
 .alert-card {
     display: grid;
-    grid-template-columns: 56px 1fr auto;
+    grid-template-columns: 60px 1fr auto;
     gap: 16px;
-    padding: 18px 22px;
-    border-radius: var(--radius-lg);
-    align-items: start;
+    padding: 18px;
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-soft);
+    transition: var(--transition-med);
     cursor: pointer;
-    transition: all 0.2s ease;
-    border: 1px solid rgba(255,255,255,0.05);
+    position: relative;
 }
 
-    .alert-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(0,0,0,0.3);
-        border-color: rgba(255,255,255,0.1);
-    }
+.alert-card:hover {
+    background: var(--bg-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+}
 
-    /* CARD COLORS BASED ON SEVERITY */
-    .alert-card.critical {
-        background: linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%);
-        border-left: 4px solid #ef4444;
-        color: #fef2f2;
-    }
+.alert-card::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 4px;
+    height: 100%;
+}
 
-    .alert-card.warning {
-        background: linear-gradient(135deg, #78350f 0%, #92400e 100%);
-        border-left: 4px solid #f97316;
-        color: #fffbeb;
-    }
+.alert-card.critical::before { background: var(--critical); }
+.alert-card.warning::before { background: var(--warning); }
+.alert-card.info::before { background: var(--info); }
 
-    .alert-card.resolved {
-        opacity: 0.65;
-        filter: grayscale(25%);
-    }
+.alert-card.resolved {
+    opacity: 0.6;
+}
 
-/* ----------------------------- */
-/* ALERT ICON */
-/* ----------------------------- */
+/* ============================= */
+/* ICON */
+/* ============================= */
 .alert-icon {
-    font-size: 26px;
-    background: rgba(255,255,255,0.12);
-    padding: 15px;
-    border-radius: var(--radius-sm);
+    font-size: 22px;
     display: flex;
     align-items: center;
     justify-content: center;
-    height: fit-content;
-    flex-shrink: 0;
+    padding: 12px;
+    border-radius: var(--radius-sm);
+    background: rgba(255,255,255,0.05);
 }
 
-/* ----------------------------- */
-/* ALERT CONTENT */
-/* ----------------------------- */
+/* ============================= */
+/* CONTENT */
+/* ============================= */
 .alert-content {
-    flex: 1;
     min-width: 0;
 }
 
-.alert-header {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    flex-wrap: wrap;
-    margin-bottom: 8px;
+.alert-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-main);
+    margin-bottom: 4px;
 }
 
-    .alert-header h3 {
-        margin: 0;
-        font-size: 16px;
-        font-weight: 700;
-        flex: 1;
-    }
-
-.badge {
-    padding: 5px 11px;
-    border-radius: 6px;
-    font-size: 11px;
+.alert-status {
+    font-size: 12px;
     font-weight: 600;
-    color: #fff;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
+    margin-bottom: 6px;
+    color: var(--text-muted);
 }
 
-.badge.red {
-    background: #ef4444;
-}
-
-.badge.yellow {
-    background: #f97316;
-}
-
-.badge.green {
-    background: #22c55e;
+.alert-description {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.4;
 }
 
 .alert-meta {
     margin-top: 8px;
     font-size: 12px;
-    color: #94a3b8;
+    color: var(--text-dim);
     display: flex;
-    gap: 12px;
     flex-wrap: wrap;
+    gap: 10px;
 }
-
-/* ALERT DESCRIPTION */
-.alert-card > .alert-content > p {
-    font-size: 14px;
-    margin: 10px 0 0;
-    line-height: 1.4;
-}
-
-/* ----------------------------- */
-/* ALERT ACTIONS (RESOLVE / CLOSE) */
-/* ----------------------------- */
-.alert-actions {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-    justify-content: flex-start;
-    min-width: 80px;
-}
-
-    .alert-actions button,
-    .alert-actions form button {
-        padding: 8px 12px;
-        border-radius: var(--radius-sm);
-        font-weight: 500;
-        font-size: 12px;
-        border: none;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        white-space: nowrap;
-    }
-
-    .alert-actions form button {
-        background: #22c55e;
-        color: #ffffff;
-    }
-
-        .alert-actions form button:hover {
-            background: #16a34a;
-            transform: translateY(-1px);
-        }
-
-    .alert-actions > button {
-        background: transparent;
-        color: #94a3b8;
-        font-size: 16px;
-        padding: 4px;
-        border: none;
-    }
-
-        .alert-actions > button:hover {
-            color: #ef4444;
-        }
 
 /* ============================= */
-/* MODAL STYLING */
+/* ACTION BUTTONS */
+/* ============================= */
+.alert-actions {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+}
+
+/* equal sizing for all items */
+.alert-actions form,
+.alert-actions .details-btn {
+    flex: 1;
+}
+
+/* base button style (CONSISTENT SIZE) */
+.alert-actions button {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    border: none;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    white-space: nowrap;
+}
+
+/* ============================= */
+/* COLOR MAPPING (ORDER-BASED) */
+/* ============================= */
+
+/* 🔵 1st = Acknowledge */
+.alert-actions form:nth-child(1) button {
+    background: rgba(59,130,246,0.25);
+    color: #93c5fd;
+}
+
+.alert-actions form:nth-child(1) button:hover {
+    background: rgba(59,130,246,0.45);
+}
+
+/* 🟢 2nd = Resolve */
+.alert-actions form:nth-child(2) button {
+    background: rgba(16,185,129,0.25);
+    color: #6ee7b7;
+}
+
+.alert-actions form:nth-child(2) button:hover {
+    background: rgba(16,185,129,0.45);
+}
+
+/* 🔴 3rd = Escalate */
+.alert-actions form:nth-child(3) button {
+    background: rgba(239,68,68,0.25);
+    color: #fca5a5;
+}
+
+.alert-actions form:nth-child(3) button:hover {
+    background: rgba(239,68,68,0.45);
+}
+
+/* DETAILS BUTTON */
+.alert-actions .details-btn {
+    flex: 1;
+    background: rgba(255,255,255,0.05);
+    color: var(--text-main);
+}
+
+.alert-actions .details-btn:hover {
+    background: rgba(255,255,255,0.12);
+}
+
+/* ============================= */
+/* MODAL */
 /* ============================= */
 #alertModal {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.6);
-    display: none;
-    justify-content: center;
+    inset: 0;
+    background: rgba(0,0,0,0.65);
+    display: flex;
     align-items: center;
-    z-index: 9999;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: var(--transition-med);
+    z-index: 999;
 }
 
 #alertModal.active {
-    display: flex !important;
+    opacity: 1;
+    pointer-events: auto;
 }
 
-    #alertModal > div {
-        background: #0f172a;
-        padding: 32px 36px;
-        border-radius: var(--radius-lg);
-        width: 90%;
-        max-width: 700px;
-        color: #f1f5f9;
-        position: relative;
-        border: 1px solid rgba(255,255,255,0.08);
-        box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-        max-height: 85vh;
-        overflow-y: auto;
-    }
-
-    #alertModal h2 {
-        margin: 0 0 24px 0;
-        font-size: 20px;
-        font-weight: 700;
-        letter-spacing: -0.3px;
-    }
-
-    #alertModal .section {
-        margin-bottom: 24px;
-        padding-bottom: 20px;
-        border-bottom: 1px solid rgba(255,255,255,0.05);
-    }
-
-    #alertModal .section:last-child {
-        border-bottom: none;
-        margin-bottom: 0;
-        padding-bottom: 0;
-    }
-
-    #alertModal .section-title {
-        margin: 0 0 12px 0;
-        font-size: 12px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: #94a3b8;
-    }
-
-    #alertModal .info-row {
-        display: flex;
-        gap: 12px;
-        margin-bottom: 8px;
-        font-size: 13px;
-    }
-
-    #alertModal .info-label {
-        font-weight: 600;
-        color: #cbd5f5;
-        min-width: 80px;
-    }
-
-    #alertModal p {
-        font-size: 13px;
-        line-height: 1.6;
-        margin: 0;
-        color: #cbd5f5;
-    }
-
-    #alertModal img {
-        border-radius: var(--radius-md);
-        border: 1px solid rgba(255,255,255,0.05);
-        max-width: 100%;
-        height: auto;
-    }
-
-    #alertModal .section-actions {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-        gap: 12px;
-        padding-top: 20px;
-        padding-bottom: 0;
-        margin-bottom: 0;
-        border-bottom: none;
-    }
-
-    #alertModal form {
-        margin: 0;
-    }
-
-    #alertModal form button,
-    #alertModal .btn-live {
-        padding: 12px 16px;
-        border-radius: var(--radius-sm);
-        border: none;
-        cursor: pointer;
-        font-weight: 600;
-        font-size: 13px;
-        transition: all 0.2s ease;
-        width: 100%;
-    }
-
-    #alertModal .btn-acknowledge {
-        background: #3b82f6;
-        color: #fff;
-    }
-
-        #alertModal .btn-acknowledge:hover {
-            background: #2563eb;
-            transform: translateY(-1px);
-        }
-
-    #alertModal .btn-resolve {
-        background: #22c55e;
-        color: #fff;
-    }
-
-        #alertModal .btn-resolve:hover {
-            background: #16a34a;
-            transform: translateY(-1px);
-        }
-
-    #alertModal .btn-escalate {
-        background: #ff6b35;
-        color: #fff;
-    }
-
-        #alertModal .btn-escalate:hover {
-            background: #ff5a1a;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
-        }
-
-    #alertModal .btn-live {
-        background: #8b5cf6;
-        color: #fff;
-    }
-
-        #alertModal .btn-live:hover {
-            background: #7c3aed;
-            transform: translateY(-1px);
-        }
-
-    #alertModal span {
-        position: absolute;
-        top: 20px;
-        right: 24px;
-        font-size: 24px;
-        cursor: pointer;
-        color: #cbd5f5;
-        transition: all 0.2s ease;
-        width: 32px;
-        height: 32px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: var(--radius-sm);
-    }
-
-        #alertModal span:hover {
-            background: rgba(239, 68, 68, 0.1);
-            color: #ef4444;
-        }
-
-    #alertModal h2 {
-        margin-top: 0;
-        font-size: 20px;
-        font-weight: 700;
-        margin-bottom: 20px;
-        letter-spacing: -0.3px;
-    }
-
-    #alertModal p {
-        font-size: 13px;
-        line-height: 1.6;
-        margin-bottom: 16px;
-    }
-
-    #alertModal p strong {
-        color: #cbd5f5;
-        font-weight: 600;
-    }
-
-    #alertModal img {
-        border-radius: var(--radius-md);
-        margin-top: 12px;
-        border: 1px solid rgba(255,255,255,0.05);
-        max-width: 100%;
-    }
-
-    #alertModal hr {
-        margin: 20px 0;
-        border: none;
-        border-top: 1px solid rgba(255,255,255,0.05);
-    }
-
-    #alertModal div:not([id]) > div:last-child {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-        gap: 12px;
-    }
-
-    #alertModal form button,
-    #alertModal button:not([onclick*="closeModal"]):not([onclick*="viewLive"]) {
-        padding: 12px 16px;
-        border-radius: var(--radius-sm);
-        border: none;
-        cursor: pointer;
-        font-weight: 600;
-        font-size: 13px;
-        transition: all 0.2s ease;
-        width: 100%;
-    }
-
-    #alertModal .btn-acknowledge {
-        background: #3b82f6;
-        color: #fff;
-    }
-
-        #alertModal .btn-acknowledge:hover {
-            background: #2563eb;
-            transform: translateY(-1px);
-        }
-
-    #alertModal .btn-resolve {
-        background: #22c55e;
-        color: #fff;
-    }
-
-        #alertModal .btn-resolve:hover {
-            background: #16a34a;
-            transform: translateY(-1px);
-        }
-
-    #alertModal .btn-escalate {
-        background: #ff6b35;
-        color: #fff;
-    }
-
-        #alertModal .btn-escalate:hover {
-            background: #ff5a1a;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
-        }
-
-    #alertModal .btn-live {
-        background: #8b5cf6;
-        color: #fff;
-    }
-
-        #alertModal .btn-live:hover {
-            background: #7c3aed;
-            transform: translateY(-1px);
-        }
-
-/* ============================= */
-/* LIGHT MODE SUPPORT */
-/* ============================= */
-body.light-mode .page-title {
-    color: #0f172a;
+.modal-content {
+    width: 480px;
+    max-width: 95%;
+    background: #111827;
+    border-radius: var(--radius-lg);
+    padding: 22px;
+    border: 1px solid var(--border-soft);
+    animation: fadeIn 0.2s ease;
 }
 
-body.light-mode .subtitle {
-    color: #64748b;
+/* Close */
+.close-btn {
+    float: right;
+    font-size: 22px;
+    cursor: pointer;
+    color: var(--text-muted);
 }
 
-body.light-mode .filter-btn {
-    background: #e2e8f0;
-    color: #334155;
-    border-color: #cbd5f5;
+.close-btn:hover {
+    color: #fff;
 }
 
-    body.light-mode .filter-btn:hover {
-        background: #cbd5f5;
-        color: #0f172a;
-    }
-
-    body.light-mode .filter-btn.active {
-        background: #2563eb;
-        color: white;
-    }
-
-body.light-mode .alert-card {
-    border-color: #e2e8f0;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+/* Header */
+.modal-header h2 {
+    margin: 0;
+    font-size: 20px;
+    color: #fff;
 }
 
-body.light-mode .alert-card.critical {
-    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
-    color: #7f1d1d;
-    border-left-color: #dc2626;
+/* Body */
+.modal-body {
+    margin-top: 16px;
 }
 
-body.light-mode .alert-card.warning {
-    background: linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%);
-    color: #7c2d12;
-    border-left-color: #ea580c;
+/* Fields */
+.field {
+    margin-bottom: 14px;
 }
 
-body.light-mode .alert-meta {
-    color: #64748b;
+.field label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 4px;
 }
 
-body.light-mode .alert-icon {
-    background: rgba(15, 23, 42, 0.1);
+.field input {
+    width: 100%;
+    padding: 8px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-soft);
+    background: #0f172a;
+    color: #e5e7eb;
 }
 
-body.light-mode #alertModal > div {
-    background: #ffffff;
-    color: #0f172a;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.1);
-}
-
-body.light-mode #alertModal span {
-    color: #64748b;
-}
-
-    body.light-mode #alertModal span:hover {
-        background: rgba(239, 68, 68, 0.08);
-        color: #dc2626;
-    }
-
-body.light-mode #alertModal h2 {
-    color: #0f172a;
-}
-
-body.light-mode #alertModal p {
-    color: #475569;
-}
-
-body.light-mode #alertModal p strong {
-    color: #0f172a;
-}
-
-body.light-mode #alertModal hr {
-    border-color: #e2e8f0;
+.description-box {
+    background: #0f172a;
+    padding: 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-soft);
+    font-size: 13px;
+    color: var(--text-muted);
 }
 
 /* ============================= */
-/* RESPONSIVE DESIGN */
+/* MODAL ACTION BUTTONS */
+/* ============================= */
+.section-actions {
+    margin-top: 18px;
+    display: flex;
+    gap: 10px;
+}
+
+/* equal width */
+.section-actions form {
+    flex: 1;
+}
+
+/* base button */
+.section-actions button {
+    width: 100%;
+    padding: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    border: none;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+/* ============================= */
+/* COLOR BY ORDER */
+/* ============================= */
+
+/* 🔵 Acknowledge */
+.section-actions form:nth-child(1) button {
+    background: rgba(59,130,246,0.25);
+    color: #93c5fd;
+}
+
+.section-actions form:nth-child(1) button:hover {
+    background: rgba(59,130,246,0.45);
+}
+
+/* 🟢 Resolve */
+.section-actions form:nth-child(2) button {
+    background: rgba(16,185,129,0.25);
+    color: #6ee7b7;
+}
+
+.section-actions form:nth-child(2) button:hover {
+    background: rgba(16,185,129,0.45);
+}
+
+/* 🔴 Escalate */
+.section-actions form:nth-child(3) button {
+    background: rgba(239,68,68,0.25);
+    color: #fca5a5;
+}
+
+.section-actions form:nth-child(3) button:hover {
+    background: rgba(239,68,68,0.45);
+}
+
+/* ============================= */
+/* ANIMATION */
+/* ============================= */
+@keyframes fadeIn {
+    from { transform: translateY(10px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+/* ============================= */
+/* LIGHT MODE */
+/* ============================= */
+body.light-mode {
+    --bg-main: #f8fafc;
+    --bg-card: #ffffff;
+    --bg-hover: #f1f5f9;
+
+    --text-main: #0f172a;
+    --text-muted: #475569;
+    --text-dim: #64748b;
+
+    --border-soft: #e2e8f0;
+}
+
+body.light-mode .alert-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+/* ============================= */
+/* RESPONSIVE */
 /* ============================= */
 @media (max-width: 768px) {
     .alert-card {
-        grid-template-columns: 48px 1fr;
+        grid-template-columns: 50px 1fr;
     }
 
     .alert-actions {
-        grid-column: 2;
+        grid-column: span 2;
+        flex-wrap: wrap;
     }
 
-    #alertModal > div {
-        padding: 24px 20px;
-        width: 95%;
+    .alert-actions form,
+    .alert-actions .details-btn {
+        flex: 1 1 48%;
     }
 
-    #alertModal span {
-        top: 16px;
-        right: 16px;
+    .page-title {
+        font-size: 24px;
     }
 }

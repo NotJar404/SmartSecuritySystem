@@ -23,6 +23,25 @@ namespace WebApp.Controllers
         {
             var now = DateTime.UtcNow;
 
+            // =========================
+            // FETCH RECENT ACCESS LOGS
+            // =========================
+            var recentAccessLogs = await _context.AccessLogs
+                .OrderByDescending(a => a.Timestamp)
+                .Take(5)
+                .ToListAsync();
+
+            // ✅ Populate UI-safe values (same as AccessController)
+            foreach (var log in recentAccessLogs)
+            {
+                log.FullName = log.FullName ?? "Unknown User";
+                log.StudentId = log.StudentId ?? "N/A";
+                log.Department = log.Department ?? "-";
+                log.Room = log.Room ?? "Unknown Room";
+                log.Location = log.Location ?? "Unknown Location";
+                log.ImageUrl = log.ImageUrl ?? "/images/default-user.png";
+            }
+
             var model = new DashboardViewModel
             {
                 // =========================
@@ -50,7 +69,7 @@ namespace WebApp.Controllers
                     .CountAsync(),
 
                 // =========================
-                // ACCESS REQUESTS (FIXED)
+                // ACCESS REQUESTS
                 // =========================
                 PendingAccessCount = await _context.AccessLogs
                     .Where(a => a.AccessResult == "denied")
@@ -72,7 +91,10 @@ namespace WebApp.Controllers
                 Cameras = await _context.CameraDevices
                     .Include(c => c.Room)
                     .Take(5)
-                    .ToListAsync()
+                    .ToListAsync(),
+
+                // ✅ NEW: ACCESS LOGS FOR DASHBOARD
+                RecentAccessLogs = recentAccessLogs
             };
 
             return View(model);

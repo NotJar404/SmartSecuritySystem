@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
     <title>@ViewData["Title"] - SecureVision</title>
 
     <link rel="stylesheet" href="~/css/dashboard.css" />
@@ -10,220 +12,251 @@
     <link rel="stylesheet" href="~/css/profile.css" />
     <link rel="stylesheet" href="~/css/analytics.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+
+    <style>
+        /* ============================= */
+        /* FIXED WORKSTATION LAYOUT */
+        /* ============================= */
+
+        html, body {
+            height: 100%;
+            overflow: hidden; /* 🔥 disables page scroll */
+        }
+
+        body {
+            margin: 0;
+        }
+
+        .dashboard {
+            height: 100vh;
+            display: flex;
+
+            /* fixed desktop feel */
+            overflow: hidden;
+        }
+
+        /* ============================= */
+        /* SIDEBAR FIXED */
+        /* ============================= */
+        .sidebar {
+            width: 260px;
+            height: 100vh;
+
+            display: flex;
+            flex-direction: column;
+
+            overflow: hidden; /* prevents sidebar scroll */
+        }
+
+        .sidebar ul {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .sidebar-footer {
+            margin-top: auto;
+        }
+
+        /* ============================= */
+        /* MAIN AREA FIXED */
+        /* ============================= */
+        .main {
+            flex: 1;
+            height: 100vh;
+
+            display: flex;
+            flex-direction: column;
+
+            overflow: hidden;
+        }
+
+        /* Topbar fixed height */
+        .topbar {
+            flex-shrink: 0;
+        }
+
+        /* Dashboard content area (IMPORTANT) */
+        .main > *:last-child {
+            flex: 1;
+            overflow: hidden; /* 🔥 prevents page scroll */
+        }
+
+        /* ============================= */
+        /* OPTIONAL: prevent inner scroll leaks */
+        /* ============================= */
+        .dashboard-container,
+        .dashboard-grid,
+        .scroll-body,
+        .cctv-grid {
+            overflow: hidden !important;
+        }
+    </style>
+
 </head>
 
 <body>
-<div class="dashboard">
+    <div class="dashboard">
 
-    <!-- SIDEBAR -->
-    <div class="sidebar">
+        <!-- ===================== -->
+        <!-- SIDEBAR -->
+        <!-- ===================== -->
+        <div class="sidebar">
 
-        <div class="logo">
-            <div class="logo-icon">
-                <i class="fa fa-shield-halved"></i>
+            <div class="logo">
+                <div class="logo-icon">
+                    <i class="fa fa-shield-halved"></i>
+                </div>
+                <div>
+                    <h2>SecureVision</h2>
+                    <p>Quezon City University</p>
+                </div>
             </div>
-            <div>
-                <h2>SecureVision</h2>
-                <p>Quezon City University</p>
-            </div>
-        </div>
 
-        <!-- PROFILE -->
-        <a asp-controller="Profile" asp-action="Index" class="profile-card">
-            <div class="profile-avatar">
-                @{
-                    var fullName = User.FindFirst("FullName")?.Value
-                                ?? User.Identity?.Name
-                                ?? "User";
+            <!-- PROFILE -->
+            <a asp-controller="Profile" asp-action="Index" class="profile-card">
 
-                    var initial = !string.IsNullOrEmpty(fullName)
+                <div class="profile-avatar">
+                    @{
+                        var fullName = User.FindFirst("FullName")?.Value
+                        ?? User.Identity?.Name
+                        ?? "User";
+
+                        var initial = !string.IsNullOrEmpty(fullName)
                         ? fullName.Substring(0, 1).ToUpper()
                         : "U";
-                }
+                    }
 
-                @initial
-            </div>
-
-            <div class="profile-info">
-                <strong>
-                    @(User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? "Unknown User")
-                </strong>
-
-                <small>
-                    @(User.IsInRole("Admin") ? "Administrator" : "Security Personnel")
-                </small>
-            </div>
-        </a>
-
-        <!-- NAV -->
-        <ul>
-            @if (User.IsInRole("Admin"))
-            {
-                <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Admin" ? "active" : "")">
-                    <a asp-controller="Admin" asp-action="Index">
-                        <i class="fa fa-chart-line"></i> Dashboard
-                    </a>
-                </li>
-
-                <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Cameras" ? "active" : "")">
-                    <a asp-controller="Cameras" asp-action="Index">
-                        <i class="fa fa-video"></i> Live Monitoring
-                    </a>
-                </li>
-
-                <li class="nav-item @(ViewContext.RouteData.Values["action"]?.ToString() == "Personnel" ? "active" : "")">
-                    <a asp-controller="Admin" asp-action="Personnel">
-                        <i class="fa fa-users"></i> Personnel
-                    </a>
-                </li>
-
-                <li class="nav-item @(ViewContext.RouteData.Values["action"]?.ToString() == "Analytics" ? "active" : "")">
-                    <a asp-controller="Admin" asp-action="Analytics">
-                        <i class="fa fa-chart-bar"></i> Analytics
-                    </a>
-                </li>
-
-                <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Logs" ? "active" : "")">
-                    <a asp-controller="Logs" asp-action="Index">
-                        <i class="fa fa-file-lines"></i> Activity Logs
-                    </a>
-                </li>
-
-                <li class="nav-item @(ViewContext.RouteData.Values["action"]?.ToString() == "System" ? "active" : "")">
-                    <a asp-controller="Admin" asp-action="System">
-                        <i class="fa fa-gear"></i> System Settings
-                    </a>
-                </li>
-            }
-            else if (User.IsInRole("Security"))
-            {
-                <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Dashboard" ? "active" : "")">
-                    <a asp-controller="Dashboard" asp-action="Index">
-                        <i class="fa fa-home"></i> Dashboard
-                    </a>
-                </li>
-
-                <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Cameras" ? "active" : "")">
-                    <a asp-controller="Cameras" asp-action="Index">
-                        <i class="fa fa-video"></i> Live Monitoring
-                    </a>
-                </li>
-
-                <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Access" ? "active" : "")">
-                    <a asp-controller="Access" asp-action="Index">
-                        <i class="fa fa-id-badge"></i> Access Monitoring
-                    </a>
-                </li>
-
-                <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Alerts" ? "active" : "")">
-                    <a asp-controller="Alerts" asp-action="Index">
-                        <i class="fa fa-bell"></i> Alerts
-                    </a>
-                </li>
-
-                <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Logs" ? "active" : "")">
-                    <a asp-controller="Logs" asp-action="Index">
-                        <i class="fa fa-file"></i> Logs
-                    </a>
-                </li>
-            }
-        </ul>
-
-        <!-- LOGOUT -->
-        <div class="sidebar-footer">
-            <a href="#" onclick="confirmLogout()" class="logout-btn">
-                <i class="fa fa-right-from-bracket"></i> Logout
-            </a>
-        </div>
-
-    </div>
-
-    <!-- MAIN -->
-    <div class="main">
-
-        <div class="topbar">
-            <div class="top-left">
-                <h3>@ViewData["Title"]</h3>
-            </div>
-
-            <div class="top-center">
-                @DateTime.Now.ToString("dddd, MMMM dd, yyyy")
-            </div>
-
-            <div class="top-right">
-                <span id="liveTime"></span>
-
-                <!-- 🔥 THEME TOGGLE -->
-                <div class="theme-toggle" onclick="toggleTheme()" id="themeToggle">
-                    <i id="themeIcon" class="fa fa-moon"></i>
+                    @initial
                 </div>
 
-                <a asp-controller="Alerts" asp-action="Index" class="notif">
-                    <i class="fa fa-bell"></i>
-                    <span class="notif-badge">1</span>
+                <div class="profile-info">
+                    <strong>
+                        @(User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? "Unknown User")
+                    </strong>
+
+                    <small>
+                        @(User.IsInRole("Admin") ? "Administrator" : "Security Personnel")
+                    </small>
+                </div>
+
+            </a>
+
+            <!-- NAVIGATION -->
+            <ul>
+
+                @if (User.IsInRole("Admin"))
+                {
+                    <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Admin" ? "active" : "")">
+                        <a asp-controller="Admin" asp-action="Index">
+                            <i class="fa fa-chart-line"></i> Dashboard Overview
+                        </a>
+                    </li>
+
+                    <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Cameras" ? "active" : "")">
+                        <a asp-controller="Cameras" asp-action="Index">
+                            <i class="fa fa-video"></i> Live Monitoring
+                        </a>
+                    </li>
+
+                    <li class="nav-item @(ViewContext.RouteData.Values["action"]?.ToString() == "Personnel" ? "active" : "")">
+                        <a asp-controller="Admin" asp-action="Personnel">
+                            <i class="fa fa-users"></i> User Management
+                        </a>
+                    </li>
+
+                    <li class="nav-item @(ViewContext.RouteData.Values["action"]?.ToString() == "Analytics" ? "active" : "")">
+                        <a asp-controller="Admin" asp-action="Analytics">
+                            <i class="fa fa-chart-bar"></i> Security Analytics
+                        </a>
+                    </li>
+
+                    <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Logs" ? "active" : "")">
+                        <a asp-controller="Logs" asp-action="Index">
+                            <i class="fa fa-file-lines"></i> Audit Logs
+                        </a>
+                    </li>
+
+                    <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Alerts" ? "active" : "")">
+                        <a asp-controller="Alerts" asp-action="Index">
+                            <i class="fa fa-triangle-exclamation"></i> Security Alerts
+                        </a>
+                    </li>
+
+                    <li class="nav-item @(ViewContext.RouteData.Values["action"]?.ToString() == "System" ? "active" : "")">
+                        <a asp-controller="Admin" asp-action="System">
+                            <i class="fa fa-gear"></i> System Configuration
+                        </a>
+                    </li>
+                }
+                else if (User.IsInRole("Security"))
+                {
+                    <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Dashboard" ? "active" : "")">
+                        <a asp-controller="Dashboard" asp-action="Index">
+                            <i class="fa fa-home"></i> Dashboard Overview
+                        </a>
+                    </li>
+
+                    <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Cameras" ? "active" : "")">
+                        <a asp-controller="Cameras" asp-action="Index">
+                            <i class="fa fa-video"></i> Live Monitoring
+                        </a>
+                    </li>
+
+                    <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Access" ? "active" : "")">
+                        <a asp-controller="Access" asp-action="Index">
+                            <i class="fa fa-id-badge"></i> Access Control Monitoring
+                        </a>
+                    </li>
+
+                    <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Alerts" ? "active" : "")">
+                        <a asp-controller="Alerts" asp-action="Index">
+                            <i class="fa fa-triangle-exclamation"></i> Active Security Alerts
+                        </a>
+                    </li>
+
+                    <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Logs" ? "active" : "")">
+                        <a asp-controller="Logs" asp-action="Index">
+                            <i class="fa fa-file"></i> Activity Logs
+                        </a>
+                    </li>
+                }
+
+            </ul>
+
+            <!-- LOGOUT -->
+            <div class="sidebar-footer">
+                <a href="#" onclick="confirmLogout()" class="logout-btn">
+                    <i class="fa fa-right-from-bracket"></i> Logout
                 </a>
             </div>
+
         </div>
 
-        @RenderBody()
+        <!-- ===================== -->
+        <!-- MAIN CONTENT -->
+        <!-- ===================== -->
+        <div class="main">
 
+            <!-- TOPBAR -->
+            @await Html.PartialAsync("_Topbar")
+
+            <!-- PAGE CONTENT -->
+            <div class="page-content">
+                @RenderBody()
+            </div>
+
+        </div>
     </div>
-</div>
 
-@RenderSection("Scripts", required: false)
+    @RenderSection("Scripts", required: false)
 
-<script>
-/* 🕒 TIME */
-function updateTime() {
-    const now = new Date();
-    document.getElementById('liveTime').textContent =
-        now.toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: true
-        });
-}
-setInterval(updateTime, 1000);
-updateTime();
-
-/* 🌙 THEME TOGGLE */
-function toggleTheme() {
-    const body = document.body;
-    const icon = document.getElementById("themeIcon");
-
-    body.classList.toggle("light-mode");
-
-    if (body.classList.contains("light-mode")) {
-        icon.classList.replace("fa-moon", "fa-sun");
-        localStorage.setItem("theme", "light");
-    } else {
-        icon.classList.replace("fa-sun", "fa-moon");
-        localStorage.setItem("theme", "dark");
-    }
-}
-
-/* LOAD THEME ON START */
-window.onload = function () {
-    const savedTheme = localStorage.getItem("theme");
-    const icon = document.getElementById("themeIcon");
-
-    if (savedTheme === "light") {
-        document.body.classList.add("light-mode");
-        icon.classList.replace("fa-moon", "fa-sun");
-    } else {
-        document.body.classList.remove("light-mode");
-        icon.classList.replace("fa-sun", "fa-moon");
-    }
-};
-
-/* 🔓 LOGOUT */
-function confirmLogout() {
-    if (confirm("Are you sure you want to logout?")) {
-        window.location.href = '/Auth/Logout';
-    }
-}
-</script>
+    <script>
+        function confirmLogout() {
+            if (confirm("Are you sure you want to logout?")) {
+                window.location.href = '/Auth/Logout';
+            }
+        }
+    </script>
 
 </body>
 </html>

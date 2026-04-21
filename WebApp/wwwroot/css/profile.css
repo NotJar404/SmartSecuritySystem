@@ -1,147 +1,311 @@
-﻿/* ============================= */
-/* PROFILE PAGE */
+﻿/* ========================================================= */
+/* PROFILE UI - FINAL BALANCED DESKTOP LAYOUT (FIXED HEIGHT ALIGNMENT)
+/* ========================================================= */
+
 /* ============================= */
+/* THEME */
+/* ============================= */
+:root {
+    --bg-main: #020617;
+    --bg-panel: #0b1220;
+    --bg-panel-2: #0f172a;
 
-.profile-container {
+    --text-main: #e5e7eb;
+    --text-muted: #94a3b8;
+
+    --border: rgba(255,255,255,0.06);
+
+    --blue: #3b82f6;
+    --blue-soft: rgba(59,130,246,0.15);
+    --red-soft: rgba(239,68,68,0.15);
+
+    --radius-md: 8px;
+    --radius-lg: 12px;
+}
+
+/* ============================= */
+/* GLOBAL */
+/* ============================= */
+* { box-sizing: border-box; }
+
+html, body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    font-family: system-ui, sans-serif;
+    background: var(--bg-main);
+    color: var(--text-main);
+}
+
+/* ============================= */
+/* PAGE (FIX: FULL USABLE HEIGHT) */
+/* ============================= */
+.profile-page {
+    height: calc(100vh - 70px);
+    display: grid;
+    grid-template-rows: auto 1fr;
+    gap: 8px;
+    padding: 12px;
+    padding-bottom: 12px;
+    position: relative;
+}
+
+/* subtle bottom fade for visual boundary */
+.profile-page::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 10px;
+    background: linear-gradient(to bottom, transparent, var(--bg-main));
+    pointer-events: none;
+}
+
+/* ============================= */
+/* HEADER */
+/* ============================= */
+.page-title {
+    font-size: 18px;
+    margin: 0;
+}
+
+.subtitle {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+/* ============================= */
+/* MAIN GRID (FIX HEIGHT DISTRIBUTION) */
+/* ============================= */
+.profile-grid-2col {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 8px;
+    height: 100%;
+    align-items: stretch;
+}
+
+/* ============================= */
+/* LEFT PANEL (BALANCED HEIGHT) */
+/* ============================= */
+.left-panel {
     display: flex;
-    gap: 40px;
-    background: #0f172a;
-    padding: 25px;
-    border-radius: 16px;
-    border: 1px solid rgba(255,255,255,0.05);
-}
-
-/* LEFT SIDE */
-.profile-left {
-    width: 220px;
-    text-align: center;
-}
-
-.profile-img {
-    width: 150px;
-    height: 150px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 3px solid #2563eb;
-    margin-bottom: 15px;
-}
-
-/* FILE INPUT */
-.file-input {
-    width: 100%;
-    margin-bottom: 10px;
-    font-size: 0.8rem;
-}
-
-/* RIGHT SIDE */
-.profile-right {
-    flex: 1;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    background: linear-gradient(180deg, var(--bg-panel), var(--bg-panel-2));
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    height: 100%;
+    overflow: hidden;
+    min-height: 0;
 }
 
 /* FORM */
+.profile-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    flex: 1;
+    min-height: 0;
+}
+
+/* AVATAR */
+.avatar-box {
+    display: flex;
+    justify-content: center;
+}
+
+.profile-img {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+}
+
+/* INPUTS */
 .form-group {
-    margin-bottom: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
 }
 
-    .form-group label {
-        font-size: 0.8rem;
-        color: #94a3b8;
-        display: block;
-        margin-bottom: 4px;
-    }
-
-    .form-group input {
-        width: 100%;
-        padding: 10px;
-        border-radius: 8px;
-        border: 1px solid #1f2937;
-        background: #020617;
-        color: #fff;
-    }
-
-/* READONLY */
-.readonly {
-    background: #111827 !important;
-    color: #94a3b8;
+label {
+    font-size: 10px;
+    color: var(--text-muted);
 }
 
-/* BUTTONS */
+input {
+    padding: 6px;
+    font-size: 11px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: var(--bg-panel);
+    color: var(--text-main);
+}
+
+/* BUTTON */
 .btn {
-    padding: 10px 16px;
-    border-radius: 8px;
+    padding: 8px;
+    font-size: 11px;
+    border-radius: var(--radius-md);
     border: none;
-    font-size: 0.85rem;
     cursor: pointer;
-    transition: 0.2s;
 }
 
-    .btn.primary {
-        background: #2563eb;
-        color: #fff;
-    }
+.full-width { width: 100%; }
 
-        .btn.primary:hover {
-            background: #1d4ed8;
-        }
+.btn.primary {
+    background: var(--blue);
+    color: #fff;
+}
 
-    .btn.danger {
-        background: #ef4444;
-        color: #fff;
-    }
+.btn.danger {
+    background: var(--red-soft);
+    color: #f87171;
+}
 
-        .btn.danger:hover {
-            background: #dc2626;
-        }
+/* ============================= */
+/* ACCOUNT INFO */
+/* ============================= */
+.account-info {
+    margin-top: auto;
+    padding: 8px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.02);
+}
 
-/* ALERTS */
-.alert {
-    padding: 10px 14px;
+.account-info .section-title {
+    font-size: 11px;
+    text-align: center;
+    margin-bottom: 6px;
+}
+
+.account-info .info-row {
+    display: flex;
+    gap: 6px;
+}
+
+.account-info .info-row div {
+    flex: 1;
+    padding: 8px;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
     border-radius: 8px;
-    margin-bottom: 15px;
-    font-size: 0.85rem;
+    border: 1px solid var(--border);
+    background: var(--bg-panel);
 }
 
-    .alert.success {
-        background: rgba(34,197,94,0.15);
-        color: #22c55e;
-    }
+.account-info label {
+    font-size: 9px;
+    color: var(--text-muted);
+}
 
-    .alert.error {
-        background: rgba(239,68,68,0.15);
-        color: #ef4444;
-    }
+.account-info p {
+    margin: 2px 0 0;
+    font-size: 13px;
+    font-weight: 600;
+}
 
-/* PASSWORD SECTION */
+/* ============================= */
+/* RIGHT PANEL */
+/* ============================= */
+.right-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    height: 100%;
+    min-height: 0;
+}
+
+/* CARD */
+.card {
+    padding: 12px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    background: linear-gradient(180deg, var(--bg-panel), var(--bg-panel-2));
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* ============================= */
+/* CHANGE PASSWORD */
+/* ============================= */
+.password-rules {
+    font-size: 11px;
+    padding: 8px;
+    border-radius: var(--radius-md);
+    background: rgba(255,255,255,0.03);
+}
+
 .password-form {
-    max-width: 400px;
-}
-
-/* TITLES */
-.section-title {
-    margin-bottom: 15px;
-    font-weight: 500;
-}
-
-.divider {
-    margin: 30px 0;
-    border: 1px solid rgba(255,255,255,0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
 /* ============================= */
-/* LIGHT MODE SUPPORT */
+/* BOTTOM PANELS */
 /* ============================= */
-
-body.light-mode .profile-container {
-    background: #ffffff;
+.right-bottom {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    flex: 1;
+    min-height: 0;
 }
 
-body.light-mode .form-group input {
-    background: #f1f5f9;
-    color: #0f172a;
-    border: 1px solid #e2e8f0;
+/* ============================= */
+/* SECURITY INFO */
+/* ============================= */
+.info-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
 }
 
-body.light-mode .readonly {
-    background: #e2e8f0 !important;
-    color: #475569;
+.info-row div {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+/* ============================= */
+/* SESSION */
+/* ============================= */
+.session-info {
+    font-size: 10px;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+/* ============================= */
+/* TEXT */
+/* ============================= */
+.text-muted {
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+/* ============================= */
+/* FINAL ALIGNMENT FIX */
+/* ============================= */
+.profile-grid-2col,
+.left-panel,
+.right-panel,
+.right-bottom,
+.card {
+    min-height: 0;
 }

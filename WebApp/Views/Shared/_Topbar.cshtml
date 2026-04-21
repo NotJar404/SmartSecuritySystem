@@ -1,0 +1,83 @@
+<link rel="stylesheet" href="~/css/shared.css" />
+
+<div class="topbar">
+    <div class="top-left">
+        <h3>@ViewData["Title"]</h3>
+    </div>
+
+    <div class="top-center">
+        @DateTime.Now.ToString("dddd, MMMM dd, yyyy")
+    </div>
+
+    <div class="top-right">
+        <span id="liveTime"></span>
+
+        <!-- THEME TOGGLE -->
+        <div class="theme-toggle" onclick="toggleTheme()" id="themeToggle">
+            <i id="themeIcon" class="fa fa-moon"></i>
+        </div>
+
+        <!-- NOTIFICATIONS -->
+        <a asp-controller="Notifications" asp-action="Index" class="notif">
+            <i class="fa fa-bell"></i>
+            <span class="notif-badge">3</span>
+        </a>
+    </div>
+</div>
+
+<script>
+/* =========================
+   🕒 LIVE CLOCK
+========================= */
+function updateTime() {
+    const now = new Date();
+
+    const time = now.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+    });
+
+    const el = document.getElementById("liveTime");
+    if (el) el.textContent = time;
+}
+
+setInterval(updateTime, 1000);
+updateTime();
+
+/* =========================
+   🌙 THEME TOGGLE
+========================= */
+function applyTheme(theme) {
+    const body = document.body;
+    const icon = document.getElementById("themeIcon");
+
+    if (!icon) return;
+
+    if (theme === "light") {
+        body.classList.add("light-mode");
+        icon.classList.remove("fa-moon");
+        icon.classList.add("fa-sun");
+    } else {
+        body.classList.remove("light-mode");
+        icon.classList.remove("fa-sun");
+        icon.classList.add("fa-moon");
+    }
+
+    localStorage.setItem("theme", theme);
+}
+
+function toggleTheme() {
+    const isLight = document.body.classList.contains("light-mode");
+    applyTheme(isLight ? "dark" : "light");
+}
+
+/* =========================
+   🌐 LOAD SAVED THEME
+========================= */
+(function initTheme() {
+    const savedTheme = localStorage.getItem("theme") || "dark";
+    applyTheme(savedTheme);
+})();
+</script>

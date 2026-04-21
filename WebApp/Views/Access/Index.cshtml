@@ -8,93 +8,71 @@
 <link rel="stylesheet" href="~/css/access.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
 
-<div class="dock-container">
+<div class="access-grid">
 
-    <!-- CENTER PANEL -->
-    <div class="dock-center">
-        <div class="panel h-full">
+    <!-- HEADER -->
+    <div class="grid-header">
+        <i class="fa fa-shield-halved"></i>
+        <span>SECUREVISION ACCESS CONTROL</span>
+        <span id="statusText" class="status-text">No selection</span>
+    </div>
 
-            <!-- HEADER -->
-            <div class="panel-header">
-                <i class="fa fa-user-circle"></i>
-                <span>Access Details</span>
-                <span id="statusText" class="status-text">No person selected</span>
+    <!-- MAIN CONTENT (LEFT SIDE) -->
+    <div class="grid-main">
+
+        <div class="panel-body">
+
+            <div id="emptyState" class="center-content">
+                <div class="avatar-bg">
+                    <i class="fa fa-user"></i>
+                </div>
             </div>
 
-            <!-- BODY -->
-            <div class="panel-body">
+            <div id="detailContent" class="detail-layout" style="display:none;">
 
-                <!-- EMPTY STATE -->
-                <div id="emptyState" class="center-content">
-                    <div class="avatar-bg">
-                        <i class="fa fa-user"></i>
-                    </div>
-                    <div class="skeleton-lines">
-                        <div class="line-long"></div>
-                        <div class="line-med"></div>
-                        <div class="line-short"></div>
-                    </div>
+                <div class="profile-section">
+                    <img id="detImg" src="~/images/default-user.png" class="profile-large" />
+                    <h2 id="detName">Name</h2>
+                    <p id="detId">ID</p>
                 </div>
 
-                <!-- DETAIL CONTENT -->
-                <div id="detailContent" class="detail-layout" style="display:none;">
+                <div class="info-grid">
 
-                    <!-- PROFILE -->
-                    <div class="profile-section">
-                        <img id="detImg" src="~/images/default-user.png" class="profile-large" />
-                        <h2 id="detName">Name</h2>
-                        <p id="detId">ID</p>
+                    <div class="info-block full">
+                        <label>Department</label>
+                        <div id="detDept" class="field-box">-</div>
                     </div>
 
-                    <!-- INFO GRID -->
-                    <div class="info-grid">
-
-                        <!-- DEPARTMENT -->
-                        <div class="info-block full">
-                            <label><i class="fa fa-building"></i> Department</label>
-                            <div id="detDept" class="field-box">-</div>
-                        </div>
-
-                        <!-- CONTACT -->
-                        <div class="info-block">
-                            <label><i class="fa fa-envelope"></i> Contact</label>
-                            <div id="detEmail" class="field-box">-</div>
-                            <div id="detPhone" class="field-box mt-2">-</div>
-                        </div>
-
-                        <!-- ACCESS -->
-                        <div class="info-block">
-                            <label><i class="fa fa-location-dot"></i> Access Information</label>
-                            <div class="field-box">ROOM: <span id="detRoom">-</span></div>
-                            <div class="field-box mt-2">LOCATION: <span id="detLoc">-</span></div>
-                            <div class="field-box mt-2">TIME: <span id="detTime">-</span></div>
-                        </div>
-
+                    <div class="info-block">
+                        <label>Contact</label>
+                        <div id="detEmail" class="field-box">-</div>
+                        <div id="detPhone" class="field-box mt-2">-</div>
                     </div>
+
+                    <div class="info-block">
+                        <label>Access</label>
+                        <div class="field-box">ROOM: <span id="detRoom">-</span></div>
+                        <div class="field-box">LOCATION: <span id="detLoc">-</span></div>
+                        <div class="field-box">TIME: <span id="detTime">-</span></div>
+                    </div>
+
                 </div>
-
             </div>
+
         </div>
     </div>
 
-    <!-- RIGHT PANEL -->
-    <div class="dock-right">
-        <div class="panel h-full">
+    <!-- RIGHT SIDE NAV (ACCESS LOGS) -->
+    <div class="grid-nav">
 
-            <div class="panel-header">
-                <i class="fa fa-list"></i>
-                <span>Access Logs</span>
-            </div>
+        <div class="log-scroll">
 
-            <div class="log-scroll">
-                <p class="helper-text">
-                    Click on an access log to view detailed information
-                </p>
+            <p class="helper-text">Recent Access Logs</p>
 
-                @foreach (var log in Model)
-                {
-                    <div class="log-card"
-                         onclick="dockData(
+            @foreach (var log in Model)
+            {
+                <div class="log-card"
+                     onclick="dockData(
                             '@log.FullName',
                             '@log.StudentId',
                             '@log.Location',
@@ -106,33 +84,30 @@
                             '@log.Timestamp.ToString("hh:mm tt")'
                          )">
 
-                        <div class="log-avatar-box">
-                            <img src="@log.ImageUrl" onerror="this.style.display='none'" />
-                            <i class="fa fa-user"></i>
-                        </div>
-
-                        <div class="log-info">
-                            <h4>@log.FullName</h4>
-                            <p>@log.Timestamp.ToString("hh:mm tt")</p>
-                        </div>
+                    <div class="log-avatar-box">
+                        <img src="@log.ImageUrl" onerror="this.style.display='none'" />
+                        <i class="fa fa-user"></i>
                     </div>
-                }
-            </div>
+
+                    <div class="log-info">
+                        <h4>@log.FullName</h4>
+                        <p>@log.Timestamp.ToString("hh:mm tt")</p>
+                    </div>
+
+                </div>
+            }
 
         </div>
     </div>
 
 </div>
 
-<!-- SCRIPT -->
 <script>
     function dockData(name, id, loc, img, dept, email, phone, room, time) {
 
-        // Hide empty, show details
         document.getElementById("emptyState").style.display = "none";
         document.getElementById("detailContent").style.display = "block";
 
-        // Fill data
         document.getElementById("detName").innerText = name;
         document.getElementById("detId").innerText = id;
         document.getElementById("detImg").src = img || '/images/default-user.png';
@@ -145,7 +120,6 @@
         document.getElementById("detLoc").innerText = loc || "-";
         document.getElementById("detTime").innerText = time || "-";
 
-        // Header update
         document.getElementById("statusText").innerText = name;
     }
 </script>

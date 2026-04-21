@@ -11,9 +11,17 @@ namespace WebApp.Models
         public int ActiveAlertCount { get; set; }
         public int PendingAccessCount { get; set; }
 
-        public List<DetectionLog> RecentEvents { get; set; } = new();
+        // =====================
+        // EXISTING DATA
+        // =====================
 
-        // ✅ FIXED HERE
+        public List<DetectionLog> RecentEvents { get; set; } = new();
         public List<Camera> Cameras { get; set; } = new();
+
+        // =====================
+        // 🔥 ADD THIS (FIX ERROR)
+        // =====================
+
+        public List<AccessLog> RecentAccessLogs { get; set; } = new();
     }
 }

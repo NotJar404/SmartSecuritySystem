@@ -1,92 +1,197 @@
 ﻿@model WebApp.Models.Profile
 
-<h2 class="page-title">My Profile</h2>
-
-@if (TempData["Success"] != null)
-{
-    <div class="alert success">@TempData["Success"]</div>
+@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
 }
 
-<div class="profile-container">
+<div class="profile-page">
 
-    <!-- LEFT -->
-    <div class="profile-left">
+    <!-- ================= HEADER ================= -->
+    <div class="title-block">
+        <h1 class="page-title">My Profile</h1>
+        <p class="subtitle">
+            Manage your personal information and security settings
+        </p>
 
-        <img src="@(string.IsNullOrEmpty(Model.ProfileImagePath) 
-            ? "/images/default.png" 
-            : Model.ProfileImagePath)" 
-            class="profile-img" />
-
-        <form asp-action="UpdateProfile" method="post" enctype="multipart/form-data">
-            <input type="hidden" asp-for="Id" />
-
-            <input type="file" asp-for="ProfileImage" class="file-input" />
-
-            <button type="submit" class="btn primary">Upload</button>
-        </form>
+        @if (TempData["Success"] != null)
+        {
+            <div class="alert success">@TempData["Success"]</div>
+        }
     </div>
 
-    <!-- RIGHT -->
-    <div class="profile-right">
-        <form asp-action="UpdateProfile" method="post" enctype="multipart/form-data">
+    <!-- ================= MAIN GRID ================= -->
+    <div class="profile-grid-2col">
 
-            <input type="hidden" asp-for="Id" />
+        <!-- ================= LEFT PANEL ================= -->
+        <div class="left-panel">
 
-            <div class="form-group">
-                <label>Full Name</label>
-                <input asp-for="FullName" />
+            <form asp-action="UpdateProfile"
+                  method="post"
+                  enctype="multipart/form-data"
+                  class="profile-form">
+
+                <input type="hidden" asp-for="Id" />
+
+                <!-- AVATAR -->
+                <div class="avatar-box">
+                    <img src="@(string.IsNullOrEmpty(Model.ProfileImagePath)
+                                ? "/images/default-profile.png"
+                                : Model.ProfileImagePath)"
+                         class="profile-img" />
+                </div>
+
+                <!-- INPUTS -->
+                <div class="form-group">
+                    <label>Profile Photo</label>
+                    <input type="file" name="ProfileImage" class="file-input" />
+                </div>
+
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input asp-for="FullName" />
+                </div>
+
+                <div class="form-group">
+                    <label>Username</label>
+                    <input asp-for="Username" />
+                </div>
+
+                <div class="form-group">
+                    <label>Email</label>
+                    <input asp-for="Email" />
+                </div>
+
+                <!-- SAVE BUTTON -->
+                <button type="submit" class="btn primary full-width">
+                    Save Changes
+                </button>
+
+            </form>
+
+            <!-- ACCOUNT INFO -->
+            <div class="card account-info">
+                <h3 class="section-title">Account Info</h3>
+
+                <div class="info-row">
+                    <div>
+                        <label>ID</label>
+                        <p>@Model.Id</p>
+                    </div>
+
+                    <div>
+                        <label>Role</label>
+                        <p>@Model.Role</p>
+                    </div>
+                </div>
             </div>
 
-            <div class="form-group">
-                <label>Username</label>
-                <input asp-for="Username" />
+        </div>
+
+        <!-- ================= RIGHT PANEL ================= -->
+        <div class="right-panel">
+
+            <!-- CHANGE PASSWORD -->
+            <div class="card">
+
+                <h3 class="section-title">Change Password</h3>
+
+                @if (TempData["PasswordError"] != null)
+                {
+                    <div class="alert error">@TempData["PasswordError"]</div>
+                }
+
+                @if (TempData["PasswordSuccess"] != null)
+                {
+                    <div class="alert success">@TempData["PasswordSuccess"]</div>
+                }
+
+                <!-- RULES -->
+                <div class="password-rules">
+                    <strong>Password must contain:</strong>
+                    <ul>
+                        <li>8+ characters</li>
+                        <li>Upper & lowercase</li>
+                        <li>At least 1 number</li>
+                        <li>1 special character</li>
+                    </ul>
+                </div>
+
+                <!-- FORM -->
+                <form asp-action="ChangePassword"
+                      method="post"
+                      class="password-form">
+
+                    <div class="form-group">
+                        <label>Current</label>
+                        <input type="password" name="CurrentPassword" required />
+                    </div>
+
+                    <div class="form-group">
+                        <label>New</label>
+                        <input type="password" name="NewPassword" required />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Confirm</label>
+                        <input type="password" name="ConfirmPassword" required />
+                    </div>
+
+                    <button type="submit" class="btn danger full-width">
+                        Update Password
+                    </button>
+
+                </form>
+
             </div>
 
-            <div class="form-group">
-                <label>Email</label>
-                <input asp-for="Email" readonly class="readonly" />
+            <!-- ================= BOTTOM SECTION ================= -->
+            <div class="right-bottom">
+
+                <!-- SECURITY INFO -->
+                <div class="card">
+                    <h3 class="section-title">Security Info</h3>
+
+                    <div class="info-row">
+                        <div>
+                            <span>Status</span>
+                            <span>@Model.Status</span>
+                        </div>
+
+                        <div>
+                            <span>Last Login</span>
+                            <span>@Model.LastLogin</span>
+                        </div>
+
+                        <!-- Optional future fields -->
+                        <div>
+                            <span>2FA</span>
+                            <span>Disabled</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SESSION -->
+                <div class="card">
+                    <h3 class="section-title">Current Session</h3>
+
+                    <div class="session-info">
+                        <p><strong>Device:</strong> @Context.Request.Headers["User-Agent"]</p>
+                        <p><strong>IP:</strong> @Context.Connection.RemoteIpAddress</p>
+                        <p><strong>Status:</strong> Active</p>
+                    </div>
+
+                    <p class="text-muted">
+                        This session is active on your device.
+                    </p>
+
+                    <button class="btn danger full-width">
+                        Logout All Devices
+                    </button>
+                </div>
+
             </div>
 
-            <div class="form-group">
-                <label>Role</label>
-                <input asp-for="Role" readonly class="readonly" />
-            </div>
+        </div>
 
-            <button type="submit" class="btn primary">Save Changes</button>
-        </form>
     </div>
 </div>
-
-<hr class="divider" />
-
-<h3 class="section-title">Change Password</h3>
-
-@if (TempData["PasswordError"] != null)
-{
-    <div class="alert error">@TempData["PasswordError"]</div>
-}
-
-@if (TempData["PasswordSuccess"] != null)
-{
-    <div class="alert success">@TempData["PasswordSuccess"]</div>
-}
-
-<form asp-action="ChangePassword" method="post" class="password-form">
-
-    <div class="form-group">
-        <label>Current Password</label>
-        <input type="password" name="CurrentPassword" required />
-    </div>
-
-    <div class="form-group">
-        <label>New Password</label>
-        <input type="password" name="NewPassword" required />
-    </div>
-
-    <div class="form-group">
-        <label>Confirm Password</label>
-        <input type="password" name="ConfirmPassword" required />
-    </div>
-
-    <button type="submit" class="btn danger">Update Password</button>
-</form>

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using WebApp.Data;
 using WebApp.Models;
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -19,28 +20,29 @@ namespace WebApp.Controllers
         }
 
         // =========================
-        // VIEW ALERTS WITH FILTER
+        // INDEX (FILTERED VIEW)
         // =========================
         public async Task<IActionResult> Index(string filter = "all")
         {
-            filter = filter?.ToLower() ?? "all";
+            filter = (filter ?? "all").ToLower();
 
-            IQueryable<WebApp.Models.Alert> query = _context.Alerts;
+            IQueryable<Alert> query = _context.Alerts.AsNoTracking();
 
             query = filter switch
             {
-                "new" => query.Where(a => a.Status == WebApp.Models.AlertStatus.New),
-                "acknowledged" => query.Where(a => a.Status == WebApp.Models.AlertStatus.Acknowledged),
-                "resolved" => query.Where(a => a.Status == WebApp.Models.AlertStatus.Resolved),
+                "new" => query.Where(a => a.Status == AlertStatus.New),
+                "acknowledged" => query.Where(a => a.Status == AlertStatus.Acknowledged),
+                "escalated" => query.Where(a => a.Status == AlertStatus.Escalated),
+                "resolved" => query.Where(a => a.Status == AlertStatus.Resolved),
                 _ => query
             };
 
-            ViewBag.Filter = filter;
-
             var data = await query
-                .OrderByDescending(a => a.Timestamp)
-                .AsNoTracking()
+                .OrderByDescending(a => a.Severity)
+                .ThenByDescending(a => a.Timestamp)
                 .ToListAsync();
+
+            ViewBag.Filter = filter;
 
             return View(data);
         }
@@ -52,39 +54,17 @@ namespace WebApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Acknowledge(int id)
         {
-            var alert = await _context.Alerts
-                .FirstOrDefaultAsync(a => a.AlertId == id);
+            var alert = await _context.Alerts.FindAsync(id);
+            if (alert == null) return NotFound();
 
-            if (alert == null)
-                return NotFound();
+            if (alert.Status != AlertStatus.New)
+                return BadRequest("Only NEW alerts can be acknowledged.");
 
-            if (alert.Status == WebApp.Models.AlertStatus.New)
-            {
-                alert.Status = WebApp.Models.AlertStatus.Acknowledged;
-                await _context.SaveChangesAsync();
-            }
+            alert.Status = AlertStatus.Acknowledged;
+            alert.AcknowledgedAt = DateTime.UtcNow;
+            alert.AcknowledgedBy = User.Identity?.Name ?? "Unknown";
 
-            return RedirectToAction(nameof(Index));
-        }
-
-        // =========================
-        // RESOLVE ALERT
-        // =========================
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Resolve(int id)
-        {
-            var alert = await _context.Alerts
-                .FirstOrDefaultAsync(a => a.AlertId == id);
-
-            if (alert == null)
-                return NotFound();
-
-            if (alert.Status != WebApp.Models.AlertStatus.Resolved)
-            {
-                alert.Status = WebApp.Models.AlertStatus.Resolved;
-                await _context.SaveChangesAsync();
-            }
+            await _context.SaveChangesAsync();
 
             return RedirectToAction(nameof(Index));
         }
@@ -96,20 +76,46 @@ namespace WebApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Escalate(int id)
         {
-            var alert = await _context.Alerts
-                .FirstOrDefaultAsync(a => a.AlertId == id);
+            var alert = await _context.Alerts.FindAsync(id);
+            if (alert == null) return NotFound();
 
-            if (alert == null)
-                return NotFound();
+            if (alert.Status == AlertStatus.Resolved)
+                return BadRequest("Resolved alerts cannot be escalated.");
 
-            // escalate severity
-            alert.Severity = WebApp.Models.SeverityLevel.CRITICAL;
+            if (alert.Status == AlertStatus.Escalated)
+                return RedirectToAction(nameof(Index));
 
-            // only reset status if not resolved
-            if (alert.Status != WebApp.Models.AlertStatus.Resolved)
-            {
-                alert.Status = WebApp.Models.AlertStatus.New;
-            }
+            alert.Status = AlertStatus.Escalated;
+            alert.EscalatedAt = DateTime.UtcNow;
+            alert.EscalatedBy = User.Identity?.Name ?? "Unknown";
+
+            // keep consistent severity rule
+            alert.Severity = SeverityLevel.CRITICAL;
+
+            await _context.SaveChangesAsync();
+
+            return RedirectToAction(nameof(Index));
+        }
+
+        // =========================
+        // RESOLVE ALERT
+        // =========================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Resolve(int id)
+        {
+            var alert = await _context.Alerts.FindAsync(id);
+            if (alert == null) return NotFound();
+
+            if (alert.Status == AlertStatus.New)
+                return BadRequest("Must acknowledge before resolving.");
+
+            if (alert.Status == AlertStatus.Resolved)
+                return RedirectToAction(nameof(Index));
+
+            alert.Status = AlertStatus.Resolved;
+            alert.ResolvedAt = DateTime.UtcNow;
+            alert.ResolvedBy = User.Identity?.Name ?? "Unknown";
 
             await _context.SaveChangesAsync();
 

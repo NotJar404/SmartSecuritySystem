@@ -11,12 +11,14 @@ namespace WebApp.Models
         [Column("alert_id")]
         public int AlertId { get; set; }
 
+        // IMPORTANT: stored as TEXT/VARCHAR in DB
         [Column("type")]
-        public string Type { get; set; } = string.Empty;
+        public AlertType Type { get; set; }
 
         [Column("description")]
         public string? Description { get; set; }
 
+        // IMPORTANT: stored as TEXT/VARCHAR in DB
         [Column("severity")]
         public SeverityLevel Severity { get; set; } = SeverityLevel.WARNING;
 
@@ -26,10 +28,36 @@ namespace WebApp.Models
         [Column("timestamp")]
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
 
+        // IMPORTANT: stored as TEXT/VARCHAR in DB
         [Column("status")]
         public AlertStatus Status { get; set; } = AlertStatus.New;
 
-        // UI ONLY
+        // =========================
+        // TRACKING
+        // =========================
+
+        [Column("acknowledged_by")]
+        public string? AcknowledgedBy { get; set; }
+
+        [Column("acknowledged_at")]
+        public DateTime? AcknowledgedAt { get; set; }
+
+        [Column("resolved_by")]
+        public string? ResolvedBy { get; set; }
+
+        [Column("resolved_at")]
+        public DateTime? ResolvedAt { get; set; }
+
+        [Column("escalated_by")]
+        public string? EscalatedBy { get; set; }
+
+        [Column("escalated_at")]
+        public DateTime? EscalatedAt { get; set; }
+
+        // =========================
+        // UI ONLY (NOT IN DATABASE)
+        // =========================
+
         [NotMapped]
         public int MinutesAgo => (int)(DateTime.UtcNow - Timestamp).TotalMinutes;
 
@@ -40,11 +68,26 @@ namespace WebApp.Models
         public bool IsResolved => Status == AlertStatus.Resolved;
 
         [NotMapped]
-        public bool IsActive => Status == AlertStatus.New;
+        public bool IsActive => Status != AlertStatus.Resolved;
+    }
+
+    // =========================
+    // ENUMS (stored as STRING in DB)
+    // =========================
+
+    public enum AlertType
+    {
+        UnauthorizedAccess,
+        Intrusion,
+        SuspiciousActivity,
+        AccessGranted,
+        DoorEvent,
+        SystemError
     }
 
     public enum SeverityLevel
     {
+        INFO,
         WARNING,
         CRITICAL
     }
@@ -53,6 +96,7 @@ namespace WebApp.Models
     {
         New,
         Acknowledged,
+        Escalated,
         Resolved
     }
 }

@@ -1,214 +1,293 @@
-﻿@model WebApp.Models.DashboardViewModel
+﻿@using System.Linq
+@model WebApp.Models.DashboardViewModel
 
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
-    ViewData["Title"] = "Dashboard";
+    ViewData["Title"] = "Security Dashboard";
 }
 
-<div class="dashboard-container">
-
+<div class="dashboard-container" role="main">
     <!-- ===================== -->
-    <!-- STATS -->
+    <!-- STATS (NO SCROLL) -->
     <!-- ===================== -->
-    <div class="stats">
+    <section class="stats" aria-label="System Statistics">
 
         <div class="stat-card">
-            <div class="stat-top">
-                <div class="stat-icon blue"><i class="fa fa-video fa-fw"></i></div>
-                <span class="stat-label">Active Cameras</span>
+            <div class="stat-icon blue"><i class="fa fa-video"></i></div>
+            <div class="stat-card-content">
+                <span class="stat-label">Cameras</span>
+                <h2>@Model.ActiveCameraCount</h2>
+                <p class="stat-meta">Active</p>
             </div>
-
-            <h2>@Model.ActiveCameraCount / @Model.TotalCameraCount</h2>
-            <p>Active Cameras</p>
-
-            <span class="stat-change neutral">Live</span>
         </div>
 
         <div class="stat-card">
-            <div class="stat-top">
-                <div class="stat-icon yellow"><i class="fa fa-bullseye fa-fw"></i></div>
-                <span class="stat-label">Detections Today</span>
+            <div class="stat-icon yellow"><i class="fa fa-bullseye"></i></div>
+            <div class="stat-card-content">
+                <span class="stat-label">Detections</span>
+                <h2>@Model.TodayDetectionCount</h2>
+                <p class="stat-meta">Today</p>
             </div>
-
-            <h2>@Model.TodayDetectionCount</h2>
-            <p>Detections Today</p>
-
-            <span class="stat-change positive">Updated</span>
         </div>
 
         <div class="stat-card">
-            <div class="stat-top">
-                <div class="stat-icon red"><i class="fa fa-bell fa-fw"></i></div>
-                <span class="stat-label">Active Alerts</span>
+            <div class="stat-icon red"><i class="fa fa-triangle-exclamation"></i></div>
+            <div class="stat-card-content">
+                <span class="stat-label">Alerts</span>
+                <h2>@Model.ActiveAlertCount</h2>
+                <p class="stat-meta">Active</p>
             </div>
-
-            <h2>@Model.ActiveAlertCount</h2>
-            <p>Active Alerts</p>
-
-            <span class="stat-change negative">Attention</span>
         </div>
 
         <div class="stat-card">
-            <div class="stat-top">
-                <div class="stat-icon green"><i class="fa fa-id-card fa-fw"></i></div>
-                <span class="stat-label">Access Requests</span>
+            <div class="stat-icon green"><i class="fa fa-id-card"></i></div>
+            <div class="stat-card-content">
+                <span class="stat-label">Access</span>
+                <h2>@Model.PendingAccessCount</h2>
+                <p class="stat-meta">Recent</p>
             </div>
-
-            <h2>@Model.PendingAccessCount</h2>
-            <p>Access Requests</p>
-
-            <span class="stat-change neutral">Pending</span>
         </div>
 
-    </div>
+    </section>
 
     <!-- ===================== -->
-    <!-- QUICK ACTIONS -->
+    <!-- MAIN GRID -->
     <!-- ===================== -->
-    <div class="panel">
-        <h3>Quick Actions</h3>
+    <div class="dashboard-grid">
 
-        <div class="quick-actions">
+        <!-- ===================== -->
+        <!-- LEFT: CCTV (SCROLL ZONE #1) -->
+        <!-- ===================== -->
+        <section class="grid-left">
 
-            <div class="qa-card">
-                <div class="qa-left">
-                    <div class="qa-icon blue"><i class="fa fa-video"></i></div>
+            <div class="panel camera-panel">
+
+                <div class="panel-header">
                     <div>
-                        <h4>Live Monitoring</h4>
-                        <p>View all camera feeds in real-time</p>
+                        <h3>Live CCTV Wall</h3>
+                        <p class="panel-subtitle">Real-time camera feeds</p>
                     </div>
+
+                    <a asp-controller="Cameras"
+                       asp-action="Index"
+                       class="panel-action">
+                        Manage Cameras
+                    </a>
                 </div>
-                <div class="qa-arrow">
-                    <i class="fa fa-chevron-right"></i>
-                </div>
-            </div>
 
-            <div class="qa-card">
-                <div class="qa-left">
-                    <div class="qa-icon purple"><i class="fa fa-id-card"></i></div>
-                    <div>
-                        <h4>
-                            Access Monitoring
-                            <span class="badge red">@Model.PendingAccessCount Pending</span>
-                        </h4>
-                        <p>Review RFID access requests</p>
-                    </div>
-                </div>
-                <div class="qa-arrow">
-                    <i class="fa fa-chevron-right"></i>
-                </div>
-            </div>
+                <!-- 🔥 SCROLLABLE CCTV AREA -->
+                <div class="scroll-cctv">
 
-            <div class="qa-card">
-                <div class="qa-left">
-                    <div class="qa-icon orange"><i class="fa fa-bell"></i></div>
-                    <div>
-                        <h4>
-                            Security Alerts
-                            <span class="badge red">@Model.ActiveAlertCount Active</span>
-                        </h4>
-                        <p>Check active security alerts</p>
-                    </div>
-                </div>
-                <div class="qa-arrow">
-                    <i class="fa fa-chevron-right"></i>
-                </div>
-            </div>
+                    <div class="camera-grid cctv-grid">
 
-            <div class="qa-card">
-                <div class="qa-left">
-                    <div class="qa-icon green"><i class="fa fa-file-alt"></i></div>
-                    <div>
-                        <h4>Activity Logs</h4>
-                        <p>View security event logs</p>
-                    </div>
-                </div>
-                <div class="qa-arrow">
-                    <i class="fa fa-chevron-right"></i>
-                </div>
-            </div>
+                        @if (Model.Cameras?.Any() == true)
+                        {
+                            foreach (var cam in Model.Cameras)
+                            {
+                                var url = cam.StreamUrl ?? "";
+                                var name = cam.Name ?? "Camera";
 
-        </div>
-    </div>
+                                <div class="camera-tile">
 
-    <!-- ===================== -->
-    <!-- LOWER GRID -->
-    <!-- ===================== -->
-    <div class="grid-2">
+                                    <video class="cctv-video"
+                                           muted
+                                           autoplay
+                                           playsinline
+                                           preload="auto"
+                                           data-src="@url">
+                                    </video>
 
-        <!-- RECENT EVENTS -->
-        <div class="panel">
-            <div class="panel-header">
-                <h3>Recent Events</h3>
-                <a href="#">View All</a>
-            </div>
+                                    <div class="camera-overlay">
+                                        <span class="cam-label">@name</span>
+                                        <span class="live-dot">● LIVE</span>
+                                    </div>
 
-            @if (Model.RecentEvents != null && Model.RecentEvents.Any())
-            {
-                @foreach (var item in Model.RecentEvents)
-                {
-                    <div class="event-item">
-                        <div class="event-icon blue">
-                            <i class="fa fa-eye"></i>
-                        </div>
-                        <div>
-                            <h4>
-                                @(item.DetectionType switch
-                                {
-                                    "motion" => "Motion Detected",
-                                    "human" => "Person Detected",
-                                    "intrusion" => "Intrusion Alert",
-                                    "face" => "Face Detected",
-                                    _ => item.DetectionType
-                                })
-                            </h4>
-                            <p>
-                                @(
-                                    item.Camera != null
-                                        ? (item.Camera.RoomName ?? item.Camera.Location)
-                                        : $"Camera ID: {item.CameraId}"
-                                )
-                                • @item.Timestamp.ToLocalTime().ToString("HH:mm:ss")
-                            </p>
-                        </div>
-                    </div>
-                }
-            }
-            else
-            {
-                <p>No recent events.</p>
-            }
-        </div>
-
-        <!-- CAMERA STATUS -->
-        <div class="panel">
-            <div class="panel-header">
-                <h3>Camera Status</h3>
-                <a href="#">View Live</a>
-            </div>
-
-            @if (Model.Cameras != null && Model.Cameras.Any())
-            {
-                @foreach (var cam in Model.Cameras)
-                {
-                    <div class="camera-item">
-                        <div>
-                            <span class="dot @(cam.Status == "active" ? "online" : "offline")"></span>
-                            <div>
-                                <strong>@cam.Name</strong>
-                                <p>@(cam.RoomName ?? cam.Location)</p>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="empty-state">
+                                <p>No cameras available</p>
                             </div>
-                        </div>
-                        <span class="status-badge">@cam.Status</span>
+                        }
+
                     </div>
-                }
-            }
-            else
-            {
-                <p>No cameras found.</p>
-            }
-        </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+        <!-- ===================== -->
+        <!-- RIGHT SIDE -->
+        <!-- ===================== -->
+        <aside class="grid-right">
+
+            <!-- ===================== -->
+            <!-- ACCESS (SCROLL ZONE #2) -->
+            <!-- ===================== -->
+            <div class="panel">
+
+                <div class="panel-header">
+                    <div>
+                        <h3>Access Monitoring</h3>
+                        <p class="panel-subtitle">Recent entry activity</p>
+                    </div>
+                </div>
+
+                <div class="scroll-zone">
+
+                    @if (Model.RecentAccessLogs?.Any() == true)
+                    {
+                        foreach (var log in Model.RecentAccessLogs)
+                        {
+                            <div class="event-item">
+
+                                <div class="event-icon @(log.IsAuthorized ? "blue" : "red")">
+                                    <i class="fa @(log.IsAuthorized ? "fa-check" : "fa-xmark")"></i>
+                                </div>
+
+                                <div class="event-content">
+                                    <h4>@log.FullName</h4>
+                                    <p>@log.Room • @log.Timestamp.ToLocalTime().ToString("hh:mm tt")</p>
+                                </div>
+
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="empty-state">No access logs</div>
+                    }
+
+                </div>
+
+            </div>
+
+            <!-- ===================== -->
+            <!-- ALERTS (SCROLL ZONE #3) -->
+            <!-- ===================== -->
+            <div class="panel">
+
+                <div class="panel-header">
+                    <div>
+                        <h3>Security Alerts</h3>
+                        <p class="panel-subtitle">Detected events</p>
+                    </div>
+                </div>
+
+                <div class="scroll-zone">
+
+                    @if (Model.RecentEvents?.Any() == true)
+                    {
+                        foreach (var item in Model.RecentEvents)
+                        {
+                            <div class="alert-card">
+
+                                <h4>
+                                    @(item.DetectionType switch
+                                    {
+                                        "motion" => "Motion Detected",
+                                        "human" => "Person Detected",
+                                        "intrusion" => "Intrusion Alert",
+                                        "face" => "Face Recognized",
+                                        _ => item.DetectionType
+                                    })
+                        </h4>
+
+                                <p>
+                                    @item.Camera?.RoomName •
+                                    @item.Timestamp.ToLocalTime().ToString("HH:mm:ss")
+                                </p>
+
+                            </div>
+                                        }
+                    }
+                    else
+                    {
+                        <div class="empty-state">No alerts</div>
+                    }
+
+                </div>
+
+            </div>
+
+        </aside>
 
     </div>
-
 </div>
+
+<!-- ===================== -->
+<!-- CCTV AUTO PLAYER -->
+<!-- ===================== -->
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
+<script>
+
+    window.addEventListener("DOMContentLoaded", async function () {
+
+        const videos = document.querySelectorAll(".cctv-video");
+
+        let webcamStream = null;
+
+        async function getWebcam() {
+            if (webcamStream) return webcamStream;
+
+            try {
+                webcamStream = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: false
+                });
+
+                return webcamStream;
+            }
+            catch (err) {
+                console.log("Webcam access denied:", err);
+                return null;
+            }
+        }
+
+        for (const video of videos) {
+
+            const url = video.getAttribute("data-src");
+
+            video.muted = true;
+            video.playsInline = true;
+            video.autoplay = true;
+
+            if (url && url.trim() !== "") {
+
+                if (url.includes(".m3u8") && window.Hls) {
+
+                    const hls = new Hls();
+                    hls.loadSource(url);
+                    hls.attachMedia(video);
+
+                } else {
+                    video.src = url;
+                }
+
+                video.load();
+
+                video.play().catch(err => {
+                    console.log("Stream failed:", url, err);
+                });
+
+            } else {
+
+                const stream = await getWebcam();
+
+                if (stream) {
+                    video.srcObject = stream;
+
+                    video.play().catch(err => {
+                        console.log("Webcam play failed:", err);
+                    });
+                }
+            }
+        }
+
+    });
+</script>
