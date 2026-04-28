@@ -150,82 +150,85 @@
 </div>
 
 <!-- MODAL -->
-<div id="cameraModal" class="modal" onclick="outsideClick(event)">
+<div id="cameraModal" class="modal fade" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="post"
+              id="cameraForm"
+              asp-controller="Cameras"
+              asp-action="Add"
+              class="modal-content">
 
-    <form method="post"
-          id="cameraForm"
-          asp-controller="Cameras"
-          asp-action="Add"
-          class="modal-content">
+            @Html.AntiForgeryToken()
 
-        @Html.AntiForgeryToken()
+            <input type="hidden" id="camId" name="Id" value="0" />
+            <input type="hidden" name="Status" value="active" />
 
-        <input type="hidden" id="camId" name="Id" value="0" />
-        <input type="hidden" name="Status" value="active" />
-
-        <div class="modal-header">
-            <h2 id="modalTitle">Add Camera</h2>
-            <span class="close" onclick="closeModal()">&times;</span>
-        </div>
-
-        <div class="modal-body">
-
-            <div class="form-group">
-                <label>Camera Name</label>
-                <input type="text" id="camName" name="Name" required />
+            <div class="modal-header">
+                <h5 id="modalTitle">Add Camera</h5>
+                <button type="button" class="close" onclick="closeModal()" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
             </div>
 
-            <div class="form-group">
-                <label>Location</label>
-                <input type="text" id="camLocation" name="Location" required />
-            </div>
+            <div class="modal-body">
 
-            <div class="form-group">
-                <label>Room</label>
-                <select id="camRoom" name="RoomId" required>
-                    <option value="">-- Select Room --</option>
-                    @if (rooms != null && rooms.Count > 0)
-                    {
-                        foreach (var room in rooms)
+                <div class="form-group">
+                    <label>Camera Name</label>
+                    <input type="text" id="camName" name="Name" required />
+                </div>
+
+                <div class="form-group">
+                    <label>Location</label>
+                    <input type="text" id="camLocation" name="Location" required />
+                </div>
+
+                <div class="form-group">
+                    <label>Room</label>
+                    <select id="camRoom" name="RoomId" required>
+                        <option value="">-- Select Room --</option>
+                        @if (rooms != null && rooms.Count > 0)
                         {
-                            <option value="@room.RoomId">@room.RoomName</option>
+                            foreach (var room in rooms)
+                            {
+                                <option value="@room.RoomId">@room.RoomName</option>
+                            }
                         }
-                    }
-                </select>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Stream URL</label>
+
+                    <input type="text"
+                        id="camSource"
+                        name="StreamUrl"
+                        placeholder="Enter Raspberry Pi / IP camera URL (or leave empty for webcam test)"
+                        />
+
+                    <small>
+                        ✔ Raspberry Pi: http://192.168.x.x:xxxx<br />
+                        ✔ IP Camera / OBS stream supported<br />
+                        ✔ Leave EMPTY for laptop webcam (TEST MODE ONLY)
+                    </small>
+                </div>
+
             </div>
 
-            <div class="form-group">
-                <label>Stream URL</label>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light btn-sm" onclick="closeModal()">Cancel</button>
 
-                <input type="text"
-                    id="camSource"
-                    name="StreamUrl"
-                    placeholder="Enter Raspberry Pi / IP camera URL (or leave empty for webcam test)"
-                    />
-
-                <small style="color:gray; display:block; margin-top:5px;">
-                    ✔ Raspberry Pi: http://192.168.x.x:xxxx<br />
-                    ✔ IP Camera / OBS stream supported<br />
-                    ✔ Leave EMPTY for laptop webcam (TEST MODE ONLY)
-                </small>
+                @if (User.IsInRole("Admin"))
+                {
+                    <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-primary btn-sm" disabled>Save</button>
+                }
             </div>
 
-        </div>
-
-        <div class="modal-footer">
-            <button type="button" class="cancel" onclick="closeModal()">Cancel</button>
-
-            @if (User.IsInRole("Admin"))
-            {
-                <button type="submit">Save</button>
-            }
-            else
-            {
-                <button type="button" disabled>Save</button>
-            }
-        </div>
-
-    </form>
+        </form>
+    </div>
 </div>
 
 <script>
@@ -328,30 +331,66 @@ function toggleFullscreen() {
 }
 
 function openModal() {
-    cameraForm.reset();
-    cameraModal.style.display = "flex";
+    document.getElementById("cameraForm").reset();
+    document.getElementById("modalTitle").innerText = "Add Camera";
+    document.getElementById("cameraForm").action = "/Cameras/Add";
+    document.getElementById("camId").value = "0";
+    
+    const modal = document.getElementById('cameraModal');
+    modal.classList.add('show');
+    document.body.style.overflow = 'hidden';
 }
 
 function closeModal() {
-    cameraModal.style.display = "none";
-}
-
-function outsideClick(e) {
-    if (e.target.id === "cameraModal") closeModal();
+    const modal = document.getElementById('cameraModal');
+    modal.classList.remove('show');
+    document.body.style.overflow = 'auto';
 }
 
 function editSelectedCamera() {
     if (!selectedCamera) return;
 
-    cameraForm.action = "/Cameras/Edit";
+    const form = document.getElementById("cameraForm");
+    form.action = "/Cameras/Edit";
+    
+    document.getElementById("modalTitle").innerText = "Edit Camera";
+    document.getElementById("camId").value = selectedCamera.Id || 0;
+    document.getElementById("camName").value = selectedCamera.Name || "";
+    document.getElementById("camLocation").value = selectedCamera.Location || "";
+    document.getElementById("camSource").value = selectedCamera.StreamUrl || "";
+    document.getElementById("camRoom").value = selectedCamera.RoomId || "";
 
-    camId.value = selectedCamera.Id || 0;
-    camName.value = selectedCamera.Name || "";
-    camLocation.value = selectedCamera.Location || "";
-    camSource.value = selectedCamera.StreamUrl || "";
-    camRoom.value = selectedCamera.RoomId || "";
-
-    cameraModal.style.display = "flex";
+    const modal = document.getElementById('cameraModal');
+    modal.classList.add('show');
+    document.body.style.overflow = 'hidden';
 }
+
+// Modal event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('cameraModal');
+    const closeBtn = document.querySelector('#cameraModal .close');
+    const cancelBtn = document.querySelector('#cameraModal .btn-light');
+    
+    if (closeBtn) {
+        closeBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            closeModal();
+        });
+    }
+    
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            closeModal();
+        });
+    }
+    
+    // Close on backdrop click
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            closeModal();
+        }
+    });
+});
 
 </script>

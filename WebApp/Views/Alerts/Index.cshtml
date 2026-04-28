@@ -9,245 +9,278 @@
 }
 
 <link rel="stylesheet" href="~/css/alert.css" />
+<link rel="stylesheet" href="~/css/dashboard.css" />
 
-<h1 class="page-title">Security Alerts</h1>
+<div class="dashboard-container">
 
-<p class="subtitle">
-    <strong>@activeCount</strong> active alerts requiring attention
-</p>
-
-<!-- FILTERS -->
-<div class="alert-filters">
-
-    <a asp-action="Index" asp-route-filter="all"
-       class="filter-btn @(filter == "all" ? "active" : "")">
-        All (@Model.Count)
-    </a>
-
-    <a asp-action="Index" asp-route-filter="new"
-       class="filter-btn @(filter == "new" ? "active" : "")">
-        New (@Model.Count(a => a.Status == AlertStatus.New))
-    </a>
-
-    <a asp-action="Index" asp-route-filter="acknowledged"
-       class="filter-btn @(filter == "acknowledged" ? "active" : "")">
-        Acknowledged (@Model.Count(a => a.Status == AlertStatus.Acknowledged))
-    </a>
-
-    <a asp-action="Index" asp-route-filter="resolved"
-       class="filter-btn @(filter == "resolved" ? "active" : "")">
-        Resolved (@Model.Count(a => a.Status == AlertStatus.Resolved))
-    </a>
-
-</div>
-
-<!-- ALERT LIST -->
-<div class="alerts-container">
-
-@foreach (var alert in Model
-    .OrderByDescending(a => a.Severity)
-    .ThenByDescending(a => a.Timestamp))
-{
-    var isCritical = alert.Severity == SeverityLevel.CRITICAL;
-    var isWarning = alert.Severity == SeverityLevel.WARNING;
-    var isResolved = alert.Status == AlertStatus.Resolved;
-
-    var cardClass = "alert-card";
-    cardClass += isCritical ? " critical" :
-                 isWarning ? " warning" : " info";
-
-    if (isResolved) cardClass += " resolved";
-
-    <div class="@cardClass"
-         data-id="@alert.AlertId"
-         data-type="@alert.Type"
-         data-desc="@(alert.Description ?? "No description")"
-         data-room="@(alert.RoomId?.ToString() ?? "N/A")"
-         data-severity="@alert.Severity"
-         data-time="@alert.Timestamp.ToString("yyyy-MM-dd HH:mm")"
-         data-status="@alert.Status">
-
-        <!-- ICON -->
-        <div class="alert-icon">
-            @(isCritical ? "🚨" : isWarning ? "⚠️" : "ℹ️")
+    <header class="cmd-header d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h2 class="mb-0">Security Alerts</h2>
+            <small class="text-muted">Monitor and manage system security incidents</small>
         </div>
+        <div>
+            <span class="live-badge">● @activeCount ACTIVE</span>
+        </div>
+    </header>
 
-        <!-- CONTENT (STRICT STACK ORDER) -->
-        <div class="alert-content">
+    <div class="alerts-page">
 
-            <!-- 1. TYPE (TOP MOST) -->
-            <div class="alert-title">@alert.Type</div>
+        <div class="alert-toolbar">
+            <div class="toolbar-left">
+                <form method="get" class="search-bar">
+                    <input type="text"
+                           name="search"
+                           placeholder="Search alerts by type, room, status..."
+                           value="@Context.Request.Query["search"]" />
+                    <button type=\"submit\" aria-label=\"Search alerts\"><i class=\"fa fa-search\"></i></button>
+                </form>
 
-            <!-- 2. STATUS (UNDER TYPE) -->
-            <div class="alert-status">@alert.Status</div>
-
-            <!-- 3. DESCRIPTION -->
-            <div class="alert-description">
-                @(alert.Description ?? "No description")
+                <div class="alert-filters">
+                    <a asp-action="Index" asp-route-filter="all"
+                       class="filter-btn @(filter == "all" ? "active" : "")">
+                        All (@Model.Count)
+                    </a>
+                    <a asp-action="Index" asp-route-filter="new"
+                       class="filter-btn @(filter == "new" ? "active" : "")">
+                        New (@Model.Count(a => a.Status == AlertStatus.New))
+                    </a>
+                    <a asp-action="Index" asp-route-filter="acknowledged"
+                       class="filter-btn @(filter == "acknowledged" ? "active" : "")">
+                        Acknowledged (@Model.Count(a => a.Status == AlertStatus.Acknowledged))
+                    </a>
+                    <a asp-action="Index" asp-route-filter="resolved"
+                       class="filter-btn @(filter == "resolved" ? "active" : "")">
+                        Resolved (@Model.Count(a => a.Status == AlertStatus.Resolved))
+                    </a>
+                </div>
             </div>
 
-            <!-- 4. META -->
-            <div class="alert-meta">
-                Room: @(alert.RoomId?.ToString() ?? "N/A")
-                • ⏱ @alert.MinutesAgo m ago
-                • @alert.Timestamp.ToString("g")
+            <div class="toolbar-right">
+                <p class="subtitle">
+                    <strong>@activeCount</strong> active alerts requiring attention
+                </p>
             </div>
-
         </div>
 
-        <!-- ACTIONS -->
-        <div class="alert-actions">
-
-            @if (!isResolved)
+        <div class="alerts-container">
+            @foreach (var alert in Model
+                .OrderByDescending(a => a.Severity)
+                .ThenByDescending(a => a.Timestamp))
             {
-                if (alert.Status == AlertStatus.New)
-                {
-                    <form method="post" asp-action="Acknowledge">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="id" value="@alert.AlertId" />
-                        <button type="submit">Acknowledge</button>
-                    </form>
-                }
+                var isCritical = alert.Severity == SeverityLevel.CRITICAL;
+                var isWarning = alert.Severity == SeverityLevel.WARNING;
+                var isResolved = alert.Status == AlertStatus.Resolved;
+                // Check if the alert has an associated recording path
+                var hasVideo = !string.IsNullOrEmpty(alert.VideoPath);
 
-                if (alert.Status == AlertStatus.Acknowledged)
-                {
-                    <form method="post" asp-action="Resolve">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="id" value="@alert.AlertId" />
-                        <button type="submit">Resolve</button>
-                    </form>
+                var cardClass = "alert-card";
+                cardClass += isCritical ? " critical" : isWarning ? " warning" : " info";
+                if (isResolved) cardClass += " resolved";
 
-                    <form method="post" asp-action="Escalate">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="id" value="@alert.AlertId" />
-                        <button type="submit">Escalate</button>
-                    </form>
-                }
+                <div class="@cardClass"
+                     data-id="@alert.AlertId"
+                     data-type="@alert.Type"
+                     data-desc="@(alert.Description ?? "No description")"
+                     data-room="@(alert.RoomId?.ToString() ?? "N/A")"
+                     data-severity="@alert.Severity"
+                     data-time="@alert.Timestamp.ToString("yyyy-MM-dd HH:mm")"
+                     data-status="@alert.Status"
+                     data-video="@alert.VideoPath">
 
-                if (alert.Status == AlertStatus.Escalated)
-                {
-                    <form method="post" asp-action="Resolve">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="id" value="@alert.AlertId" />
-                        <button type="submit">Resolve</button>
-                    </form>
-                }
+                    <div class="alert-icon">
+                        @(isCritical ? "🚨" : isWarning ? "⚠️" : "ℹ️")
+                    </div>
+
+                    <div class="alert-content">
+                        <div class="alert-title">
+                            @alert.Type 
+                            @if(hasVideo){ <i class="fa fa-video" style="font-size: 0.8rem; margin-left: 8px; color: var(--accent);"></i> }
+                        </div>
+                        <div class="alert-status">@alert.Status</div>
+
+                        <div class="alert-description">
+                            @(alert.Description ?? "No description")
+                        </div>
+
+                        <div class="alert-meta">
+                            Room: @(alert.RoomId?.ToString() ?? "N/A")
+                            • ⏱ @alert.MinutesAgo m ago
+                            • @alert.Timestamp.ToString("g")
+                        </div>
+                    </div>
+
+                    <div class="alert-actions">
+                        @if (hasVideo)
+                        {
+                            <button type="button" class="video-btn" onclick="openAlertModal(this.closest('.alert-card').dataset, true)">
+                                <i class="fa fa-play"></i> Watch
+                            </button>
+                        }
+
+                        @if (!isResolved)
+                        {
+                            if (alert.Status == AlertStatus.New)
+                            {
+                                <form method="post" asp-action="Acknowledge">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@alert.AlertId" />
+                                    <button type="submit">Acknowledge</button>
+                                </form>
+                            }
+
+                            if (alert.Status == AlertStatus.Acknowledged)
+                            {
+                                <form method="post" asp-action="Resolve" style="display:inline;">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@alert.AlertId" />
+                                    <button type="submit">Resolve</button>
+                                </form>
+
+                                <form method="post" asp-action="Escalate" style="display:inline;">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@alert.AlertId" />
+                                    <button type="submit">Escalate</button>
+                                </form>
+                            }
+                        }
+                        <button type="button" class="details-btn">Details</button>
+                    </div>
+                </div>
             }
-
-            <button type="button" class="details-btn">Details</button>
-
         </div>
     </div>
-}
 
-</div>
-
-<!-- ================= MODAL ================= -->
-<div id="alertModal">
-    <div class="modal-content">
-
-        <span class="close-btn">&times;</span>
-
-        <div class="modal-header">
-            <h2 id="modalTitle"></h2>
-        </div>
-
-        <div class="modal-body">
-
-            <div class="modal-info">
-
-                <div class="field">
-                    <label>Status</label>
-                    <input type="text" id="modalStatus" readonly />
+    <div id="alertModal" class="modal fade" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 id="modalTitle">Alert Details</h5>
+                    <button type="button" class="close" onclick="closeAlertModal()" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
                 </div>
 
-                <div class="field">
-                    <label>Severity</label>
-                    <input type="text" id="modalSeverity" readonly />
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-7" id="videoContainer" style="display:none;">
+                            <label><i class="fa fa-film"></i> Event Recording</label>
+                            <div class="video-wrapper mb-3" style="background:#000; border-radius: 8px; overflow: hidden;">
+                                <video id="modalVideoPlayer" width="100%" controls>
+                                    <source src="" type="video/mp4">
+                                    Your browser does not support the video tag.
+                                </video>
+                            </div>
+                        </div>
+
+                        <div class="col-md">
+                            <div class="field">
+                                <label>Status</label>
+                                <input type="text" id="modalStatus" readonly />
+                            </div>
+                            <div class="field">
+                                <label>Severity</label>
+                                <input type="text" id="modalSeverity" readonly />
+                            </div>
+                            <div class="field">
+                                <label>Room</label>
+                                <input type="text" id="modalLocation" readonly />
+                            </div>
+                            <div class="field">
+                                <label>Time</label>
+                                <input type="text" id="modalTime" readonly />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field mt-3">
+                        <label>Description</label>
+                        <p class="description-box" id="modalDescription"></p>
+                    </div>
                 </div>
 
-                <div class="field">
-                    <label>Room</label>
-                    <input type="text" id="modalLocation" readonly />
+                <div class="modal-footer">
+                    <form method="post" asp-action="Acknowledge" class="modal-form">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" class="modalAlertId" />
+                        <button type="submit" class="btn btn-primary btn-sm">Acknowledge</button>
+                    </form>
+                    <form method="post" asp-action="Resolve" class="modal-form">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" class="modalAlertId" />
+                        <button type="submit" class="btn btn-primary btn-sm">Resolve</button>
+                    </form>
+                    <form method="post" asp-action="Escalate" class="modal-form">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" class="modalAlertId" />
+                        <button type="submit" class="btn btn-primary btn-sm">Escalate</button>
+                    </form>
                 </div>
-
-                <div class="field">
-                    <label>Time</label>
-                    <input type="text" id="modalTime" readonly />
-                </div>
-
-                <div class="field">
-                    <label>Description</label>
-                    <p class="description-box" id="modalDescription"></p>
-                </div>
-
             </div>
-
         </div>
-
-        <div class="section-actions">
-
-            <form method="post" asp-action="Acknowledge">
-                @Html.AntiForgeryToken()
-                <input type="hidden" name="id" class="modalAlertId" />
-                <button type="submit">Acknowledge</button>
-            </form>
-
-            <form method="post" asp-action="Resolve">
-                @Html.AntiForgeryToken()
-                <input type="hidden" name="id" class="modalAlertId" />
-                <button type="submit">Resolve</button>
-            </form>
-
-            <form method="post" asp-action="Escalate">
-                @Html.AntiForgeryToken()
-                <input type="hidden" name="id" class="modalAlertId" />
-                <button type="submit">Escalate</button>
-            </form>
-
-        </div>
-
     </div>
-</div>
 
-<!-- ================= SCRIPT ================= -->
-<script>
-const modal = document.getElementById("alertModal");
+    <script>
+    const alertModal = document.getElementById("alertModal");
+    const videoPlayer = document.getElementById("modalVideoPlayer");
+    const videoContainer = document.getElementById("videoContainer");
 
-document.querySelectorAll(".alert-card").forEach(card => {
+    document.querySelectorAll(".alert-card").forEach(card => {
+        card.addEventListener("click", (e) => {
+            if (e.target.closest("form") || e.target.closest("button")) return;
+            openAlertModal(card.dataset);
+        });
 
-    card.addEventListener("click", (e) => {
-        if (e.target.closest("form") || e.target.closest("button")) return;
-        openModal(card.dataset);
+        const detailsBtn = card.querySelector(".details-btn");
+        if (detailsBtn) {
+            detailsBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                openAlertModal(card.dataset);
+            });
+        }
     });
 
-    const btn = card.querySelector(".details-btn");
-    if (btn) {
-        btn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            openModal(card.dataset);
-        });
+    function openAlertModal(data, autoPlay = false) {
+        alertModal.classList.add("active");
+
+        // Set IDs for forms
+        document.querySelectorAll(".modalAlertId").forEach(x => x.value = data.id);
+
+        // Map Data
+        document.getElementById("modalTitle").innerText = data.type || "Alert";
+        document.getElementById("modalDescription").innerText = data.desc || "No description";
+        document.getElementById("modalLocation").value = data.room || "N/A";
+        document.getElementById("modalSeverity").value = data.severity || "UNKNOWN";
+        document.getElementById("modalTime").value = data.time || "N/A";
+        document.getElementById("modalStatus").value = data.status || "UNKNOWN";
+
+        // Handle Video
+        if (data.video && data.video !== "") {
+            videoContainer.style.display = "block";
+            videoPlayer.src = data.video;
+            if(autoPlay) videoPlayer.play();
+        } else {
+            videoContainer.style.display = "none";
+            videoPlayer.pause();
+            videoPlayer.src = "";
+        }
+        
+        document.body.style.overflow = 'hidden';
     }
-});
 
-function openModal(data) {
-    modal.classList.add("active");
+    function closeAlertModal() {
+        alertModal.classList.remove("active");
+        videoPlayer.pause();
+        videoPlayer.src = "";
+        document.body.style.overflow = 'auto';
+    }
 
-    document.querySelectorAll(".modalAlertId").forEach(x => x.value = data.id);
-
-    document.getElementById("modalTitle").innerText = data.type || "Alert";
-    document.getElementById("modalDescription").innerText = data.desc || "No description";
-    document.getElementById("modalLocation").value = data.room || "N/A";
-    document.getElementById("modalSeverity").value = data.severity || "UNKNOWN";
-    document.getElementById("modalTime").value = data.time || "N/A";
-    document.getElementById("modalStatus").value = data.status || "UNKNOWN";
-}
-
-document.querySelector(".close-btn").addEventListener("click", () => {
-    modal.classList.remove("active");
-});
-
-modal.addEventListener("click", e => {
-    if (e.target === modal) modal.classList.remove("active");
-});
-</script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Close on backdrop click
+        alertModal.addEventListener('click', function(e) {
+            if (e.target === alertModal) {
+                closeAlertModal();
+            }
+        });
+    });
+    </script>
+</div>

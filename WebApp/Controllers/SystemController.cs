@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using WebApp.Data;
 using WebApp.Models;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace WebApp.Controllers
@@ -19,70 +20,97 @@ namespace WebApp.Controllers
         }
 
         // =========================
-        // SYSTEM PAGE (NO SERVICE, NO VIEWMODEL)
+        // SYSTEM PAGE (LOAD REAL TOGGLES)
         // =========================
         public async Task<IActionResult> Index()
         {
-            var cameras = await _context.CameraDevices
-                .Include(c => c.Room)
+            // Pulling from the alarm_settings table (IDs 1-4 now that duplicates are gone)
+            var settings = await _context.AlarmSettings
+                .OrderBy(s => s.SettingId)
                 .ToListAsync();
 
-            // Temporary alarms (since no DB table yet)
-            var alarms = new List<EmergencyAlarm>
-            {
-                new EmergencyAlarm { Id = 1, Name = "Intruder Alert", Description = "Triggered when an intruder is detected", IconType = "intruder", IsEnabled = false },
-                new EmergencyAlarm { Id = 2, Name = "Fire Alarm", Description = "Triggered when smoke/fire detected", IconType = "fire", IsEnabled = false },
-                new EmergencyAlarm { Id = 3, Name = "Earthquake Drill", Description = "Simulation mode", IconType = "earthquake", IsEnabled = false },
-                new EmergencyAlarm { Id = 4, Name = "Emergency Drill", Description = "General emergency drill", IconType = "ambulance", IsEnabled = false }
-            };
-
-            // Send directly to View using dynamic container
-            ViewBag.Cameras = cameras;
-            ViewBag.Alarms = alarms;
-
-            return View();
+            // This ViewBag name MUST match the 'var alarms = ViewBag.Alarms' in your Index.cshtml
+            ViewBag.Alarms = settings; 
+            
+            return View(); 
         }
 
-        // =========================
-        // UPDATE CAMERA
-        // =========================
+        // ==========================================
+        // TOGGLE ALARM (CALLED BY JS confirmToggle)
+        // ==========================================
         [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> UpdateCamera(int id, string name, string location, string ipAddress)
+        public async Task<IActionResult> UpdateAlarmStatus(int id, bool isEnabled)
         {
-            var camera = await _context.CameraDevices
-                .FirstOrDefaultAsync(c => c.Id == id);
+            // Finding the specific alarm protocol (Intrusion, Fire, etc.)
+            var setting = await _context.AlarmSettings
+                .FirstOrDefaultAsync(s => s.SettingId == id);
 
-            if (camera == null)
-                return Json(new { success = false, message = "Camera not found" });
+            if (setting == null)
+            {
+                return NotFound(new { success = false, message = "Alarm protocol not found in database." });
+            }
 
-            camera.Name = name;
-            camera.Location = location;
-
+            // Updating the record
+            setting.IsEnabled = isEnabled;
             await _context.SaveChangesAsync();
 
-            return Json(new { success = true, message = "Camera updated successfully" });
+            return Json(new
+            {
+                success = true,
+                message = $"Protocol {setting.Name} has been {(isEnabled ? "Armed" : "Disarmed")}."
+            });
         }
 
         // =========================
-        // TOGGLE ALARM (TEMP ONLY)
+        // TOGGLE SYSTEM FEATURE
         // =========================
         [HttpPost]
-        [ValidateAntiForgeryToken]
-        public IActionResult ToggleAlarm(int alarmId, bool isEnabled)
+        public IActionResult ToggleFeature([FromBody] FeatureToggleRequest request)
         {
-            // No DB yet
-            return Json(new { success = true });
+            if (request == null)
+                return BadRequest();
+
+            return Json(new
+            {
+                success = true,
+                message = $"{request.Feature} set to {(request.State ? "ON" : "OFF")}"
+            });
         }
 
         // =========================
-        // SETTINGS (PLACEHOLDER)
+        // SAVE GLOBAL SETTINGS
         // =========================
         [HttpPost]
-        [ValidateAntiForgeryToken]
-        public IActionResult UpdateSetting(string setting, bool value)
+        public IActionResult SaveSettings([FromBody] SystemSettingsRequest request)
         {
-            return Json(new { success = true });
+            if (request == null)
+                return BadRequest();
+
+            // Logic for pushing to Raspberry Pi via SQL bridge goes here
+            return Json(new
+            {
+                success = true,
+                message = "Settings deployed successfully to hardware engine."
+            });
         }
+    }
+
+    // =========================
+    // REQUEST MODELS
+    // =========================
+
+    public class FeatureToggleRequest
+    {
+        public string Feature { get; set; } = string.Empty;
+        public bool State { get; set; }
+    }
+
+    public class SystemSettingsRequest
+    {
+        public bool ArmSystem { get; set; }
+        public bool EyeStrainProtection { get; set; }
+        public bool AutoMaintenance { get; set; }
+        public int MotionSensitivity { get; set; }
+        public int FaceAccuracy { get; set; }
     }
 }

@@ -4,14 +4,12 @@
 }
 
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
     <link rel="stylesheet" href="~/css/login.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 </head>
-
 <body>
 
 <div class="page-wrapper">
@@ -72,6 +70,12 @@
                         <i class="fa fa-eye right-icon" onclick="togglePassword()"></i>
                     </div>
 
+                    <!-- Error message display (below password) -->
+                    @if (ViewBag.LoginError != null)
+                    {
+                        <p class="error">@ViewBag.LoginError</p>
+                    }
+
                     <div class="options">
                         <label class="remember-me">
                             <input type="checkbox" name="rememberMe" />
@@ -86,14 +90,6 @@
                     </button>
                 </form>
 
-                <div class="demo">
-                    Demo: admin / 1234
-                </div>
-
-                @if (ViewBag.Error != null)
-                {
-                    <p class="error">@ViewBag.Error</p>
-                }
             </div>
 
             <!-- FORGOT PASSWORD FORM -->

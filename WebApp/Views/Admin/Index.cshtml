@@ -1,203 +1,642 @@
 ﻿@model WebApp.Models.AdminDashboardViewModel
-
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
-    ViewData["Title"] = "Admin Dashboard";
+    ViewData["Title"] = "Admin Command Center";
 }
+
+<link rel="stylesheet" href="~/css/dashboard.css" />
+
+<!-- LIBRARIES -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
 <div class="dashboard-container">
 
     <!-- ===================== -->
+    <!-- HEADER -->
+    <!-- ===================== -->
+    <header class="cmd-header d-flex justify-content-between align-items-center mb-3">
+
+        <div>
+            <h2 class="mb-0">Admin Command Center</h2>
+            <small class="text-muted">System configuration, monitoring & audit control</small>
+        </div>
+
+        <div>
+            <span class="live-badge">● SYSTEM ACTIVE</span>
+        </div>
+
+    </header>
+
+    <!-- ===================== -->
     <!-- STATS -->
     <!-- ===================== -->
-    <div class="stats">
-
+    <section class="stats-grid">
         <div class="stat-card">
-            <div class="stat-icon blue">
-                <i class="fa fa-users"></i>
-            </div>
-            <div>
-                <h2>@Model.ActivePersonnelCount</h2>
-                <p>Active Personnel</p>
+            <div class="stat-icon blue"><i class="fa fa-users"></i></div>
+            <div class="stat-content">
+                <span>Active Personnel</span>
+                <h3>@Model.ActivePersonnelCount</h3>
             </div>
         </div>
 
         <div class="stat-card">
-            <div class="stat-icon yellow">
-                <i class="fa fa-video"></i>
-            </div>
-            <div>
-                <h2>@Model.ActiveCameraCount</h2>
-                <p>Active Cameras</p>
+            <div class="stat-icon yellow"><i class="fa fa-video"></i></div>
+            <div class="stat-content">
+                <span>Active Cameras</span>
+                <h3>@Model.ActiveCameraCount</h3>
             </div>
         </div>
 
         <div class="stat-card">
-            <div class="stat-icon red">
-                <i class="fa fa-exclamation-triangle"></i>
-            </div>
-            <div>
-                <h2>@Model.ActiveIncidentCount</h2>
-                <p>Active Alerts</p>
+            <div class="stat-icon red"><i class="fa fa-exclamation-triangle"></i></div>
+            <div class="stat-content">
+                <span>Active Alerts</span>
+                <h3>@Model.ActiveIncidentCount</h3>
             </div>
         </div>
 
         <div class="stat-card">
-            <div class="stat-icon green">
-                <i class="fa fa-chart-bar"></i>
+            <div class="stat-icon green"><i class="fa fa-chart-bar"></i></div>
+            <div class="stat-content">
+                <span>Detections Today</span>
+                <h3>@Model.TodayDetectionCount</h3>
             </div>
-            <div>
-                <h2>@Model.TodayDetectionCount</h2>
-                <p>Today Detections</p>
+        </div>
+    </section>
+
+    <!-- ===================== -->
+    <!-- QUICK ACTIONS -->
+    <!-- ===================== -->
+    <section class="panel">
+        <div class="panel-header">
+            <h4>Administrative Actions</h4>
+            <small>Direct system management tasks</small>
+        </div>
+
+        <div class="quick-actions-row">
+
+            <a href="#" class="quick-card" data-toggle="modal" data-target="#userModal">
+                <i class="fa fa-user-plus"></i>
+                <div class="quick-info">
+                    <strong>Add Personnel</strong>
+                    <small>Create and manage accounts</small>
+                </div>
+            </a>
+
+            <a href="#" class="quick-card" data-toggle="modal" data-target="#rfidModal">
+                <i class="fa fa-id-card"></i>
+                <div class="quick-info">
+                    <strong>RFID Enrollment</strong>
+                    <small>Register authorized access tags</small>
+                </div>
+            </a>
+
+            <a href="#" class="quick-card" data-toggle="modal" data-target="#cameraModal">
+                <i class="fa fa-tools"></i>
+                <div class="quick-info">
+                    <strong>Camera Configuration</strong>
+                    <small>Calibration & sensitivity</small>
+                </div>
+            </a>
+
+            <a href="#" class="quick-card" data-toggle="modal" data-target="#exportModal">
+                <i class="fa fa-file-export"></i>
+                <div class="quick-info">
+                    <strong>Export Reports</strong>
+                    <small>Generate audit reports (PDF/CSV/Charts)</small>
+                </div>
+            </a>
+
+        </div>
+    </section>
+
+    <!-- ===================== -->
+    <!-- MAIN GRID -->
+    <!-- ===================== -->
+    <section class="admin-main-grid">
+
+        <!-- AUDIT STREAM -->
+        <div class="audit-column">
+            <div class="panel full-height">
+                <div class="panel-header">
+                    <h5>Critical Audit Stream</h5>
+                    <small>Recent system and admin activity</small>
+                </div>
+
+                <div class="audit-feed">
+
+                    @if (Model.AuditLogs?.Any() == true)
+                    {
+                        foreach (var log in Model.AuditLogs.Take(6))
+                        {
+                            <div class="audit-item">
+                                <i class="fa fa-history audit-icon blue"></i>
+                                <div class="audit-details">
+                                    <strong>@log.Action</strong>
+                                    <p>@log.Description</p>
+                                    <small>@log.Timestamp.ToString("hh:mm tt")</small>
+                                </div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="audit-item">
+                            <i class="fa fa-info-circle audit-icon blue"></i>
+                            <div class="audit-details">
+                                <strong>No audit data</strong>
+                                <p>System activity will appear here</p>
+                                <small>—</small>
+                            </div>
+                        </div>
+                    }
+
+                </div>
             </div>
         </div>
 
-    </div>
-
-<!-- ===================== -->
-<!-- QUICK ACTIONS -->
-<!-- ===================== -->
-<div class="section">
-
-    <div class="section-header">
-        <h3>Quick Actions</h3>
-    </div>
-
-    <div class="quick-grid">
-
-        <div class="quick-card">
-            <div class="quick-icon"><i class="fa fa-user-plus"></i></div>
-            <div class="quick-text">
-                <h4>Add Personnel</h4>
-                <p>Create security account</p>
+        <!-- OCCUPANCY -->
+        <div class="occupancy-column">
+            <div class="panel chart-panel">
+                <div class="panel-header">
+                    <h5>Facility Occupancy</h5>
+                </div>
+                <div class="chart-wrapper">
+                    <canvas id="occupancyChart"></canvas>
+                </div>
             </div>
         </div>
 
-        <div class="quick-card">
-            <div class="quick-icon"><i class="fa fa-video"></i></div>
-            <div class="quick-text">
-                <h4>Monitor Cameras</h4>
-                <p>View live feeds</p>
-            </div>
-        </div>
-
-        <div class="quick-card">
-            <div class="quick-icon"><i class="fa fa-bell"></i></div>
-            <div class="quick-text">
-                <h4>View Alerts</h4>
-                <p>Security incidents</p>
-            </div>
-        </div>
-
-        <div class="quick-card">
-            <div class="quick-icon"><i class="fa fa-chart-line"></i></div>
-            <div class="quick-text">
-                <h4>Analytics</h4>
-                <p>System reports</p>
-            </div>
-        </div>
-
-    </div>
-</div>
+    </section>
 
     <!-- ===================== -->
     <!-- CHARTS -->
     <!-- ===================== -->
-    <div class="grid-2">
-
+    <section class="charts-grid">
         <div class="panel chart-panel">
-            <h4>Alert Trends</h4>
+            <div class="panel-header">
+                <h5>Weekly Alert Trends</h5>
+            </div>
             <div class="chart-wrapper">
                 <canvas id="alertChart"></canvas>
             </div>
         </div>
 
         <div class="panel chart-panel">
-            <h4>Access Activity</h4>
+            <div class="panel-header">
+                <h5>Weekly Access Logs</h5>
+            </div>
             <div class="chart-wrapper">
                 <canvas id="accessChart"></canvas>
             </div>
         </div>
-
-        <div class="panel chart-panel">
-            <h4>Detection Activity</h4>
-            <div class="chart-wrapper">
-                <canvas id="motionChart"></canvas>
-            </div>
-        </div>
-
-        <div class="panel chart-panel">
-            <h4>Room Occupancy</h4>
-            <div class="chart-wrapper">
-                <canvas id="occupancyChart"></canvas>
-            </div>
-        </div>
-
-    </div>
+    </section>
 
 </div>
 
+<link rel="stylesheet" href="~/css/personnel.css" />
+
+<!-- ===================================================== -->
+<!-- MODALS (STANDARDIZED) -->
+<!-- ===================================================== -->
+
+<!-- PERSONNEL MODAL -->
+<div class="modal fade" id="userModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <form method="post" id="userForm" asp-controller="Personnel" asp-action="Add">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="userId" name="Id" />
+
+                <div class="modal-header d-flex justify-content-between align-items-center">
+                    <h5 id="userModalTitle" class="mb-0">Add Personnel</h5>
+                    <button type="button" class="close" onclick="closeUserModal()" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Full Name</label>
+                        <input id="fullName" name="FullName" class="form-control" required />
+                    </div>
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input id="username" name="Username" class="form-control" required />
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input id="email" name="Email" type="email" class="form-control" required />
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input id="password" name="Password" type="password" class="form-control" required />
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light btn-sm" onclick="closeUserModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- RFID MODAL -->
+<div class="modal fade" id="rfidModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <form method="post" id="rfidForm" asp-controller="Admin" asp-action="EnrollRfid">
+                @Html.AntiForgeryToken()
+
+                <div class="modal-header d-flex justify-content-between align-items-center">
+                    <h5 id="rfidModalTitle" class="mb-0">RFID Enrollment</h5>
+                    <button type="button" class="close" onclick="closeRfidModal()" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Profile Image</label>
+                        <input id="profileImage" name="ProfileImage" type="file" accept="image/*" class="form-control" />
+                    </div>
+                    <div class="form-group">
+                        <label>RFID Tag</label>
+                        <input id="rfidTag" name="RfidTag" class="form-control" placeholder="Enter RFID tag ID" required />
+                    </div>
+                    <div class="form-group">
+                        <label>Full Name</label>
+                        <input id="rfidFullName" name="FullName" class="form-control" placeholder="Enter full name" required />
+                    </div>
+                    <div class="form-group">
+                        <label>Department</label>
+                        <input id="rfidDepartment" name="Department" class="form-control" placeholder="Enter department" />
+                    </div>
+                    <div class="form-group">
+                        <label>Phone Number</label>
+                        <input id="rfidPhone" name="PhoneNumber" type="tel" class="form-control" placeholder="Enter phone number" />
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input id="rfidEmail" name="Email" type="email" class="form-control" placeholder="Enter email address" required />
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light btn-sm" onclick="closeRfidModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- CAMERA MODAL -->
+<div class="modal fade" id="cameraModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <form method="post" id="cameraForm" asp-controller="Cameras" asp-action="Add">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="camId" name="Id" />
+
+                <div class="modal-header d-flex justify-content-between align-items-center">
+                    <h5 id="cameraModalTitle" class="mb-0">Camera Configuration</h5>
+                    <button type="button" class="close" onclick="closeCameraModal()" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Camera Name</label>
+                        <input id="camName" name="Name" class="form-control" required />
+                    </div>
+                    <div class="form-group">
+                        <label>Location</label>
+                        <input id="camLocation" name="Location" class="form-control" required />
+                    </div>
+                    <div class="form-group">
+                        <label>Stream URL</label>
+                        <input id="camSource" name="StreamUrl" type="text" class="form-control" placeholder="Enter Raspberry Pi / IP camera URL or leave empty for webcam test" />
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light btn-sm" onclick="closeCameraModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- EXPORT PDF MODAL (STANDARDIZED) -->
+<div id="exportModal" class="modal">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+
+            <div class="modal-header">
+                <h5 id="modalTitle" class="mb-0">Export Admin Report</h5>
+                <button type="button" class="close" onclick="closeExportModal()" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+
+            <div class="modal-body">
+                
+                <!-- Date Range -->
+                <div class="form-group">
+                    <label>Start Date</label>
+                    <input type="date" id="exportStartDate" class="form-control" />
+                </div>
+
+                <div class="form-group">
+                    <label>End Date</label>
+                    <input type="date" id="exportEndDate" class="form-control" />
+                </div>
+
+                <!-- Filters -->
+                <div class="form-group">
+                    <label>Location</label>
+                    <select id="exportLocation" class="form-control">
+                        <option value="">All Rooms</option>
+                        <option>Lobby</option>
+                        <option>Server Room A</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Event Type</label>
+                    <select id="exportEventType" class="form-control">
+                        <option value="">All Events</option>
+                        <option>Alert</option>
+                        <option>Access</option>
+                    </select>
+                </div>
+
+                <!-- Paper Size -->
+                <div class="form-group">
+                    <label>Paper Size</label>
+                    <select id="paperSize" class="form-control">
+                        <option value="a4">A4</option>
+                        <option value="letter">Letter (8.5" x 11")</option>
+                        <option value="landscape">A4 Landscape</option>
+                    </select>
+                </div>
+
+                <!-- Include Sections -->
+                <div class="form-group">
+                    <label>Include in Report</label>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="includeCharts" checked />
+                            <label for="includeCharts">Charts & Graphs</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="includeSummary" checked />
+                            <label for="includeSummary">Summary Statistics</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="includeLogs" />
+                            <label for="includeLogs">Activity Logs</label>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light btn-sm" onclick="closeExportModal()">Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="generateExportPDF()">Export PDF</button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
 <!-- ===================== -->
-<!-- CHART.JS -->
+<!-- SCRIPT (UPDATED) -->
 <!-- ===================== -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-    const labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Labels ?? new List<string>()));
+/* ============================= */
+/* DATA */
+/* ============================= */
+const labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Labels ?? []));
+const alertData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AlertWeekly ?? []));
+const accessData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AccessWeekly ?? []));
+const occupancyData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.OccupancyWeekly ?? []));
 
-    const alertData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AlertWeekly ?? new List<int>()));
-    const accessData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AccessWeekly ?? new List<int>()));
-    const motionData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.MotionWeekly ?? new List<int>()));
-    const occupancyData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.OccupancyWeekly ?? new List<int>()));
+/* ============================= */
+/* MODAL FUNCTIONS (STANDARDIZED) */
+/* ============================= */
 
-    function createChart(id, type, label, data, color) {
-        const ctx = document.getElementById(id);
-        if (!ctx) return;
+// Personnel Modal
+function closeUserModal() {
+    const modal = document.getElementById('userModal');
+    modal.classList.remove('show');
+    document.body.style.overflow = 'auto';
+}
 
-        new Chart(ctx, {
-            type: type,
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: label,
-                    data: data,
-                    backgroundColor: color + "55",
-                    borderColor: color,
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: { precision: 0 }
-                    }
+// RFID Modal
+function closeRfidModal() {
+    const modal = document.getElementById('rfidModal');
+    modal.classList.remove('show');
+    document.body.style.overflow = 'auto';
+}
+
+// Camera Modal
+function closeCameraModal() {
+    const modal = document.getElementById('cameraModal');
+    modal.classList.remove('show');
+    document.body.style.overflow = 'auto';
+}
+
+// Export Modal
+function closeExportModal() {
+    const modal = document.getElementById('exportModal');
+    modal.classList.remove('show');
+    document.body.style.overflow = 'auto';
+}
+
+/* Modal backdrop click handlers */
+document.addEventListener('DOMContentLoaded', function() {
+    const modals = ['userModal', 'rfidModal', 'cameraModal', 'exportModal'];
+    
+    modals.forEach(modalId => {
+        const modal = document.getElementById(modalId);
+        if (!modal) return;
+        
+        // Click on backdrop to close
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                modal.classList.remove('show');
+                document.body.style.overflow = 'auto';
+            }
+        });
+        
+        // Close button handler
+        const closeBtn = modal.querySelector('.close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', function() {
+                modal.classList.remove('show');
+                document.body.style.overflow = 'auto';
+            });
+        }
+        
+        // Cancel button handler
+        const cancelBtn = modal.querySelector('.btn-light');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', function() {
+                modal.classList.remove('show');
+                document.body.style.overflow = 'auto';
+            });
+        }
+    });
+    
+    // Override quick-action clicks to show modals properly
+    document.querySelectorAll('.quick-card').forEach(card => {
+        card.addEventListener('click', function(e) {
+            e.preventDefault();
+            const target = this.getAttribute('data-target');
+            if (target) {
+                const modalId = target.replace('#', '');
+                const modal = document.getElementById(modalId);
+                if (modal) {
+                    modal.classList.add('show');
+                    document.body.style.overflow = 'hidden';
                 }
             }
         });
-    }
+    });
+});
 
-    createChart("alertChart", "line", "Alerts", alertData, "#ef4444");
-    createChart("accessChart", "bar", "Access Logs", accessData, "#3b82f6");
-    createChart("motionChart", "bar", "Detections", motionData, "#a855f7");
+/* ============================= */
+/* QUICK FEATURE FALLBACK */
+/* ============================= */
+function notifyFeature(feature) {
+    alert(feature + " is not yet available.");
+}
 
-    new Chart(document.getElementById("occupancyChart"), {
-        type: "bar",
+/* ============================= */
+/* CHARTS */
+/* ============================= */
+function createChart(id, type, label, data, color) {
+    const ctx = document.getElementById(id);
+    if (!ctx) return;
+
+    new Chart(ctx, {
+        type: type,
         data: {
-            labels: ["Lobby", "Floor 1", "Server Room", "Admin", "Parking"],
+            labels: labels,
             datasets: [{
-                label: "Occupancy",
-                data: occupancyData,
-                backgroundColor: "#22c55e"
+                label: label,
+                data: data.length ? data : [0,0,0,0,0,0,0],
+                backgroundColor: color + "33",
+                borderColor: color,
+                borderWidth: 2,
+                fill: true,
+                tension: 0.4
             }]
         },
         options: {
             responsive: true,
-            maintainAspectRatio: false
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } }
         }
     });
+}
+
+/* init charts */
+createChart("alertChart", "line", "Alerts", alertData, "#ef4444");
+createChart("accessChart", "bar", "Access", accessData, "#3b82f6");
+
+/* occupancy chart */
+const occCtx = document.getElementById("occupancyChart");
+if (occCtx) {
+    new Chart(occCtx, {
+        type: "bar",
+        data: {
+            labels: ["Lobby", "Server", "Storage", "Office", "Parking"],
+            datasets: [{
+                label: "Activity Level",
+                data: occupancyData.length ? occupancyData : [0,0,0,0,0],
+                backgroundColor: "#D4A373",
+                borderRadius: 5
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } }
+        }
+    });
+}
+
+/* ============================= */
+/* EXPORT PDF FUNCTION */
+/* ============================= */
+
+const { jsPDF } = window.jspdf;
+
+async function generateExportPDF(){
+    const startDate = document.getElementById('exportStartDate').value;
+    const endDate = document.getElementById('exportEndDate').value;
+    const location = document.getElementById('exportLocation').value;
+    const eventType = document.getElementById('exportEventType').value;
+    const paperSize = document.getElementById('paperSize').value;
+    const includeCharts = document.getElementById('includeCharts').checked;
+    const includeSummary = document.getElementById('includeSummary').checked;
+    const includeLogs = document.getElementById('includeLogs').checked;
+
+    const canvas = await html2canvas(document.querySelector(".dashboard-container"), {scale:2});
+    const img = canvas.toDataURL("image/png");
+
+    const pdf = new jsPDF({
+        orientation: paperSize.includes('landscape') ? 'l' : 'p',
+        unit: 'mm',
+        format: paperSize === 'letter' ? 'letter' : 'a4'
+    });
+
+    // Title & Metadata
+    pdf.setFontSize(16);
+    pdf.text("Admin Report", 15, 15);
+    
+    pdf.setFontSize(10);
+    if (startDate) pdf.text(`From: ${startDate}`, 15, 22);
+    if (endDate) pdf.text(`To: ${endDate}`, 15, 28);
+    if (location) pdf.text(`Location: ${location}`, 15, 34);
+    if (eventType) pdf.text(`Event Type: ${eventType}`, 15, 40);
+
+    // Add image
+    pdf.addImage(img,'PNG',10,50,190,140);
+    
+    pdf.save(`admin_${new Date().toISOString().split('T')[0]}.pdf`);
+    closeExportModal();
+}
+
+/* ============================= */
+/* OPTIONAL: BUTTON HOOKS (if needed) */
+/* ============================= */
+
+function openPersonnelModal() {
+    openModal("userModal");
+}
+
+function openRFIDModal() {
+    openModal("rfidModal");
+}
+
+function openCameraModal() {
+    openModal("cameraModal");
+}
+
+function openExportModal() {
+    openModal("exportModal");
+}
 </script>

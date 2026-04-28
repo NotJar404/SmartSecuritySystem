@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using WebApp.Data;
 using SmartSecuritySystem.Models;
+using SmartSecuritySystem.ViewModels;
 using System.Linq;
 using System;
 using System.Security.Claims;
@@ -23,12 +24,22 @@ namespace SmartSecuritySystem.Controllers
             _logger = logger;
         }
 
-        // =========================
-        // VIEW
-        // =========================
-        public IActionResult Index(string search)
+        // =====================================================
+        // MAIN VIEW (ONLY ENTRY POINT THAT RETURNS THE VIEW)
+        // =====================================================
+        public IActionResult Index(string? search)
+        {
+            var model = BuildViewModel(search);
+            return View("~/Views/Admin/Personnel.cshtml", model);
+        }
+
+        // =====================================================
+        // VIEWMODEL BUILDER (CENTRALIZED - PREVENTS TYPE ERRORS)
+        // =====================================================
+        private PersonnelManagementViewModel BuildViewModel(string? search)
         {
             var users = _context.Users.AsQueryable();
+            var members = _context.AuthorizedPersonnel.AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(search))
             {
@@ -36,123 +47,129 @@ namespace SmartSecuritySystem.Controllers
                     (u.FullName ?? "").Contains(search) ||
                     (u.Username ?? "").Contains(search) ||
                     (u.Email ?? "").Contains(search));
+
+                members = members.Where(m =>
+                    (m.FullName ?? "").Contains(search) ||
+                    (m.Email ?? "").Contains(search) ||
+                    (m.Department ?? "").Contains(search));
             }
 
-            return View("~/Views/Admin/Personnel.cshtml", users.ToList());
+            return new PersonnelManagementViewModel
+            {
+                SystemUsers = users.ToList(),
+
+                CampusMembers = members.ToList().Select(m => new AuthorizedMember
+                {
+                    Id = m.PersonId,
+                    FullName = m.FullName,
+                    Email = m.Email ?? "",
+                    Phone = m.Phone ?? "",
+                    Department = m.Department ?? "",
+                    RfidTag = m.RfidTag ?? "",
+                    Status = m.Status,
+                    SecurityLevel = m.SecurityLevel,
+                    HasFaceData = !string.IsNullOrEmpty(m.FaceEmbedding),
+                    CreatedAt = m.CreatedAt,
+                    LastAccess = null
+                }).ToList()
+            };
         }
 
-        // =========================
-        // ADD
-        // =========================
+        // =====================================================
+        // ADD (UNIFIED SAFE FLOW)
+        // =====================================================
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Add(User user)
+        public IActionResult Add(User user, string RegType, string? Department, string? RfidTag, string? Phone)
         {
-            _logger.LogInformation("🔥 ADD START - {Username}", user?.Username);
-
-            ModelState.Remove("Id");
-
-            if (user == null)
-                return RedirectToAction(nameof(Index));
-
-            // VALIDATION
-            if (_context.Users.Any(u => u.Username == user.Username))
-                ModelState.AddModelError("Username", "Username already exists.");
-
-            if (_context.Users.Any(u => u.Email == user.Email))
-                ModelState.AddModelError("Email", "Email already exists.");
-
-            if (string.IsNullOrWhiteSpace(user.PasswordHash))
-                ModelState.AddModelError("PasswordHash", "Password is required.");
-
-            if (!ModelState.IsValid)
-            {
-                _logger.LogWarning("❌ MODELSTATE INVALID");
-                return View("~/Views/Admin/Personnel.cshtml", _context.Users.ToList());
-            }
-
-            // FORCE ROLE
-            user.Role = "Security";
-
-            // NORMALIZE STATUS
-            user.Status = NormalizeStatus(user.Status);
-
-            // 🔥 FIX: HASH ONLY IF NOT HASHED
-            if (!IsSha256Base64(user.PasswordHash))
-            {
-                user.PasswordHash = HashPassword(user.PasswordHash);
-            }
-
-            user.CreatedAt = DateTime.UtcNow;
-            user.UpdatedAt = DateTime.UtcNow;
-
-            try
-            {
-                _context.Users.Add(user);
-                _context.SaveChanges();
-
-                _logger.LogInformation("✅ USER CREATED: {Username}", user.Username);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "💥 DATABASE ERROR");
-                return View("~/Views/Admin/Personnel.cshtml", _context.Users.ToList());
-            }
+            if (RegType == "staff")
+                AddStaff(user);
+            else
+                AddCampusMember(user.FullName, user.Email, Department, RfidTag, Phone);
 
             return RedirectToAction(nameof(Index));
         }
 
-        // =========================
-        // EDIT
-        // =========================
+        private void AddStaff(User user)
+        {
+            ModelState.Remove("Id");
+
+            if (string.IsNullOrWhiteSpace(user.Username) || string.IsNullOrWhiteSpace(user.PasswordHash))
+                return;
+
+            if (_context.Users.Any(u => u.Username == user.Username))
+                return;
+
+            user.Role = "Security";
+            user.Status = NormalizeStatus(user.Status);
+
+            if (!IsSha256Base64(user.PasswordHash))
+                user.PasswordHash = HashPassword(user.PasswordHash);
+
+            user.CreatedAt = DateTime.UtcNow;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            _context.Users.Add(user);
+            _context.SaveChanges();
+        }
+
+        private void AddCampusMember(string? name, string? email, string? dept, string? rfid, string? phone)
+        {
+            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(rfid))
+                return;
+
+            if (_context.AuthorizedPersonnel.Any(p => p.RfidTag == rfid))
+                return;
+
+            var member = new AuthorizedPersonnel
+            {
+                FullName = name,
+                Email = email,
+                Department = dept,
+                RfidTag = rfid,
+                Phone = phone,
+                Status = "active",
+                SecurityLevel = "normal",
+                FaceEmbedding = "PENDING_ENROLLMENT",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            _context.AuthorizedPersonnel.Add(member);
+            _context.SaveChanges();
+        }
+
+        // =====================================================
+        // EDIT (USERS ONLY - SAFE)
+        // =====================================================
         [HttpPost]
         [ValidateAntiForgeryToken]
         public IActionResult Edit(User user)
         {
             var existing = _context.Users.FirstOrDefault(u => u.Id == user.Id);
-
             if (existing == null)
                 return RedirectToAction(nameof(Index));
-
-            if (_context.Users.Any(u => u.Username == user.Username && u.Id != user.Id))
-                ModelState.AddModelError("Username", "Username already exists.");
-
-            if (_context.Users.Any(u => u.Email == user.Email && u.Id != user.Id))
-                ModelState.AddModelError("Email", "Email already exists.");
-
-            if (!ModelState.IsValid)
-                return View("~/Views/Admin/Personnel.cshtml", _context.Users.ToList());
 
             existing.FullName = user.FullName;
             existing.Username = user.Username;
             existing.Email = user.Email;
-
-            existing.Role = "Security";
-
-            // NORMALIZE STATUS
             existing.Status = NormalizeStatus(user.Status);
-
             existing.UpdatedAt = DateTime.UtcNow;
 
-            // 🔥 FIX: HANDLE PASSWORD SAFELY
             if (!string.IsNullOrWhiteSpace(user.PasswordHash))
             {
-                if (!IsSha256Base64(user.PasswordHash))
-                    existing.PasswordHash = HashPassword(user.PasswordHash);
-                else
-                    existing.PasswordHash = user.PasswordHash;
+                existing.PasswordHash = IsSha256Base64(user.PasswordHash)
+                    ? user.PasswordHash
+                    : HashPassword(user.PasswordHash);
             }
 
             _context.SaveChanges();
-
-            _logger.LogInformation("✅ EDIT SUCCESS");
-
             return RedirectToAction(nameof(Index));
         }
 
-        // =========================
-        // DELETE
-        // =========================
+        // =====================================================
+        // DELETE (USERS ONLY - SAFE GUARD)
+        // =====================================================
         [HttpPost]
         [ValidateAntiForgeryToken]
         public IActionResult Delete(int id)
@@ -168,15 +185,13 @@ namespace SmartSecuritySystem.Controllers
             _context.Users.Remove(user);
             _context.SaveChanges();
 
-            _logger.LogInformation("🗑 DELETE SUCCESS");
-
             return RedirectToAction(nameof(Index));
         }
 
-        // =========================
-        // STATUS NORMALIZER
-        // =========================
-        private string NormalizeStatus(string status)
+        // =====================================================
+        // HELPERS
+        // =====================================================
+        private string NormalizeStatus(string? status)
         {
             if (string.IsNullOrWhiteSpace(status))
                 return "active";
@@ -187,14 +202,11 @@ namespace SmartSecuritySystem.Controllers
             {
                 "active" => "active",
                 "inactive" => "inactive",
-                "locked" => "locked",
+                "blocked" => "blocked",
                 _ => "active"
             };
         }
 
-        // =========================
-        // HASH PASSWORD
-        // =========================
         private string HashPassword(string password)
         {
             using var sha = SHA256.Create();
@@ -203,21 +215,14 @@ namespace SmartSecuritySystem.Controllers
             );
         }
 
-        // =========================
-        // DETECT HASH (PREVENT DOUBLE HASH)
-        // =========================
-        private bool IsSha256Base64(string s)
+        private bool IsSha256Base64(string? s)
         {
-            if (string.IsNullOrEmpty(s))
-                return false;
-
-            if (s.Length != 44)
+            if (string.IsNullOrEmpty(s) || s.Length != 44)
                 return false;
 
             try
             {
-                var bytes = Convert.FromBase64String(s);
-                return bytes.Length == 32;
+                return Convert.FromBase64String(s).Length == 32;
             }
             catch
             {
@@ -225,9 +230,6 @@ namespace SmartSecuritySystem.Controllers
             }
         }
 
-        // =========================
-        // CURRENT USER (FIXED)
-        // =========================
         private int GetCurrentUserId()
         {
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;

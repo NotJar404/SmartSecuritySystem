@@ -39,68 +39,68 @@ namespace SmartSecuritySystem.Controllers
             var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
             var now = DateTime.UtcNow;
 
+            // Check for empty username or password
             if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
             {
                 await LogLogin(username, ipAddress, false);
-                ViewBag.LoginError = "Invalid username or password";
+                ViewBag.LoginError = "Invalid username or password"; // Error message
                 return View("Login");
             }
 
+            // Look for the user in the database
             var user = await _context.Users
                 .FirstOrDefaultAsync(u => u.Username == username);
 
+            // Check if the user exists
             if (user == null)
             {
                 await LogLogin(username, ipAddress, false);
-                ViewBag.LoginError = "Invalid username or password";
+                ViewBag.LoginError = "Account does not exist"; // Specific error for non-existing account
                 return View("Login");
             }
 
-            // ACCOUNT LOCK (3 FAILS / 10 MIN)
+            // Check for failed login attempts in the last 10 minutes
             var tenMinutesAgo = now.AddMinutes(-10);
-
             var failedAttempts = await _context.LoginLogs
-                .Where(l => l.Username == username &&
-                            !l.Success &&
-                            l.Timestamp >= tenMinutesAgo)
+                .Where(l => l.Username == username && !l.Success && l.Timestamp >= tenMinutesAgo)
                 .CountAsync();
 
             if (failedAttempts >= 3)
             {
                 await LogLogin(username, ipAddress, false);
-                ViewBag.LoginError = "Account temporarily locked. Try again after 10 minutes.";
+                ViewBag.LoginError = "Account temporarily locked. Try again after 10 minutes."; // Lock message
                 return View("Login");
             }
 
-            // STATUS CHECK
+            // Check if the account is active
             if (!string.Equals(user.Status?.Trim(), "active", StringComparison.OrdinalIgnoreCase))
             {
                 await LogLogin(username, ipAddress, false);
-                ViewBag.LoginError = "Account is inactive or locked";
+                ViewBag.LoginError = "Account is inactive or locked"; // Account status message
                 return View("Login");
             }
 
-            // PASSWORD CHECK
-            var stored = user.PasswordHash?.Trim() ?? "";
-            var input = password?.Trim() ?? "";
-            var hashedInput = HashPassword(input);
+            // Validate the password
+            var storedPassword = user.PasswordHash?.Trim() ?? "";
+            var inputPassword = password?.Trim() ?? "";
+            var hashedInput = HashPassword(inputPassword);
 
             bool passwordMatches =
-                string.Equals(stored, input, StringComparison.Ordinal) ||
-                string.Equals(stored, hashedInput, StringComparison.Ordinal);
+                string.Equals(storedPassword, inputPassword, StringComparison.Ordinal) ||
+                string.Equals(storedPassword, hashedInput, StringComparison.Ordinal);
 
             if (!passwordMatches)
             {
                 await LogLogin(username, ipAddress, false);
-                ViewBag.LoginError = "Invalid username or password";
+                ViewBag.LoginError = "Invalid username or password"; // Password mismatch message
                 return View("Login");
             }
 
-            // SUCCESS LOGIN
+            // If login is successful
             await LogLogin(username, ipAddress, true);
 
-            // AUTO HASH UPGRADE
-            if (string.Equals(stored, input, StringComparison.Ordinal))
+            // Auto hash password upgrade if it's in plain text
+            if (string.Equals(storedPassword, inputPassword, StringComparison.Ordinal))
             {
                 user.PasswordHash = hashedInput;
                 user.UpdatedAt = now;
@@ -145,34 +145,37 @@ namespace SmartSecuritySystem.Controllers
         {
             ViewBag.ShowForgot = true;
 
+            // Validate email input
             if (string.IsNullOrWhiteSpace(email))
             {
-                ViewBag.ForgotError = "Email is required";
+                ViewBag.ForgotError = "Email is required"; // Error message for missing email
                 return View("Login");
             }
 
+            // Check if the email exists in the database
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
 
             if (user == null)
             {
-                ViewBag.ForgotError = "Email not found";
+                ViewBag.ForgotError = "Email not found"; // Error message for non-existing email
                 return View("Login");
             }
 
+            // Generate a random password and update the user's password
             var newPassword = GenerateRandomPassword(10);
-
             user.PasswordHash = HashPassword(newPassword);
             user.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
 
+            // Send the new password to the user's email
             SendEmail(
                 user.Email ?? "",
                 "Your New Password",
                 $"Hello {user.FullName},\n\nYour new password is: {newPassword}\n\nPlease change it after login."
             );
 
-            ViewBag.ForgotMessage = "A new password has been sent to your email.";
+            ViewBag.ForgotMessage = "A new password has been sent to your email."; // Success message
             return View("Login");
         }
 
@@ -236,7 +239,7 @@ namespace SmartSecuritySystem.Controllers
 
             await _context.SaveChangesAsync();
 
-            TempData["Success"] = "Profile updated successfully!";
+            TempData["Success"] = "Profile updated successfully!"; // Success message
             return RedirectToAction("Profile");
         }
 
@@ -262,7 +265,7 @@ namespace SmartSecuritySystem.Controllers
 
             if (!matches)
             {
-                TempData["PasswordError"] = "Current password is incorrect";
+                TempData["PasswordError"] = "Current password is incorrect"; // Error message
                 return RedirectToAction("Profile");
             }
 
@@ -271,7 +274,7 @@ namespace SmartSecuritySystem.Controllers
 
             await _context.SaveChangesAsync();
 
-            TempData["PasswordSuccess"] = "Password updated successfully!";
+            TempData["PasswordSuccess"] = "Password updated successfully!"; // Success message
             return RedirectToAction("Profile");
         }
 

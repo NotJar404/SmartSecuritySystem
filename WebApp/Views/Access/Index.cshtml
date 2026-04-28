@@ -2,7 +2,7 @@
 
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
-    ViewData["Title"] = "Access Control";
+    ViewData["Title"] = "Access Control Dashboard";
 }
 
 <link rel="stylesheet" href="~/css/access.css" />
@@ -10,116 +10,203 @@
 
 <div class="access-grid">
 
-    <!-- HEADER -->
     <div class="grid-header">
-        <i class="fa fa-shield-halved"></i>
-        <span>SECUREVISION ACCESS CONTROL</span>
-        <span id="statusText" class="status-text">No selection</span>
+        <div class="header-left">
+            <i class="fa fa-shield-halved me-2"></i>
+            <span>SECUREVISION ACCESS CONTROL</span>
+        </div>
+        <div class="header-right">
+            <span id="statusText" class="active-selection-text">System Monitoring Active</span>
+        </div>
     </div>
 
-    <!-- MAIN CONTENT (LEFT SIDE) -->
     <div class="grid-main">
-
         <div class="panel-body">
 
             <div id="emptyState" class="center-content">
                 <div class="avatar-bg">
-                    <i class="fa fa-user"></i>
+                    <i class="fa fa-user-shield"></i>
                 </div>
+                <p class="text-muted mt-3">Select a log entry to view full biometric details</p>
             </div>
 
             <div id="detailContent" class="detail-layout" style="display:none;">
+                
+                <div class="dashboard-container">
+                    <div class="profile-header-card">
+                        <div class="profile-main-info">
+                            <img id="detImg" src="~/images/default-user.png" class="profile-large shadow" />
+                            <div class="ms-4">
+                                <h2 id="detName" class="display-name">Name</h2>
+                                <p class="id-tag">Personnel ID: <span id="detId">0000</span></p>
+                                <div id="detStatus" class="status-badge">PENDING</div>
+                            </div>
+                        </div>
+                    </div>
 
-                <div class="profile-section">
-                    <img id="detImg" src="~/images/default-user.png" class="profile-large" />
-                    <h2 id="detName">Name</h2>
-                    <p id="detId">ID</p>
+                    <div class="info-dashboard-grid">
+                        <div class="info-card">
+                            <h6><i class="fa fa-id-card me-2"></i>Affiliation Details</h6>
+                            <div class="data-row">
+                                <span class="data-label">Department</span>
+                                <span id="detDept" class="data-value">-</span>
+                            </div>
+                            <div class="data-row">
+                                <span class="data-label">Email</span>
+                                <span id="detEmail" class="data-value">-</span>
+                            </div>
+                            <div class="data-row">
+                                <span class="data-label">Contact</span>
+                                <span id="detPhone" class="data-value">-</span>
+                            </div>
+                        </div>
+
+                        <div class="info-card">
+                            <h6><i class="fa fa-map-marker-alt me-2"></i>Access Specifics</h6>
+                            <div class="data-row">
+                                <span class="data-label">Room</span>
+                                <span id="detRoom" class="data-value">-</span>
+                            </div>
+                            <div class="data-row">
+                                <span class="data-label">Location</span>
+                                <span id="detLoc" class="data-value">-</span>
+                            </div>
+                            <div class="data-row">
+                                <span class="data-label">Timestamp</span>
+                                <span id="detTime" class="data-value">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="actionContainer" class="action-container-full">
+                        <p class="action-title">Available Security Protocols</p>
+                        <div id="actionPanel" class="action-button-group">
+                            </div>
+                    </div>
                 </div>
 
-                <div class="info-grid">
-
-                    <div class="info-block full">
-                        <label>Department</label>
-                        <div id="detDept" class="field-box">-</div>
-                    </div>
-
-                    <div class="info-block">
-                        <label>Contact</label>
-                        <div id="detEmail" class="field-box">-</div>
-                        <div id="detPhone" class="field-box mt-2">-</div>
-                    </div>
-
-                    <div class="info-block">
-                        <label>Access</label>
-                        <div class="field-box">ROOM: <span id="detRoom">-</span></div>
-                        <div class="field-box">LOCATION: <span id="detLoc">-</span></div>
-                        <div class="field-box">TIME: <span id="detTime">-</span></div>
-                    </div>
-
-                </div>
             </div>
-
         </div>
     </div>
 
-    <!-- RIGHT SIDE NAV (ACCESS LOGS) -->
     <div class="grid-nav">
-
+        <div class="log-header-fixed">
+            <i class="fa fa-list-ul me-2"></i>Recent Activity
+        </div>
         <div class="log-scroll">
-
-            <p class="helper-text">Recent Access Logs</p>
-
             @foreach (var log in Model)
             {
-                <div class="log-card"
-                     onclick="dockData(
-                            '@log.FullName',
-                            '@log.StudentId',
-                            '@log.Location',
-                            '@log.ImageUrl',
-                            '@log.Department',
-                            '@log.Email',
-                            '@log.Phone',
-                            '@log.Room',
-                            '@log.Timestamp.ToString("hh:mm tt")'
-                         )">
+                // Simple initial logic for the avatar box
+                var initials = !string.IsNullOrEmpty(log.FullName) 
+                    ? new string(log.FullName.Split(' ').Select(n => n[0]).ToArray()) 
+                    : "??";
 
+                // We pass the VideoPath to the JS function here
+                <div class="log-card" 
+                     onclick="dockData('@log.FullName', '@log.PersonnelId', '@log.Location', '@log.ImageUrl', '@log.Department', '@log.Email', '@log.Phone', '@log.Room', '@log.Timestamp.ToString("hh:mm tt")', '@log.VideoPath')">
+                    
                     <div class="log-avatar-box">
-                        <img src="@log.ImageUrl" onerror="this.style.display='none'" />
-                        <i class="fa fa-user"></i>
+                        <span class="avatar-initial">@initials</span>
                     </div>
 
                     <div class="log-info">
-                        <h4>@log.FullName</h4>
-                        <p>@log.Timestamp.ToString("hh:mm tt")</p>
+                        <div class="d-flex justify-content-between">
+                            <span class="log-name">@log.FullName</span>
+                            <span class="log-time">@log.Timestamp.ToString("hh:mm tt")</span>
+                        </div>
+                        <p class="log-sub">@log.Location • @log.Room</p>
                     </div>
-
                 </div>
             }
-
         </div>
     </div>
 
 </div>
 
 <script>
-    function dockData(name, id, loc, img, dept, email, phone, room, time) {
+let currentVideoPath = "";
 
-        document.getElementById("emptyState").style.display = "none";
-        document.getElementById("detailContent").style.display = "block";
+function dockData(name, id, loc, img, dept, email, phone, room, time, videoPath) {
+    const emptyState = document.getElementById("emptyState");
+    const detailContent = document.getElementById("detailContent");
+    
+    emptyState.style.display = "none";
+    detailContent.style.display = "block";
 
-        document.getElementById("detName").innerText = name;
-        document.getElementById("detId").innerText = id;
-        document.getElementById("detImg").src = img || '/images/default-user.png';
+    // Set Global Video Path for the action panel
+    currentVideoPath = videoPath;
 
-        document.getElementById("detDept").innerText = dept || "-";
-        document.getElementById("detEmail").innerText = email || "-";
-        document.getElementById("detPhone").innerText = phone || "-";
+    document.getElementById("detName").innerText = name;
+    document.getElementById("detId").innerText = id || "N/A";
+    document.getElementById("detImg").src = img || '/images/default-user.png';
 
-        document.getElementById("detRoom").innerText = room || "-";
-        document.getElementById("detLoc").innerText = loc || "-";
-        document.getElementById("detTime").innerText = time || "-";
+    document.getElementById("detDept").innerText = dept || "-";
+    document.getElementById("detEmail").innerText = email || "-";
+    document.getElementById("detPhone").innerText = phone || "-";
 
-        document.getElementById("statusText").innerText = name;
+    document.getElementById("detRoom").innerText = room || "-";
+    document.getElementById("detLoc").innerText = loc || "-";
+    document.getElementById("detTime").innerText = time || "-";
+
+    document.getElementById("statusText").innerText = "Viewing Detail: " + name;
+
+    // Security Logic: If Name contains "Unknown" or ID is missing, mark as Suspicious
+    let severity = "AUTHORIZED";
+    if (name.toLowerCase().includes("unknown") || !id || id === "0") {
+        severity = "SUSPICIOUS";
     }
+
+    setStatus(severity, name);
+}
+
+function setStatus(status, personName) {
+    const badge = document.getElementById("detStatus");
+    const panel = document.getElementById("actionPanel");
+    const container = document.getElementById("actionContainer");
+
+    panel.innerHTML = ""; 
+    badge.className = "status-badge";
+    container.className = "action-container-full";
+
+    if (status === "AUTHORIZED") {
+        badge.innerText = "ACCESS GRANTED";
+        badge.classList.add("authorized");
+        container.classList.add("severity-low");
+        panel.innerHTML = `<button class="btn-sec btn-neutral"><i class="fa fa-print me-2"></i>Print Access Slip</button>`;
+    } 
+    else if (status === "SUSPICIOUS") {
+        badge.innerText = "SUSPICIOUS ACTIVITY";
+        badge.classList.add("suspicious");
+        container.classList.add("severity-med");
+
+        // If there is a video recorded, add the Review Footage button
+        let videoBtn = "";
+        if (currentVideoPath && currentVideoPath !== "") {
+            videoBtn = `<button class="btn-sec btn-warning" onclick="playLogVideo()"><i class="fa fa-video me-2"></i>Review Footage</button>`;
+        }
+
+        panel.innerHTML = `
+            ${videoBtn}
+            <button class="btn-sec btn-neutral"><i class="fa fa-flag me-2"></i>Flag for Admin</button>
+            <button class="btn-sec btn-danger"><i class="fa fa-lock me-2"></i>Lockdown Room</button>
+        `;
+    }
+}
+
+function playLogVideo() {
+    if (typeof openAlertModal === "function" && currentVideoPath) {
+        const videoData = {
+            id: "LOG-" + Date.now(),
+            type: "Access Event: " + document.getElementById("detName").innerText,
+            video: currentVideoPath,
+            room: document.getElementById("detRoom").innerText,
+            time: document.getElementById("detTime").innerText,
+            status: "LOG REVIEW",
+            desc: "Visual verification of biometric access log."
+        };
+        openAlertModal(videoData, true);
+    } else {
+        alert("Video evidence is currently unavailable for this log.");
+    }
+}
 </script>

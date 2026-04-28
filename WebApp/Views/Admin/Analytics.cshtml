@@ -1,266 +1,427 @@
 @model WebApp.Models.AdminDashboardViewModel
 
 @{
-    ViewData["Title"] = "Analytics & Reports";
+    ViewData["Title"] = "Analytics & Security Alerts";
     Layout = "_Layout";
 }
 
-<div class="dashboard-container analytics">
+<link rel="stylesheet" href="~/css/dashboard.css" />
+<link rel="stylesheet" href="~/css/analytics.css" />
 
-    <!-- ===================== -->
+<!-- LIBRARIES -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<div class="dashboard-container">
+
     <!-- HEADER -->
-    <!-- ===================== -->
-    <div class="section analytics-header">
-        <div class="section-header">
-            <div>
-                <h3 style="margin:0;">Analytics & Reports</h3>
-                <p style="margin:2px 0 0; font-size:12px; color:#9ca3af;">
-                    Security system insights and operational monitoring
-                </p>
-            </div>
+    <header class="cmd-header d-flex justify-content-between align-items-end mb-4">
+        <div>
+            <h2 class="mb-0">Analytics & Security Alerts</h2>
+            <p class="text-muted mb-0">System performance insights and historical incident tracking.</p>
         </div>
-    </div>
 
-    <!-- ===================== -->
+        <div class="header-actions">
+            <button class="btn-export btn-pdf" onclick="openExportPDFModal()">
+                <i class="fa fa-file-pdf"></i> Export PDF
+            </button>
+        </div>
+    </header>
+
     <!-- STATS -->
-    <!-- ===================== -->
-    <div class="stats analytics-stats">
-
+    <section class="stats-grid">
         <div class="stat-card">
             <div class="stat-icon red"><i class="fa fa-exclamation-triangle"></i></div>
-            <div>
-                <h2>@Model.ActiveIncidentCount</h2>
-                <p>Active Alerts</p>
+            <div class="stat-content">
+                <span>Active Alerts</span>
+                <h3 id="statAlerts">@Model.ActiveIncidentCount</h3>
             </div>
         </div>
 
         <div class="stat-card">
-            <div class="stat-icon blue"><i class="fa fa-door-open"></i></div>
-            <div>
-                <h2>@Model.AccessWeekly.Sum()</h2>
-                <p>Access Logs</p>
+            <div class="stat-icon blue"><i class="fa fa-id-badge"></i></div>
+            <div class="stat-content">
+                <span>Access Logs</span>
+                <h3 id="statAccess">@Model.AccessWeekly.Sum()</h3>
             </div>
         </div>
 
         <div class="stat-card">
-            <div class="stat-icon green"><i class="fa fa-video"></i></div>
-            <div>
-                <h2>@Model.TodayDetectionCount</h2>
-                <p>Detections</p>
+            <div class="stat-icon green"><i class="fa fa-running"></i></div>
+            <div class="stat-content">
+                <span>Detections</span>
+                <h3 id="statDetections">@Model.TodayDetectionCount</h3>
             </div>
         </div>
 
         <div class="stat-card">
-            <div class="stat-icon yellow"><i class="fa fa-users"></i></div>
-            <div>
-                <h2>@Model.ActivePersonnelCount</h2>
-                <p>Personnel</p>
+            <div class="stat-icon yellow"><i class="fa fa-user-shield"></i></div>
+            <div class="stat-content">
+                <span>Personnel</span>
+                <h3>@Model.ActivePersonnelCount</h3>
             </div>
         </div>
+    </section>
 
-    </div>
-
-    <!-- ===================== -->
-    <!-- FILTERS (FIXED LAYOUT) -->
-    <!-- ===================== -->
-    <div class="section">
-
-        <div class="section-header">
-            <h3>Report Filters</h3>
+    <!-- FILTER PANEL -->
+    <section class="panel filter-panel">
+        <div class="filter-header d-flex justify-content-between align-items-center">
+            <div class="filter-title d-flex">
+                <div class="filter-icon me-2"><i class="fa fa-filter"></i></div>
+                <div>
+                    <h5 class="mb-0">Report Filters</h5>
+                    <small>Customize your report criteria</small>
+                </div>
+            </div>
+            <button class="btn" onclick="applyFilters()">Apply Filter</button>
         </div>
 
         <div class="filter-grid">
-
-            <div>
-                <label class="filter-label">Start Date</label>
-                <input type="date" class="filter-input" />
+            <div class="filter-field">
+                <label>Start Date</label>
+                <input type="date" id="startDate" class="filter-input" />
             </div>
 
-            <div>
-                <label class="filter-label">End Date</label>
-                <input type="date" class="filter-input" />
+            <div class="filter-field">
+                <label>End Date</label>
+                <input type="date" id="endDate" class="filter-input" />
             </div>
 
-            <div>
-                <label class="filter-label">Location</label>
-                <select class="filter-select">
-                    <option>All Rooms</option>
+            <div class="filter-field">
+                <label>Room/Location</label>
+                <select id="locationFilter" class="filter-input">
+                    <option value="">All Rooms</option>
+                    <option>Lobby</option>
+                    <option>Server Room A</option>
                 </select>
             </div>
 
-            <div>
-                <label class="filter-label">Event Type</label>
-                <select class="filter-select">
-                    <option>All Events</option>
+            <div class="filter-field">
+                <label>Event Type</label>
+                <select id="eventFilter" class="filter-input">
+                    <option value="">All Events</option>
+                    <option>Alert</option>
+                    <option>Access</option>
                 </select>
             </div>
-
         </div>
+    </section>
 
-        <div style="margin-top:10px; display:flex; gap:8px;">
-            <button class="btn-action-analytics btn-pdf">Export PDF</button>
-            <button class="btn-action-analytics btn-csv">Export CSV</button>
-            <button class="btn-action-analytics btn-print">Print</button>
-        </div>
-
-    </div>
-
-    <!-- ===================== -->
-    <!-- CHARTS (FIXED HEIGHT CONTROL) -->
-    <!-- ===================== -->
-    <div class="analytics-charts">
-
+    <!-- CHARTS -->
+    <div class="charts-grid">
         <div class="panel">
-            <h4>Alert Trends</h4>
-            <div class="chart-container">
+            <div class="panel-header">
+                <h5>Alert Trends</h5>
+                <small>Weekly incident frequency</small>
+            </div>
+            <div class="chart-wrapper">
                 <canvas id="alertChart"></canvas>
             </div>
         </div>
 
         <div class="panel">
-            <h4>Access Activity</h4>
-            <div class="chart-container">
+            <div class="panel-header">
+                <h5>Access Activity</h5>
+                <small>Authorized entry patterns</small>
+            </div>
+            <div class="chart-wrapper">
                 <canvas id="accessChart"></canvas>
             </div>
         </div>
+    </div>
 
+    <div class="charts-grid mt-4">
         <div class="panel">
-            <h4>Detection Activity</h4>
-            <div class="chart-container">
+            <div class="panel-header">
+                <h5>Detection Density</h5>
+                <small>Motion and sensor triggers</small>
+            </div>
+            <div class="chart-wrapper">
                 <canvas id="motionChart"></canvas>
             </div>
         </div>
 
         <div class="panel">
-            <h4>Room Occupancy</h4>
-            <div class="chart-container">
+            <div class="panel-header">
+                <h5>Facility Occupancy</h5>
+                <small>Zone distribution</small>
+            </div>
+            <div class="chart-wrapper">
                 <canvas id="occupancyChart"></canvas>
             </div>
         </div>
-
     </div>
 
-    <!-- ===================== -->
-    <!-- SCHEDULE REPORTS -->
-    <!-- ===================== -->
-    <div class="section">
-
-        <div class="section-header">
-            <h3>Schedule Automated Reports</h3>
+    <div class="panel">
+            <div class="panel-header">
+                <h5>Active Intervention Queue</h5>
+                <small>Current alerts requiring attention</small>
+            </div>
+            <div class="status-list-container" style="display: flex; flex-direction: column; gap: 12px; padding: 10px;">
+                <div class="status-item" style="display: flex; align-items: center; gap: 12px; padding: 12px; background: #fdfaf6; border-radius: 8px; border: 1px solid var(--border-soft);">
+                    <span class="status-dot red" style="width: 10px; height: 10px; border-radius: 50%; background: #bc4749;"></span>
+                    <div class="status-info">
+                        <p class="mb-0" style="font-size: 13px;"><strong>Unauthorized Entry - Room 302</strong></p>
+                        <small class="text-muted" style="font-size: 11px;">Security Team Dispatched (3 mins ago)</small>
+                    </div>
+                </div>
+                <div class="status-item" style="display: flex; align-items: center; gap: 12px; padding: 12px; background: #fdfaf6; border-radius: 8px; border: 1px solid var(--border-soft);">
+                    <span class="status-dot yellow" style="width: 10px; height: 10px; border-radius: 50%; background: #D4A373;"></span>
+                    <div class="status-info">
+                        <p class="mb-0" style="font-size: 13px;"><strong>Motion Detected - Server Room A</strong></p>
+                        <small class="text-muted" style="font-size: 11px;">Verifying via Camera Feed...</small>
+                    </div>
+                </div>
+                <div class="status-item" style="display: flex; align-items: center; gap: 12px; padding: 12px; background: #fdfaf6; border-radius: 8px; border: 1px solid var(--border-soft);">
+                    <span class="status-dot green" style="width: 10px; height: 10px; border-radius: 50%; background: #4f772d;"></span>
+                    <div class="status-info">
+                        <p class="mb-0" style="font-size: 13px;"><strong>Door Forced - Lobby</strong></p>
+                        <small class="text-success" style="font-size: 11px;">Resolved - Maintenance issue identified</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- REPORTING SECTION (KEPT EXACTLY) -->
+    <section class="panel mt-4 mb-5">
+        <div class="panel-header">
+            <h5>Automated Reporting Schedule</h5>
+            <small>Receive analytics directly to your inbox</small>
         </div>
 
-        <p style="margin-top:-6px; font-size:12px; color:#9ca3af;">
-            Receive reports automatically via email
-        </p>
-
-        <div class="filter-grid">
-
-            <div style="grid-column: span 2;">
-                <label class="filter-label">Email Address</label>
-                <input type="email" class="filter-input" placeholder="admin@security.com" />
+        <div class="row g-3">
+            <div class="col-md-5">
+                <label>Administrator Email</label>
+                <input type="email" class="form-control warm-input" placeholder="Enter administrator email..." />
             </div>
 
-            <div>
-                <label class="filter-label">Frequency</label>
-                <select class="filter-select">
-                    <option>Weekly</option>
-                    <option>Monthly</option>
-                    <option>Daily</option>
+            <div class="col-md-3">
+                <label>Report Frequency</label>
+                <select class="form-select warm-input">
+                    <option>Daily Digest</option>
+                    <option>Weekly Summary</option>
+                    <option>Critical Only</option>
                 </select>
             </div>
 
-            <div style="display:flex; align-items:end;">
-                <button class="btn-action-analytics btn-pdf" style="width:100%;">
-                    Schedule
-                </button>
+            <div class="col-md-4">
+                <label>&nbsp;</label>
+                <button class="btn btn-outline-dark">Schedule Report Delivery</button>
             </div>
-
         </div>
-
-    </div>
-
-    <!-- ===================== -->
-    <!-- RECENT ALERTS -->
-    <!-- ===================== -->
-    <div class="section">
-
-        <div class="section-header">
-            <h3>Recent Alerts</h3>
-        </div>
-
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Time</th>
-                    <th>Event</th>
-                    <th>Location</th>
-                    <th style="text-align:right;">Severity</th>
-                </tr>
-            </thead>
-
-            <tbody>
-                <tr>
-                    <td colspan="5" style="color:#9ca3af;">
-                        Connected to database — alerts will appear here
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-
-    </div>
+    </section>
 
 </div>
 
-<!-- ===================== -->
-<!-- CHART JS -->
-<!-- ===================== -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- ================= MODALS ================= -->
+
+<!-- EXPORT PDF MODAL (STANDARDIZED) -->
+<div id="exportPDFModal" class="modal">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+
+            <div class="modal-header">
+                <h5 id="modalTitle" class="mb-0">Export Analytics Report</h5>
+                <button type="button" class="close" onclick="closeExportModal()" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+
+            <div class="modal-body">
+                
+                <!-- Date Range -->
+                <div class="form-group">
+                    <label>Start Date</label>
+                    <input type="date" id="exportStartDate" class="form-control" />
+                </div>
+
+                <div class="form-group">
+                    <label>End Date</label>
+                    <input type="date" id="exportEndDate" class="form-control" />
+                </div>
+
+                <!-- Filters -->
+                <div class="form-group">
+                    <label>Location</label>
+                    <select id="exportLocation" class="form-control">
+                        <option value="">All Rooms</option>
+                        <option>Lobby</option>
+                        <option>Server Room A</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Event Type</label>
+                    <select id="exportEventType" class="form-control">
+                        <option value="">All Events</option>
+                        <option>Alert</option>
+                        <option>Access</option>
+                    </select>
+                </div>
+
+                <!-- Paper Size -->
+                <div class="form-group">
+                    <label>Paper Size</label>
+                    <select id="paperSize" class="form-control">
+                        <option value="a4">A4</option>
+                        <option value="letter">Letter (8.5" x 11")</option>
+                        <option value="landscape">A4 Landscape</option>
+                    </select>
+                </div>
+
+                <!-- Include Sections -->
+                <div class="form-group">
+                    <label>Include in Report</label>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="includeCharts" checked />
+                            <label for="includeCharts">Charts & Graphs</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="includeSummary" checked />
+                            <label for="includeSummary">Summary Statistics</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="includeLogs" />
+                            <label for="includeLogs">Activity Logs</label>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light btn-sm" onclick="closeExportModal()">Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="generateExportPDF()">Export PDF</button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ================= SCRIPT ================= -->
 
 <script>
-    const labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Labels ?? new List<string>()));
+const { jsPDF } = window.jspdf;
 
-    function createChart(id, type, data, color) {
-        const ctx = document.getElementById(id);
-        if (!ctx) return;
+// EXPORT MODAL
+function openExportPDFModal(){
+    const modal = document.getElementById("exportPDFModal");
+    modal.classList.add('show');
+    document.body.style.overflow = 'hidden';
+}
 
-        new Chart(ctx, {
-            type: type,
-            data: {
-                labels: labels,
-                datasets: [{
-                    data: data,
-                    borderColor: color,
-                    backgroundColor: color + "33",
-                    fill: true,
-                    tension: 0.4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    y: { beginAtZero: true },
-                    x: { grid: { display: false } }
-                }
+function closeExportModal(){
+    const modal = document.getElementById("exportPDFModal");
+    modal.classList.remove('show');
+    document.body.style.overflow = 'auto';
+}
+
+// Close on backdrop click
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('exportPDFModal');
+    if (modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                closeExportModal();
             }
         });
     }
+});
 
-    createChart("alertChart", "line",
-        @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AlertWeekly)),
-        "#ef4444");
+// FILTER
+function applyFilters() {
+    let start = startDate.value;
+    let end = endDate.value;
+    let loc = locationFilter.value;
+    let evt = eventFilter.value;
 
-    createChart("accessChart", "bar",
-        @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AccessWeekly)),
-        "#3b82f6");
+    document.querySelectorAll("#logTable tbody tr").forEach(row => {
+        let date = row.cells[0].innerText;
+        let event = row.cells[1].innerText;
+        let location = row.cells[2].innerText;
 
-    createChart("motionChart", "bar",
-        @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.MotionWeekly)),
-        "#a855f7");
+        let show = true;
 
-    createChart("occupancyChart", "bar",
-        @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.OccupancyWeekly)),
-        "#22c55e");
+        if (start && date < start) show = false;
+        if (end && date > end) show = false;
+        if (loc && location !== loc) show = false;
+        if (evt && !event.includes(evt)) show = false;
+
+        row.style.display = show ? "" : "none";
+    });
+
+    updateStats();
+}
+
+function updateStats(){
+    let visible = document.querySelectorAll("#logTable tbody tr:not([style*='display: none'])").length;
+    statAlerts.innerText = visible;
+    statAccess.innerText = visible;
+    statDetections.innerText = visible;
+}
+
+// EXPORT PDF WITH FILTERS
+async function generateExportPDF(){
+    const startDate = document.getElementById('exportStartDate').value;
+    const endDate = document.getElementById('exportEndDate').value;
+    const location = document.getElementById('exportLocation').value;
+    const eventType = document.getElementById('exportEventType').value;
+    const paperSize = document.getElementById('paperSize').value;
+    const includeCharts = document.getElementById('includeCharts').checked;
+    const includeSummary = document.getElementById('includeSummary').checked;
+    const includeLogs = document.getElementById('includeLogs').checked;
+
+    const canvas = await html2canvas(document.querySelector(".dashboard-container"), {scale:2});
+    const img = canvas.toDataURL("image/png");
+
+    const pdf = new jsPDF({
+        orientation: paperSize.includes('landscape') ? 'l' : 'p',
+        unit: 'mm',
+        format: paperSize === 'letter' ? 'letter' : 'a4'
+    });
+
+    // Title & Metadata
+    pdf.setFontSize(16);
+    pdf.text("Analytics Report", 15, 15);
+    
+    pdf.setFontSize(10);
+    if (startDate) pdf.text(`From: ${startDate}`, 15, 22);
+    if (endDate) pdf.text(`To: ${endDate}`, 15, 28);
+    if (location) pdf.text(`Location: ${location}`, 15, 34);
+    if (eventType) pdf.text(`Event Type: ${eventType}`, 15, 40);
+
+    // Add image
+    pdf.addImage(img,'PNG',10,50,190,140);
+    
+    pdf.save(`analytics_${new Date().toISOString().split('T')[0]}.pdf`);
+    closeExportModal();
+}
+
+// CHARTS
+const labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Labels ?? new List<string>()));
+
+function createChart(id,type,data,color){
+    new Chart(document.getElementById(id),{
+        type:type,
+        data:{
+            labels:labels,
+            datasets:[{
+                data:data,
+                borderColor:color,
+                backgroundColor:color+"20",
+                fill:true,
+                tension:0.4
+            }]
+        },
+        options:{responsive:true,maintainAspectRatio:false}
+    });
+}
+
+createChart("alertChart","line",@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AlertWeekly)),"#ef4444");
+createChart("accessChart","bar",@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AccessWeekly)),"#3b82f6");
+createChart("motionChart","line",@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.MotionWeekly)),"#a855f7");
+createChart("occupancyChart","bar",@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.OccupancyWeekly)),"#D4A373");
 </script>

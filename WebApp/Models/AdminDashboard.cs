@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using WebApp.Models;
 
 namespace WebApp.Models
 {
@@ -9,7 +8,6 @@ namespace WebApp.Models
         // =====================
         // DASHBOARD STATS
         // =====================
-
         public int ActivePersonnelCount { get; set; }
         public int ActiveCameraCount { get; set; }
         public int ActiveIncidentCount { get; set; }
@@ -18,16 +16,32 @@ namespace WebApp.Models
         // =====================
         // CHART DATA (WEEKLY)
         // =====================
-
         public List<int> AlertWeekly { get; set; } = new();
         public List<int> AccessWeekly { get; set; } = new();
         public List<int> MotionWeekly { get; set; } = new();
         public List<int> OccupancyWeekly { get; set; } = new();
 
-        // FIXED: align with DayOfWeek enum order
+        // =====================
+        // LABELS
+        // =====================
         public List<string> Labels { get; set; } = new()
         {
             "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"
         };
+
+        // =====================
+        // AUDIT LOGS (NEW)
+        // =====================
+        public List<AuditLogViewModel> AuditLogs { get; set; } = new();
+    }
+
+    // =====================
+    // SUPPORTING MODEL
+    // =====================
+    public class AuditLogViewModel
+    {
+        public string Action { get; set; } = "";
+        public string Description { get; set; } = "";
+        public DateTime Timestamp { get; set; }
     }
 }

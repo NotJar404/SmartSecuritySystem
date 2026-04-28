@@ -1,185 +1,406 @@
-﻿@model List<SmartSecuritySystem.Models.User>
-@using System.Linq
-
+﻿@model SmartSecuritySystem.ViewModels.PersonnelManagementViewModel
 @{
-    Layout = "~/Views/Shared/_Layout.cshtml";
     ViewData["Title"] = "Personnel Management";
 }
 
 <link rel="stylesheet" href="~/css/personnel.css" />
+<link rel="stylesheet" href="~/css/dashboard.css" />
 
-<div class="page">
+<div class="dashboard-container">
 
-    <!-- TOOLBAR -->
-    <div class="toolbar">
-        <form method="get" asp-action="Index" asp-controller="Personnel">
-            <input type="text" name="search" placeholder="Search personnel..." />
-        </form>
+    <header class="cmd-header d-flex justify-content-between align-items-center mb-3">
 
-        <button type="button" onclick="openAddModal()" class="btn-primary">
-            <i class="fa fa-user-plus"></i> Add Personnel
-        </button>
-    </div>
-
-    <!-- TABLE -->
-    <div class="table-container">
-        <table>
-            <thead>
-                <tr>
-                    <th>Full Name</th>
-                    <th>Username</th>
-                    <th>Email</th>
-                    <th>Status</th>
-                    <th>Created At</th>
-                    <th>Last Login</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-
-            <tbody>
-                @foreach (var user in Model)
-                {
-                    <tr>
-                        <td>@user.FullName</td>
-                        <td>@user.Username</td>
-                        <td>@user.Email</td>
-
-                        <td>
-                            <span class="status @(user.Status?.ToLower() == "active" ? "active"
-                                : user.Status?.ToLower() == "locked" ? "locked"
-                                : "inactive")">
-                                @user.Status
-                            </span>
-                        </td>
-
-                        <td>
-                            @(user.CreatedAt.HasValue
-                                ? user.CreatedAt.Value.ToString("MMM dd, yyyy hh:mm tt")
-                                : "N/A")
-                        </td>
-
-                        <td>
-                            @(user.LastLogin.HasValue
-                                ? user.LastLogin.Value.ToString("MMM dd, yyyy hh:mm tt")
-                                : "Never")
-                        </td>
-
-                        <td class="actions">
-                            <a href="javascript:void(0)"
-                               onclick="openEditModal(@user.Id, '@user.FullName', '@user.Username', '@user.Email', '@user.Status')"
-                               class="edit">
-                                <i class="fa fa-pen"></i>
-                            </a>
-
-                            <form method="post" asp-action="Delete" asp-controller="Personnel" style="display:inline;">
-                                @Html.AntiForgeryToken()
-                                <input type="hidden" name="id" value="@user.Id" />
-                                <button type="submit" class="delete" onclick="return confirm('Delete this user?')">
-                                    <i class="fa fa-trash"></i>
-                                </button>
-                            </form>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<!-- MODAL -->
-<div id="modal" class="modal">
-    <div class="modal-box">
-
-        <div class="modal-header">
-            <h2 id="modalTitle">Add Personnel</h2>
-            <span class="close" onclick="closeModal()">&times;</span>
+        <div>
+            <h2 class="mb-0">Personnel Management</h2>
+            <small class="text-muted">Manage system access and employee profiles</small>
         </div>
 
-        @if (!ViewData.ModelState.IsValid)
-        {
-            <div class="error-summary">
-                @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
-                {
-                    <div class="error">@error.ErrorMessage</div>
-                }
-            </div>
-        }
+        <div>
+            <button class="btn-export"
+                    data-toggle="modal"
+                    data-target="#userModal"
+                    onclick="openAddModal()">
+                <i class="fa fa-user-plus"></i> Register Account
+            </button>
+        </div>
 
-        <form method="post" id="userForm" asp-action="Add" asp-controller="Personnel">
-            @Html.AntiForgeryToken()
+    </header>
 
-            <input type="hidden" name="Id" id="userId" value="0" />
-
-            <div class="form-group">
-                <label>Full Name *</label>
-                <input name="FullName" id="fullName" required />
-            </div>
-
-            <div class="form-group">
-                <label>Username *</label>
-                <input name="Username" id="username" required />
-            </div>
-
-            <div class="form-group">
-                <label>Email *</label>
-                <input name="Email" id="email" required type="email" />
-            </div>
-
-            <!-- ❌ REMOVED STATUS FROM ADD -->
-
-            <div class="form-group">
-                <label>Password *</label>
-                <div class="password-field">
-                    <input type="password" name="PasswordHash" id="password" />
-                    <i class="fa fa-eye" onclick="togglePassword()"></i>
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="stat-icon-circle" style="background: rgba(212,163,115,0.15); color: var(--accent);">
+                    <i class="fas fa-users-cog"></i>
+                </div>
+                <div>
+                    <h3>@Model.SystemUsers.Count()</h3>
+                    <small>System Operators</small>
                 </div>
             </div>
-
-            <input type="hidden" name="Role" value="Security" />
-
-            <div class="modal-footer">
-                <button type="button" class="btn-secondary" onclick="closeModal()">Cancel</button>
-                <button type="submit" class="btn-primary">Save</button>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="stat-icon-circle" style="background: rgba(196,48,43,0.15); color: var(--status-locked);">
+                    <i class="fas fa-id-badge"></i>
+                </div>
+                <div>
+                    <h3>@Model.CampusMembers.Count()</h3>
+                    <small>Authorized Members</small>
+                </div>
             </div>
-        </form>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="stat-icon-circle" style="background: rgba(45,122,86,0.15); color: var(--status-active);">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div>
+                    <h3>@Model.CampusMembers.Count(m => m.Department != null)</h3>
+                    <small>Departments Active</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+
+        <div class="col-xl-6 mb-3">
+            <div class="card">
+
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Dashboard Operators</h5>
+                    <div class="d-flex align-items-center">
+                        <button class="btn btn-sm btn-light border mr-2" onclick="applyQuickFilter('staffTable', 'Admin')">Admins</button>
+                        <input type="text" id="staffSearch" class="form-control form-control-sm" style="width: 180px;" placeholder="Search operators..." onkeyup="liveSearch('staffTable', 'staffSearch')">
+                    </div>
+                </div>
+
+                <div style="max-height:380px; overflow-y:auto;">
+                    <table class="table table-hover mb-0" id="staffTable">
+
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th class="text-center">Status</th>
+                                <th class="text-right">Actions</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            @foreach (var user in Model.SystemUsers)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-sm mr-2">
+                                                @user.FullName.Substring(0,1).ToUpper()
+                                            </div>
+                                            <div>
+                                                <div class="font-weight-bold">@user.FullName</div>
+                                                <small class="text-muted search-meta">@user.Username | @user.Role</small>
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    <td class="text-center">
+                                        <span class="status-pill @user.Status.ToLower()">
+                                            @user.Status
+                                        </span>
+                                    </td>
+
+                                    <td class="text-right">
+                                        <button class="btn btn-link btn-sm"
+                                                data-toggle="modal"
+                                                data-target="#userModal"
+                                                onclick='openEditModal(
+                                                    @user.Id,
+                                                    @Html.Raw(Json.Serialize(user.FullName)),
+                                                    @Html.Raw(Json.Serialize(user.Username)),
+                                                    @Html.Raw(Json.Serialize(user.Email)),
+                                                    "staff","","")'>
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+
+                                        @if (user.Role != "Admin")
+                                        {
+                                            <form method="post" asp-action="Delete" asp-controller="Personnel" style="display:inline;">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="id" value="@user.Id" />
+                                                <button type="submit"
+                                                        class="btn btn-link text-danger btn-sm">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+
+                    </table>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="col-xl-6 mb-3">
+            <div class="card">
+
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Authorized Personnel</h5>
+                    <div class="d-flex align-items-center">
+                        <button class="btn btn-sm btn-light border mr-2" onclick="applyQuickFilter('memberTable', 'IT')">IT Dept</button>
+                        <input type="text" id="memberSearch" class="form-control form-control-sm" style="width: 180px;" placeholder="Search members..." onkeyup="liveSearch('memberTable', 'memberSearch')">
+                    </div>
+                </div>
+
+                <div style="max-height:380px; overflow-y:auto;">
+                    <table class="table table-hover mb-0" id="memberTable">
+
+                        <thead>
+                            <tr>
+                                <th>Member</th>
+                                <th>Dept / RFID</th>
+                                <th class="text-right">Actions</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            @foreach (var m in Model.CampusMembers)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="font-weight-bold">@m.FullName</div>
+                                        <small class="text-muted search-meta">@m.Email</small>
+                                    </td>
+
+                                    <td>
+                                        <small class="d-block search-meta">@m.Department</small>
+                                        <code>@m.RfidTag</code>
+                                    </td>
+
+                                    <td class="text-right">
+                                        <button class="btn btn-link btn-sm"
+                                                data-toggle="modal"
+                                                data-target="#userModal"
+                                                onclick='openEditModal(
+                                                    @m.Id,
+                                                    @Html.Raw(Json.Serialize(m.FullName)),
+                                                    "",
+                                                    @Html.Raw(Json.Serialize(m.Email)),
+                                                    "campus",
+                                                    @Html.Raw(Json.Serialize(m.Department)),
+                                                    @Html.Raw(Json.Serialize(m.RfidTag)))'>
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+
+                                        <form method="post" asp-action="DeleteMember" asp-controller="Personnel" style="display:inline;">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@m.Id" />
+                                            <button type="submit"
+                                                    class="btn btn-link text-danger btn-sm">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+
+                    </table>
+                </div>
+
+            </div>
+        </div>
 
     </div>
 </div>
 
+<div class="modal fade" id="userModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+
+        <div class="modal-content">
+
+            <form method="post" id="userForm">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="userId" name="Id" />
+
+                <div class="modal-header d-flex justify-content-between align-items-center">
+
+                    <h5 id="modalTitle" class="mb-0">Register Account</h5>
+
+                    <button type="button"
+                            class="close"
+                            data-dismiss="modal"
+                            aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+
+                </div>
+
+                <div class="modal-body">
+
+                    <div class="form-group">
+                        <label>Account Type</label>
+                        <select id="RegType" name="RegType" class="form-control" onchange="toggleFields()">
+                            <option value="staff">System Operator</option>
+                            <option value="campus">Authorized Personnel (RFID)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Full Name</label>
+                        <input id="fullName" name="FullName" class="form-control" required />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input id="email" name="Email" type="email" class="form-control" required />
+                    </div>
+
+                    <div id="staffFields" style="display:none;">
+                        <div class="form-group">
+                            <label>Username</label>
+                            <input id="username" name="Username" class="form-control" />
+                        </div>
+                        <div class="form-group">
+                            <label>Password</label>
+                            <input id="password" name="Password" type="password" class="form-control" />
+                        </div>
+                    </div>
+
+                    <div id="campusFields" style="display:none;">
+                        <div class="form-group">
+                            <label>Profile Image</label>
+                            <input id="profileImage" name="ProfileImage" type="file" accept="image/*" class="form-control" />
+                        </div>
+                        <div class="form-group">
+                            <label>RFID Tag</label>
+                            <input id="rfidTag" name="RfidTag" class="form-control" placeholder="Enter RFID tag ID" />
+                        </div>
+                        <div class="form-group">
+                            <label>Department</label>
+                            <input id="department" name="Department" class="form-control" />
+                        </div>
+                        <div class="form-group">
+                            <label>Phone Number</label>
+                            <input id="phoneNumber" name="PhoneNumber" type="tel" class="form-control" />
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light btn-sm" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+</div>
+
+@section Scripts {
 <script>
-    function openAddModal() {
-        document.getElementById("modal").classList.add("show");
-        document.getElementById("modalTitle").innerText = "Add Personnel";
+// Search Functionality
+function liveSearch(tableId, inputId) {
+    const input = document.getElementById(inputId);
+    const filter = input.value.toUpperCase();
+    const table = document.getElementById(tableId);
+    const tr = table.getElementsByTagName("tr");
 
-        const form = document.getElementById("userForm");
-        form.action = "/Personnel/Add";
-        form.reset();
-
-        document.getElementById("userId").value = "0";
+    for (let i = 1; i < tr.length; i++) {
+        const rowText = tr[i].textContent || tr[i].innerText;
+        if (rowText.toUpperCase().indexOf(filter) > -1) {
+            tr[i].style.display = "";
+        } else {
+            tr[i].style.display = "none";
+        }
     }
+}
 
-    function openEditModal(id, fullName, username, email, status) {
-        document.getElementById("modal").classList.add("show");
-        document.getElementById("modalTitle").innerText = "Edit Personnel";
+// Shortcut Filter Function
+function applyQuickFilter(tableId, term) {
+    const searchInputId = tableId === 'staffTable' ? 'staffSearch' : 'memberSearch';
+    const input = document.getElementById(searchInputId);
+    input.value = term;
+    liveSearch(tableId, searchInputId);
+}
 
-        const form = document.getElementById("userForm");
-        form.action = "/Personnel/Edit";
+function openAddModal() {
+    document.getElementById("userForm").reset();
+    document.getElementById("modalTitle").innerText = "Register Account";
+    document.getElementById("userForm").action = "/Personnel/Add";
+    document.getElementById("userId").value = "0";
+    document.getElementById("RegType").value = "staff";
+    toggleFields();
+    
+    // Show modal
+    const modal = document.getElementById('userModal');
+    modal.classList.add('show');
+    document.body.style.overflow = 'hidden';
+}
 
-        document.getElementById("userId").value = id;
-        document.getElementById("fullName").value = fullName || "";
-        document.getElementById("username").value = username || "";
-        document.getElementById("email").value = email || "";
+function openEditModal(id, name, user, email, type, dept, rfid, phone, profileImage) {
+    document.getElementById("userForm").reset();
+
+    document.getElementById("userId").value = id;
+    document.getElementById("fullName").value = name;
+    document.getElementById("email").value = email;
+    document.getElementById("RegType").value = type;
+
+    document.getElementById("userForm").action = "/Personnel/Edit";
+    document.getElementById("modalTitle").innerText = "Edit Personnel";
+
+    if (type === "staff") {
+        document.getElementById("username").value = user || "";
         document.getElementById("password").value = "";
-
-        // status handled ONLY in edit (you can add dropdown later if needed)
+    } else {
+        document.getElementById("department").value = dept || "";
+        document.getElementById("rfidTag").value = rfid || "";
+        document.getElementById("phoneNumber").value = phone || "";
     }
 
-    function closeModal() {
-        document.getElementById("modal").classList.remove("show");
-    }
+    toggleFields();
+    
+    // Show modal
+    const modal = document.getElementById('userModal');
+    modal.classList.add('show');
+    document.body.style.overflow = 'hidden';
+}
 
-    function togglePassword() {
-        const input = document.getElementById("password");
-        input.type = input.type === "password" ? "text" : "password";
+function toggleFields() {
+    const type = document.getElementById("RegType").value;
+    document.getElementById("staffFields").style.display = (type === "staff") ? "grid" : "none";
+    document.getElementById("campusFields").style.display = (type === "campus") ? "grid" : "none";
+}
+
+function closeModal() {
+    const modal = document.getElementById('userModal');
+    modal.classList.remove('show');
+    document.body.style.overflow = 'auto';
+}
+
+// Event Listeners for Closing
+document.addEventListener('DOMContentLoaded', function() {
+    const closeBtn = document.querySelector('#userModal .close');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closeModal);
     }
+    
+    const cancelBtn = document.querySelector('#userModal .modal-footer .btn-light');
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', closeModal);
+    }
+    
+    const modal = document.getElementById('userModal');
+    modal.addEventListener('click', function(event) {
+        if (event.target === modal) {
+            closeModal();
+        }
+    });
+});
 </script>
+}

@@ -11,14 +11,14 @@ namespace WebApp.Models
         [Column("alert_id")]
         public int AlertId { get; set; }
 
-        // IMPORTANT: stored as TEXT/VARCHAR in DB
+        // Stored as STRING in DB
         [Column("type")]
         public AlertType Type { get; set; }
 
         [Column("description")]
         public string? Description { get; set; }
 
-        // IMPORTANT: stored as TEXT/VARCHAR in DB
+        // Stored as STRING in DB
         [Column("severity")]
         public SeverityLevel Severity { get; set; } = SeverityLevel.WARNING;
 
@@ -28,12 +28,19 @@ namespace WebApp.Models
         [Column("timestamp")]
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
 
-        // IMPORTANT: stored as TEXT/VARCHAR in DB
+        // Stored as STRING in DB
         [Column("status")]
         public AlertStatus Status { get; set; } = AlertStatus.New;
 
         // =========================
-        // TRACKING
+        // NEW: RECORDING LINK
+        // =========================
+
+        [Column("video_path")]
+        public string? VideoPath { get; set; }
+
+        // =========================
+        // TRACKING & ACCOUNTABILITY
         // =========================
 
         [Column("acknowledged_by")]
@@ -48,14 +55,13 @@ namespace WebApp.Models
         [Column("resolved_at")]
         public DateTime? ResolvedAt { get; set; }
 
-        [Column("escalated_by")]
-        public string? EscalatedBy { get; set; }
+        [Column("escalated_by")]        public string? EscalatedBy { get; set; }
 
         [Column("escalated_at")]
         public DateTime? EscalatedAt { get; set; }
 
         // =========================
-        // UI ONLY (NOT IN DATABASE)
+        // UI HELPERS (NOT IN DB)
         // =========================
 
         [NotMapped]
@@ -69,10 +75,13 @@ namespace WebApp.Models
 
         [NotMapped]
         public bool IsActive => Status != AlertStatus.Resolved;
+
+        [NotMapped]
+        public bool HasRecording => !string.IsNullOrEmpty(VideoPath);
     }
 
     // =========================
-    // ENUMS (stored as STRING in DB)
+    // ENUMS
     // =========================
 
     public enum AlertType
@@ -80,7 +89,9 @@ namespace WebApp.Models
         UnauthorizedAccess,
         Intrusion,
         SuspiciousActivity,
-        AccessGranted,
+        AccessDenied,
+        AccessGranted, // Add this back!
+        ForcedEntry,
         DoorEvent,
         SystemError
     }

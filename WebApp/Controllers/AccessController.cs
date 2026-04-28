@@ -30,7 +30,7 @@ namespace WebApp.Controllers
             foreach (var log in logs)
             {
                 log.FullName = log.FullName ?? "Unknown User";
-                log.StudentId = log.StudentId ?? "N/A";
+                log.PersonnelId = log.PersonnelId ?? "N/A";
                 log.Department = log.Department ?? "-";
                 log.Email = log.Email ?? "-";
                 log.Phone = log.Phone ?? "-";
@@ -38,14 +38,6 @@ namespace WebApp.Controllers
                 log.Location = log.Location ?? "Unknown Location";
                 log.ImageUrl = log.ImageUrl ?? "/images/default-user.png";
             }
-
-            // ✅ Door status
-            ViewBag.Door = new DoorStatus
-            {
-                DoorName = "Main Entrance Door",
-                Location = "QCU Main Building",
-                IsLocked = true
-            };
 
             return View(logs);
         }
@@ -77,7 +69,7 @@ namespace WebApp.Controllers
             var result = logs.Select(log => new
             {
                 FullName = log.FullName ?? "Unknown User",
-                StudentId = log.StudentId ?? "N/A",
+                StudentId = log.PersonnelId ?? "N/A",
                 Department = log.Department ?? "-",
                 Email = log.Email ?? "-",
                 Phone = log.Phone ?? "-",

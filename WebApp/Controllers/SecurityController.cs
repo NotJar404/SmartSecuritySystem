@@ -35,7 +35,7 @@ namespace WebApp.Controllers
             foreach (var log in recentAccessLogs)
             {
                 log.FullName = log.FullName ?? "Unknown User";
-                log.StudentId = log.StudentId ?? "N/A";
+                log.PersonnelId = log.PersonnelId ?? "N/A";
                 log.Department = log.Department ?? "-";
                 log.Room = log.Room ?? "Unknown Room";
                 log.Location = log.Location ?? "Unknown Location";
@@ -79,8 +79,8 @@ namespace WebApp.Controllers
                 // RECENT EVENTS
                 // =========================
                 RecentEvents = await _context.DetectionLogs
-                    .Include(d => d.Camera)
-                        .ThenInclude(c => c.Room)
+                    .Include(d => d.Camera!)
+                        .ThenInclude(c => c!.Room)
                     .OrderByDescending(d => d.Timestamp)
                     .Take(5)
                     .ToListAsync(),

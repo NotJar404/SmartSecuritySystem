@@ -23,5 +23,6 @@ namespace WebApp.Models
         // =====================
 
         public List<AccessLog> RecentAccessLogs { get; set; } = new();
+        public List<Alert> RecentAlerts { get; set; } = new();
     }
 }

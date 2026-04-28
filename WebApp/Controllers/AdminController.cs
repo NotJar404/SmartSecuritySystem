@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using WebApp.Data;
 using SmartSecuritySystem.Models;
+using SmartSecuritySystem.ViewModels;
 using WebApp.Models;
 using System;
 using System.Linq;
@@ -150,19 +151,47 @@ namespace WebApp.Controllers
         // =========================
         public async Task<IActionResult> Personnel(string? search)
         {
-            var query = _context.Users.AsQueryable();
+            var users = _context.Users.AsQueryable();
+            var members = _context.AuthorizedPersonnel.AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(search))
             {
-                search = search.Trim();
+                users = users.Where(u =>
+                    (u.FullName ?? "").Contains(search) ||
+                    (u.Username ?? "").Contains(search) ||
+                    (u.Email ?? "").Contains(search));
 
-                query = query.Where(u =>
-                    u.Username.Contains(search) ||
-                    u.Email.Contains(search) ||
-                    u.FullName.Contains(search));
+                members = members.Where(m =>
+                    (m.FullName ?? "").Contains(search) ||
+                    (m.Email ?? "").Contains(search) ||
+                    (m.Department ?? "").Contains(search));
             }
 
-            return View(await query.AsNoTracking().ToListAsync());
+            var userList = await users.ToListAsync();
+            var memberList = await members.ToListAsync();
+
+            var campusMembers = memberList.Select(m => new AuthorizedMember
+            {
+                Id = m.PersonId,
+                FullName = m.FullName,
+                Email = m.Email ?? "",
+                Phone = m.Phone ?? "",
+                Department = m.Department ?? "",
+                RfidTag = m.RfidTag ?? "",
+                Status = m.Status,
+                SecurityLevel = m.SecurityLevel,
+                HasFaceData = !string.IsNullOrEmpty(m.FaceEmbedding),
+                CreatedAt = m.CreatedAt,
+                LastAccess = null
+            }).ToList();
+
+            var viewModel = new PersonnelManagementViewModel
+            {
+                SystemUsers = userList,
+                CampusMembers = campusMembers
+            };
+
+            return View("~/Views/Admin/Personnel.cshtml", viewModel);
         }
 
         // =========================

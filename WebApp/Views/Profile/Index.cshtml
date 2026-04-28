@@ -2,196 +2,159 @@
 
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
+    ViewData["Title"] = "My Profile";
 }
+<link rel="stylesheet" href="~/css/profile.css" />
 
-<div class="profile-page">
-
-    <!-- ================= HEADER ================= -->
-    <div class="title-block">
-        <h1 class="page-title">My Profile</h1>
-        <p class="subtitle">
-            Manage your personal information and security settings
-        </p>
-
-        @if (TempData["Success"] != null)
-        {
-            <div class="alert success">@TempData["Success"]</div>
-        }
+<div class="profile-dashboard">
+    <div class="dashboard-header">
+        <div class="header-text">
+            <h1 class="page-main-title">User Account Settings</h1>
+            <p class="system-timestamp">@DateTime.Now.ToString("dddd, MMMM dd, yyyy") | Active Session</p>
+        </div>
     </div>
 
-    <!-- ================= MAIN GRID ================= -->
-    <div class="profile-grid-2col">
+    <div class="profile-main-grid">
+        
+        <div class="grid-column">
+            <section class="system-card identity-card taller-card">
+                <div class="card-content-wrapper">
+                    <h2 class="card-title"><i class="fa fa-user-circle"></i> Profile Information</h2>
+                    <form asp-action="UpdateProfile" method="post" enctype="multipart/form-data" class="tight-form">
+                        <div class="avatar-section">
+                            <div class="avatar-ring">
+                                <img src="@(string.IsNullOrEmpty(Model.ProfileImagePath) ? "/images/default-profile.png" : Model.ProfileImagePath)"
+                                     class="profile-image-circle" id="profilePreview" />
+                                <label for="fileInput" class="edit-overlay"><i class="fa fa-pen"></i></label>
+                            </div>
+                            <input type="file" id="fileInput" name="ProfileImage" hidden onchange="previewImage(this)" />
+                        </div>
 
-        <!-- ================= LEFT PANEL ================= -->
-        <div class="left-panel">
-
-            <form asp-action="UpdateProfile"
-                  method="post"
-                  enctype="multipart/form-data"
-                  class="profile-form">
-
-                <input type="hidden" asp-for="Id" />
-
-                <!-- AVATAR -->
-                <div class="avatar-box">
-                    <img src="@(string.IsNullOrEmpty(Model.ProfileImagePath)
-                                ? "/images/default-profile.png"
-                                : Model.ProfileImagePath)"
-                         class="profile-img" />
+                        <div class="field-stack">
+                            <div class="field-group">
+                                <label>Full Name</label>
+                                <input asp-for="FullName" class="system-input" placeholder="Enter display name" />
+                            </div>
+                            <div class="field-group">
+                                <label>Username</label>
+                                <input asp-for="Username" class="system-input readonly" readonly />
+                            </div>
+                            <div class="field-group">
+                                <label>Email Address</label>
+                                <input asp-for="Email" class="system-input" placeholder="name@example.com" />
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-accent-save">Save Changes</button>
+                    </form>
                 </div>
 
-                <!-- INPUTS -->
-                <div class="form-group">
-                    <label>Profile Photo</label>
-                    <input type="file" name="ProfileImage" class="file-input" />
-                </div>
-
-                <div class="form-group">
-                    <label>Full Name</label>
-                    <input asp-for="FullName" />
-                </div>
-
-                <div class="form-group">
-                    <label>Username</label>
-                    <input asp-for="Username" />
-                </div>
-
-                <div class="form-group">
-                    <label>Email</label>
-                    <input asp-for="Email" />
-                </div>
-
-                <!-- SAVE BUTTON -->
-                <button type="submit" class="btn primary full-width">
-                    Save Changes
-                </button>
-
-            </form>
-
-            <!-- ACCOUNT INFO -->
-            <div class="card account-info">
-                <h3 class="section-title">Account Info</h3>
-
-                <div class="info-row">
-                    <div>
-                        <label>ID</label>
-                        <p>@Model.Id</p>
+                <div class="card-footer-grid">
+                    <div class="id-block">
+                        <span class="id-label"><i class="fa fa-fingerprint"></i> Personnel ID</span>
+                        <span class="id-value">#@Model.Id</span>
                     </div>
-
-                    <div>
-                        <label>Role</label>
-                        <p>@Model.Role</p>
+                    <div class="id-block">
+                        <span class="id-label"><i class="fa fa-shield-halved"></i> Access Role</span>
+                        <span class="id-value role-badge">@Model.Role</span>
                     </div>
                 </div>
-            </div>
-
+            </section>
         </div>
 
-        <!-- ================= RIGHT PANEL ================= -->
-        <div class="right-panel">
-
-            <!-- CHANGE PASSWORD -->
-            <div class="card">
-
-                <h3 class="section-title">Change Password</h3>
-
-                @if (TempData["PasswordError"] != null)
-                {
-                    <div class="alert error">@TempData["PasswordError"]</div>
-                }
-
-                @if (TempData["PasswordSuccess"] != null)
-                {
-                    <div class="alert success">@TempData["PasswordSuccess"]</div>
-                }
-
-                <!-- RULES -->
-                <div class="password-rules">
-                    <strong>Password must contain:</strong>
-                    <ul>
-                        <li>8+ characters</li>
-                        <li>Upper & lowercase</li>
-                        <li>At least 1 number</li>
-                        <li>1 special character</li>
-                    </ul>
-                </div>
-
-                <!-- FORM -->
-                <form asp-action="ChangePassword"
-                      method="post"
-                      class="password-form">
-
-                    <div class="form-group">
-                        <label>Current</label>
-                        <input type="password" name="CurrentPassword" required />
+        <div class="grid-column wide">
+            <section class="system-card security-card">
+                <h2 class="card-title"><i class="fa fa-key"></i> Credential Management</h2>
+                <p class="text-muted-sm">Update your system access password. Rules will update in real-time.</p>
+                
+                <form asp-action="ChangePassword" method="post" class="password-grid">
+                    <div class="pass-inputs">
+                        <div class="field-group">
+                            <label>Current Password</label>
+                            <input type="password" name="CurrentPassword" class="system-input" required />
+                        </div>
+                        <div class="field-group">
+                            <label>New Password</label>
+                            <input type="password" id="newPass" name="NewPassword" class="system-input" required />
+                        </div>
+                        <div class="field-group">
+                            <label>Confirm Password</label>
+                            <input type="password" name="ConfirmPassword" class="system-input" required />
+                        </div>
                     </div>
 
-                    <div class="form-group">
-                        <label>New</label>
-                        <input type="password" name="NewPassword" required />
+                    <div class="pass-rules-box">
+                        <span class="rules-header">Security Requirements</span>
+                        <ul class="rule-checklist" id="ruleList">
+                            <li id="rule-len" class="rule"><i class="fa fa-circle"></i> 8+ Characters</li>
+                            <li id="rule-up" class="rule"><i class="fa fa-circle"></i> One Uppercase</li>
+                            <li id="rule-num" class="rule"><i class="fa fa-circle"></i> One Number</li>
+                            <li id="rule-spec" class="rule"><i class="fa fa-circle"></i> Special Char</li>
+                        </ul>
                     </div>
 
-                    <div class="form-group">
-                        <label>Confirm</label>
-                        <input type="password" name="ConfirmPassword" required />
-                    </div>
-
-                    <button type="submit" class="btn danger full-width">
-                        Update Password
-                    </button>
-
+                    <button type="submit" id="btnUpdate" class="btn-secure-action" disabled>Update Credentials</button>
                 </form>
+            </section>
 
-            </div>
-
-            <!-- ================= BOTTOM SECTION ================= -->
-            <div class="right-bottom">
-
-                <!-- SECURITY INFO -->
-                <div class="card">
-                    <h3 class="section-title">Security Info</h3>
-
-                    <div class="info-row">
-                        <div>
-                            <span>Status</span>
-                            <span>@Model.Status</span>
+            <div class="bottom-flex">
+                <section class="system-card status-card">
+                    <h2 class="card-title-sm"><i class="fa fa-shield-check"></i> Account Integrity</h2>
+                    <div class="info-display-list">
+                        <div class="integrity-row">
+                            <span class="info-label">Current Status</span> 
+                            <span class="status-active-pill">@Model.Status</span>
                         </div>
-
-                        <div>
-                            <span>Last Login</span>
-                            <span>@Model.LastLogin</span>
-                        </div>
-
-                        <!-- Optional future fields -->
-                        <div>
-                            <span>2FA</span>
-                            <span>Disabled</span>
+                        <div class="integrity-row">
+                            <span class="info-label">Last Login</span> 
+                            <strong class="info-val">@Model.LastLogin</strong>
                         </div>
                     </div>
-                </div>
+                </section>
 
-                <!-- SESSION -->
-                <div class="card">
-                    <h3 class="section-title">Current Session</h3>
-
-                    <div class="session-info">
-                        <p><strong>Device:</strong> @Context.Request.Headers["User-Agent"]</p>
-                        <p><strong>IP:</strong> @Context.Connection.RemoteIpAddress</p>
-                        <p><strong>Status:</strong> Active</p>
+                <section class="system-card session-card">
+                    <h2 class="card-title-sm"><i class="fa fa-network-wired"></i> Current Session</h2>
+                    <div class="info-display-list">
+                        <div class="integrity-row">
+                            <span class="info-label">IP Address</span> 
+                            <code class="ip-display">@Context.Connection.RemoteIpAddress</code>
+                        </div>
+                        <button class="btn-logout-session">
+                            <i class="fa fa-right-from-bracket"></i> Terminate Session
+                        </button>
                     </div>
-
-                    <p class="text-muted">
-                        This session is active on your device.
-                    </p>
-
-                    <button class="btn danger full-width">
-                        Logout All Devices
-                    </button>
-                </div>
-
+                </section>
             </div>
-
         </div>
-
     </div>
 </div>
+
+<script>
+    const newPass = document.getElementById('newPass');
+    const updateBtn = document.getElementById('btnUpdate');
+
+    newPass.addEventListener('input', () => {
+        const val = newPass.value;
+        const requirements = {
+            'rule-len': val.length >= 8,
+            'rule-up': /[A-Z]/.test(val),
+            'rule-num': /[0-9]/.test(val),
+            'rule-spec': /[!@@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(val)
+        };
+
+        let passedCount = 0;
+        for (const [id, passed] of Object.entries(requirements)) {
+            const el = document.getElementById(id);
+            if (passed) { el.classList.add('valid'); passedCount++; }
+            else { el.classList.remove('valid'); }
+        }
+        updateBtn.disabled = passedCount < 4;
+    });
+
+    function previewImage(input) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = e => document.getElementById('profilePreview').src = e.target.result;
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+</script>

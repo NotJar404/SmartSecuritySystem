@@ -3,291 +3,281 @@
 
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
-    ViewData["Title"] = "Security Dashboard";
+    ViewData["Title"] = "Security Command Center";
 }
 
-<div class="dashboard-container" role="main">
+<link rel="stylesheet" href="~/css/dashboard.css" />
+
+<div class="dashboard-container">
+
     <!-- ===================== -->
-    <!-- STATS (NO SCROLL) -->
+    <!-- HEADER + ACTIONS -->
     <!-- ===================== -->
-    <section class="stats" aria-label="System Statistics">
+    <header class="cmd-header d-flex justify-content-between align-items-center mb-3">
+
+        <div>
+            <h2 class="mb-0">Security Command Center</h2>
+            <small class="text-muted">Real-time monitoring & access control</small>
+        </div>
+
+        <div class="emergency-cluster">
+            <button class="btn-lockdown" onclick="triggerLockdown()">
+                <i class="fas fa-lock"></i> LOCKDOWN
+            </button>
+
+            <button class="btn-emergency">
+                <i class="fas fa-phone-alt"></i> EMERGENCY
+            </button>
+        </div>
+
+    </header>
+
+    <!-- ===================== -->
+    <!-- STATS ROW -->
+    <!-- ===================== -->
+    <section class="stats-row mb-4">
 
         <div class="stat-card">
-            <div class="stat-icon blue"><i class="fa fa-video"></i></div>
-            <div class="stat-card-content">
-                <span class="stat-label">Cameras</span>
-                <h2>@Model.ActiveCameraCount</h2>
-                <p class="stat-meta">Active</p>
+            <div class="stat-icon blue"><i class="fas fa-video"></i></div>
+            <div>
+                <span>Active Cameras</span>
+                <h3>@Model.ActiveCameraCount</h3>
             </div>
         </div>
 
         <div class="stat-card">
-            <div class="stat-icon yellow"><i class="fa fa-bullseye"></i></div>
-            <div class="stat-card-content">
-                <span class="stat-label">Detections</span>
-                <h2>@Model.TodayDetectionCount</h2>
-                <p class="stat-meta">Today</p>
+            <div class="stat-icon yellow"><i class="fas fa-bullseye"></i></div>
+            <div>
+                <span>Detections Today</span>
+                <h3>@Model.TodayDetectionCount</h3>
             </div>
         </div>
 
         <div class="stat-card">
-            <div class="stat-icon red"><i class="fa fa-triangle-exclamation"></i></div>
-            <div class="stat-card-content">
-                <span class="stat-label">Alerts</span>
-                <h2>@Model.ActiveAlertCount</h2>
-                <p class="stat-meta">Active</p>
+            <div class="stat-icon red"><i class="fas fa-exclamation-triangle"></i></div>
+            <div>
+                <span>Active Alerts</span>
+                <h3>@Model.ActiveAlertCount</h3>
             </div>
         </div>
 
         <div class="stat-card">
-            <div class="stat-icon green"><i class="fa fa-id-card"></i></div>
-            <div class="stat-card-content">
-                <span class="stat-label">Access</span>
-                <h2>@Model.PendingAccessCount</h2>
-                <p class="stat-meta">Recent</p>
+            <div class="stat-icon green"><i class="fas fa-id-card"></i></div>
+            <div>
+                <span>Access Logs</span>
+                <h3>@Model.PendingAccessCount</h3>
             </div>
         </div>
 
     </section>
 
     <!-- ===================== -->
-    <!-- MAIN GRID -->
+    <!-- CCTV FILMSTRIP -->
     <!-- ===================== -->
-    <div class="dashboard-grid">
+    <section class="cctv-filmstrip-section mb-4">
 
-        <!-- ===================== -->
-        <!-- LEFT: CCTV (SCROLL ZONE #1) -->
-        <!-- ===================== -->
-        <section class="grid-left">
+        <div class="d-flex justify-content-between mb-2">
+            <span class="section-title">Live Surveillance</span>
+            <span class="live-badge">● LIVE</span>
+        </div>
 
-            <div class="panel camera-panel">
+        <div class="horizontal-camera-slider">
 
-                <div class="panel-header">
-                    <div>
-                        <h3>Live CCTV Wall</h3>
-                        <p class="panel-subtitle">Real-time camera feeds</p>
-                    </div>
+            @if (Model.Cameras?.Any() == true)
+            {
+                foreach (var cam in Model.Cameras)
+                {
+                    <div class="camera-card-wrap">
 
-                    <a asp-controller="Cameras"
-                       asp-action="Index"
-                       class="panel-action">
-                        Manage Cameras
-                    </a>
-                </div>
+                        <div class="video-container">
 
-                <!-- 🔥 SCROLLABLE CCTV AREA -->
-                <div class="scroll-cctv">
+                            <video class="cctv-video"
+                                   muted autoplay playsinline
+                                   data-src="@cam.StreamUrl">
+                            </video>
 
-                    <div class="camera-grid cctv-grid">
-
-                        @if (Model.Cameras?.Any() == true)
-                        {
-                            foreach (var cam in Model.Cameras)
-                            {
-                                var url = cam.StreamUrl ?? "";
-                                var name = cam.Name ?? "Camera";
-
-                                <div class="camera-tile">
-
-                                    <video class="cctv-video"
-                                           muted
-                                           autoplay
-                                           playsinline
-                                           preload="auto"
-                                           data-src="@url">
-                                    </video>
-
-                                    <div class="camera-overlay">
-                                        <span class="cam-label">@name</span>
-                                        <span class="live-dot">● LIVE</span>
-                                    </div>
-
-                                </div>
-                            }
-                        }
-                        else
-                        {
-                            <div class="empty-state">
-                                <p>No cameras available</p>
+                            <div class="video-overlay">
+                                <span>@cam.Name</span>
                             </div>
-                        }
+
+                        </div>
 
                     </div>
-
+                }
+            }
+            else
+            {
+                <div class="empty-state">
+                    No cameras available
                 </div>
+            }
+
+        </div>
+
+    </section>
+
+    <!-- ===================== -->
+    <!-- ALERTS + LOGS (BOTTOM) -->
+    <!-- ===================== -->
+    <section class="data-grid">
+
+        <!-- ALERTS -->
+        <div class="panel panel-alerts">
+
+            <div class="panel-header">
+                <h5>Security Alerts</h5>
+            </div>
+
+            <div class="alerts-container-dashboard">
+
+                @if (Model.RecentEvents?.Any() == true)
+                {
+                    foreach (var item in Model.RecentEvents.Take(6))
+                    {
+                        var isCritical = item.TriggeredAlert && item.Confidence > 0.8f;
+                        var isWarning = item.TriggeredAlert && item.Confidence <= 0.8f;
+                        var cardClass = "alert-card-dash";
+                        cardClass += isCritical ? " critical" : isWarning ? " warning" : " info";
+
+                        <div class="@cardClass">
+
+                            <div class="alert-icon">
+                                @(isCritical ? "🚨" : isWarning ? "⚠️" : "ℹ️")
+                            </div>
+
+                            <div class="alert-content">
+                                <div class="alert-title">@item.DetectionType</div>
+                                <div class="alert-description">@item.Camera?.RoomName</div>
+                                <div class="alert-time">@item.Timestamp.ToString("HH:mm:ss")</div>
+                            </div>
+
+                            <div class="alert-actions-dash">
+                                <button class="btn-alert-secondary">Acknowledge</button>
+                                <button class="btn-alert-primary">Details</button>
+                            </div>
+
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="empty-state">No alerts</div>
+                }
 
             </div>
 
-        </section>
+        </div>
 
-        <!-- ===================== -->
-        <!-- RIGHT SIDE -->
-        <!-- ===================== -->
-        <aside class="grid-right">
+        <!-- ACCESS LOGS -->
+        <div class="panel panel-logs">
 
-            <!-- ===================== -->
-            <!-- ACCESS (SCROLL ZONE #2) -->
-            <!-- ===================== -->
-            <div class="panel">
+            <div class="panel-header">
+                <h5>Access Monitoring</h5>
+            </div>
 
-                <div class="panel-header">
-                    <div>
-                        <h3>Access Monitoring</h3>
-                        <p class="panel-subtitle">Recent entry activity</p>
-                    </div>
-                </div>
+            <div class="log-scroll-dashboard">
 
-                <div class="scroll-zone">
-
-                    @if (Model.RecentAccessLogs?.Any() == true)
+                @if (Model.RecentAccessLogs?.Any() == true)
+                {
+                    foreach (var log in Model.RecentAccessLogs.Take(6))
                     {
-                        foreach (var log in Model.RecentAccessLogs)
-                        {
-                            <div class="event-item">
+                        var statusClass = log.IsAuthorized ? "success" : "danger";
+                        
+                        <div class="log-card-dash @statusClass">
 
-                                <div class="event-icon @(log.IsAuthorized ? "blue" : "red")">
-                                    <i class="fa @(log.IsAuthorized ? "fa-check" : "fa-xmark")"></i>
-                                </div>
-
-                                <div class="event-content">
-                                    <h4>@log.FullName</h4>
-                                    <p>@log.Room • @log.Timestamp.ToLocalTime().ToString("hh:mm tt")</p>
-                                </div>
-
+                            <div class="log-avatar-box">
+                                <img src="@(log.ImageUrl ?? "/images/default-user.png")" 
+                                     onerror="this.src='/images/default-user.png'" 
+                                     alt="@log.FullName" />
                             </div>
-                        }
-                    }
-                    else
-                    {
-                        <div class="empty-state">No access logs</div>
-                    }
 
-                </div>
+                            <div class="log-info">
+                                <div class="log-name">@log.FullName</div>
+                                <div class="log-details">
+                                    <span class="log-room">@log.Room</span>
+                                    <span class="log-time">@log.Timestamp.ToString("hh:mm tt")</span>
+                                </div>
+                            </div>
+
+                            <div class="log-status">
+                                <span class="status-badge @statusClass">
+                                    @(log.IsAuthorized ? "AUTHORIZED" : "DENIED")
+                                </span>
+                            </div>
+
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="empty-state">No logs</div>
+                }
 
             </div>
 
-            <!-- ===================== -->
-            <!-- ALERTS (SCROLL ZONE #3) -->
-            <!-- ===================== -->
-            <div class="panel">
+        </div>
 
-                <div class="panel-header">
-                    <div>
-                        <h3>Security Alerts</h3>
-                        <p class="panel-subtitle">Detected events</p>
-                    </div>
-                </div>
+    </section>
 
-                <div class="scroll-zone">
-
-                    @if (Model.RecentEvents?.Any() == true)
-                    {
-                        foreach (var item in Model.RecentEvents)
-                        {
-                            <div class="alert-card">
-
-                                <h4>
-                                    @(item.DetectionType switch
-                                    {
-                                        "motion" => "Motion Detected",
-                                        "human" => "Person Detected",
-                                        "intrusion" => "Intrusion Alert",
-                                        "face" => "Face Recognized",
-                                        _ => item.DetectionType
-                                    })
-                        </h4>
-
-                                <p>
-                                    @item.Camera?.RoomName •
-                                    @item.Timestamp.ToLocalTime().ToString("HH:mm:ss")
-                                </p>
-
-                            </div>
-                                        }
-                    }
-                    else
-                    {
-                        <div class="empty-state">No alerts</div>
-                    }
-
-                </div>
-
-            </div>
-
-        </aside>
-
-    </div>
 </div>
 
 <!-- ===================== -->
-<!-- CCTV AUTO PLAYER -->
+<!-- VIDEO STREAM LOGIC -->
 <!-- ===================== -->
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
 <script>
+window.addEventListener("DOMContentLoaded", async function () {
 
-    window.addEventListener("DOMContentLoaded", async function () {
+    const videos = document.querySelectorAll(".cctv-video");
+    let webcamStream = null;
 
-        const videos = document.querySelectorAll(".cctv-video");
+    async function getWebcam() {
+        if (webcamStream) return webcamStream;
 
-        let webcamStream = null;
-
-        async function getWebcam() {
-            if (webcamStream) return webcamStream;
-
-            try {
-                webcamStream = await navigator.mediaDevices.getUserMedia({
-                    video: true,
-                    audio: false
-                });
-
-                return webcamStream;
-            }
-            catch (err) {
-                console.log("Webcam access denied:", err);
-                return null;
-            }
+        try {
+            webcamStream = await navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: false
+            });
+            return webcamStream;
+        } catch {
+            return null;
         }
+    }
 
-        for (const video of videos) {
+    for (const video of videos) {
 
-            const url = video.getAttribute("data-src");
+        const url = video.getAttribute("data-src");
 
-            video.muted = true;
-            video.playsInline = true;
-            video.autoplay = true;
+        if (url && url.trim() !== "") {
 
-            if (url && url.trim() !== "") {
-
-                if (url.includes(".m3u8") && window.Hls) {
-
-                    const hls = new Hls();
-                    hls.loadSource(url);
-                    hls.attachMedia(video);
-
-                } else {
-                    video.src = url;
-                }
-
-                video.load();
-
-                video.play().catch(err => {
-                    console.log("Stream failed:", url, err);
-                });
-
+            if (url.includes(".m3u8") && window.Hls) {
+                const hls = new Hls();
+                hls.loadSource(url);
+                hls.attachMedia(video);
             } else {
+                video.src = url;
+            }
 
-                const stream = await getWebcam();
+            video.play().catch(() => {});
 
-                if (stream) {
-                    video.srcObject = stream;
+        } else {
 
-                    video.play().catch(err => {
-                        console.log("Webcam play failed:", err);
-                    });
-                }
+            const stream = await getWebcam();
+
+            if (stream) {
+                video.srcObject = stream;
+                video.play().catch(() => {});
             }
         }
+    }
 
-    });
+});
+
+function triggerLockdown() {
+    if (confirm("CRITICAL: Initiate full lockdown?")) {
+        console.log("Lockdown activated");
+    }
+}
 </script>

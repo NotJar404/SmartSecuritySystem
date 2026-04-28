@@ -1,381 +1,638 @@
-﻿/* ========================================= */
-/* SECURITY DASHBOARD - CLEAN & CONSISTENT UI */
-/* ========================================= */
+﻿/* ========================================================= */
+/* ==================== DASHBOARD ========================= */
+/* Uses standard variables from layouts.css */
+/* ========================================================= */
 
-/* ============================= */
-/* RESET */
-/* ============================= */
-*,
-*::before,
-*::after {
-    margin: 0;
-    padding: 0;
+/* ========================================================= */
+/* ==================== BASE =============================== */
+/* ========================================================= */
+
+/* Base body styling inherited from layouts.css */
+
+/* ========================================================= */
+/* ==================== MAIN WRAPPER ======================= */
+/* ========================================================= */
+
+.dashboard-container {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
     box-sizing: border-box;
 }
 
-/* ============================= */
-/* TOKENS (CONSISTENT SYSTEM) */
-/* ============================= */
-:root {
-    --space-1: 6px;
-    --space-2: 10px;
-    --space-3: 14px;
-    --space-4: 18px;
+/* ========================================================= */
+/* ==================== HEADER ============================= */
+/* ========================================================= */
 
-    --radius-sm: 6px;
-    --radius-md: 12px;
+.cmd-header {
+    background: var(--bg-card);
+    padding: 14px 16px;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
 
-    --bg-main: #020617;
-    --bg-card: #0f172a;
-    --bg-hover: #1e293b;
-
-    --border: rgba(255,255,255,0.06);
-    --text-muted: #94a3b8;
-
-    --blue: #3b82f6;
-    --green: #22c55e;
-    --yellow: #facc15;
-    --red: #ef4444;
-
-    --shadow-sm: 0 2px 6px rgba(0,0,0,0.3);
-    --shadow-md: 0 6px 16px rgba(0,0,0,0.4);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
-/* ============================= */
-/* BASE */
-/* ============================= */
-body {
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    background: radial-gradient(circle at top, #020617, #000);
-    color: #e5e7eb;
-    line-height: 1.4;
-    height: 100vh;
-    overflow: hidden;
+.cmd-header h2 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
 }
 
-/* ============================= */
-/* HEADER */
-/* ============================= */
-.dashboard-header {
-    padding: var(--space-1) var(--space-2);
+.cmd-header small {
+    color: var(--text-muted);
 }
 
-.dashboard-header h1 {
-    font-size: 18px;
+/* ========================================================= */
+/* ==================== BUTTONS ============================ */
+/* ========================================================= */
+
+.emergency-cluster {
+    display: flex;
+    gap: 10px;
+}
+
+.btn-lockdown,
+.btn-emergency {
+    border: none;
+    padding: 10px 14px;
+    border-radius: var(--radius);
     font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s ease;
 }
 
-.dashboard-subtitle {
+.btn-lockdown {
+    background: #FFE5E5;
+    color: var(--status-locked);
+}
+
+.btn-lockdown:hover {
+    background: #ffcccc;
+}
+
+.btn-emergency {
+    background: var(--accent);
+    color: white;
+}
+
+.btn-emergency:hover {
+    background: var(--accent-dark);
+}
+
+/* ========================================================= */
+/* ==================== STATS ROW ========================== */
+/* ========================================================= */
+
+.stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+}
+
+.stat-card {
+    background: var(--bg-card);
+    padding: 16px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    box-shadow: var(--shadow-sm);
+    min-height: 70px;
+    transition: all 0.2s ease;
+}
+
+.stat-card:hover {
+    border-color: var(--accent);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+.stat-card h3 {
+    margin: 0;
+    font-size: 1.6rem;
+    font-weight: 800;
+}
+
+.stat-card span {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.stat-icon {
+    width: 46px;
+    height: 46px;
+    min-width: 46px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+}
+
+.stat-icon.blue { background: rgba(212,163,115,0.2); color: var(--accent); }
+.stat-icon.yellow { background: rgba(200,108,32,0.15); color: var(--status-locked); }
+.stat-icon.red { background: rgba(196,48,43,0.15); color: var(--status-locked); }
+.stat-icon.green { background: rgba(45,122,86,0.15); color: var(--status-active); }
+
+/* ========================================================= */
+/* ==================== CCTV SECTION ======================= */
+/* ========================================================= */
+
+.cctv-filmstrip-section {
+    background: var(--bg-card);
+    padding: 14px;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.horizontal-camera-slider {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 6px;
+}
+
+.camera-card-wrap {
+    min-width: 260px;
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: black;
+    flex-shrink: 0;
+}
+
+.cctv-video {
+    width: 100%;
+    height: 160px;
+    object-fit: cover;
+}
+
+/* ========================================================= */
+/* ==================== DATA GRID ========================== */
+/* ========================================================= */
+
+.data-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+/* ========================================================= */
+/* ==================== PANELS ============================ */
+/* ========================================================= */
+
+.panel {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    padding: 12px;
+
+    display: flex;
+    flex-direction: column;
+    min-height: auto;
+}
+
+.panel-header {
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+}
+
+.panel-header h4 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.panel-header h5 {
+    margin: 0 0 2px 0;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.panel-header small {
+    display: block;
     font-size: 11px;
     color: var(--text-muted);
 }
 
-/* ============================= */
-/* CONTAINER */
-/* ============================= */
-.dashboard-container {
-    height: 100%;
+/* ========================================================= */
+/* ==================== PANEL CONTENT ====================== */
+/* ========================================================= */
+
+.panel-body {
     display: flex;
     flex-direction: column;
-    gap: var(--space-3);
-    padding: var(--space-3);
+    gap: 8px;
 }
 
-/* ============================= */
-/* STATS */
-/* ============================= */
-.stats {
+/* ========================================================= */
+/* ==================== QUICK ACTIONS ===================== */
+/* ========================================================= */
+
+.quick-actions-row {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: var(--space-2);
-
-    margin-top: var(--space-5);
-    align-self: stretch;
+    gap: 10px;
 }
 
-.stat-card {
-    background: linear-gradient(160deg, #0f172a, #020617);
-    border-radius: var(--radius-md);
+.quick-card {
+    background: var(--bg-card);
     border: 1px solid var(--border);
-    padding: var(--space-3);
-    min-height: 80px;
+    border-radius: var(--radius-lg);
+    padding: 10px;
     display: flex;
     align-items: center;
-    gap: var(--space-2);
-    box-shadow: var(--shadow-sm);
-    transition: 0.25s;
+    gap: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    color: var(--text-main);
 }
 
-.stat-card:hover {
+.quick-card:hover {
+    border-color: var(--accent);
+    box-shadow: 0 4px 12px rgba(212, 163, 115, 0.15);
     transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
 }
 
-/* icon */
-.stat-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.quick-card i {
+    font-size: 18px;
+    color: var(--accent);
+    min-width: 20px;
+    text-align: center;
 }
 
-.stat-icon.blue { background: rgba(59,130,246,0.15); color: var(--blue); }
-.stat-icon.green { background: rgba(34,197,94,0.15); color: var(--green); }
-.stat-icon.yellow { background: rgba(250,204,21,0.15); color: var(--yellow); }
-.stat-icon.red { background: rgba(239,68,68,0.15); color: var(--red); }
-
-.stat-card-content {
+.quick-info {
     display: flex;
     flex-direction: column;
     gap: 2px;
 }
 
-.stat-label {
-    font-size: 12px;
-    color: #cbd5f5;
-}
-
-.stat-card h2 {
-    font-size: 20px;
-    font-weight: 700;
-}
-
-.stat-meta {
-    font-size: 10px;
-    color: var(--text-muted);
-}
-
-/* ============================= */
-/* GRID LAYOUT */
-/* ============================= */
-.dashboard-grid {
-    flex: 1;
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: var(--space-2);
-    min-height: 0;
-}
-
-.grid-left {
-    display: flex;
-    min-height: 0;
-}
-
-.grid-right {
-    display: grid;
-    grid-template-rows: 1fr 1fr;
-    gap: var(--space-2);
-    min-height: 0;
-}
-
-/* ============================= */
-/* PANEL */
-/* ============================= */
-.panel {
-    background: linear-gradient(160deg, #0f172a, #020617);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--border);
-    padding: var(--space-2);
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    overflow: hidden;
-    box-shadow: var(--shadow-sm);
-    transition: 0.25s;
-}
-
-.panel:hover {
-    box-shadow: var(--shadow-md);
-}
-
-/* ============================= */
-/* PANEL HEADER */
-/* ============================= */
-.panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: var(--space-1);
-}
-
-.panel-header h3 {
+.quick-info strong {
     font-size: 13px;
+    font-weight: 700;
+    color: var(--text-main);
 }
 
-.panel-subtitle {
-    font-size: 10px;
+.quick-info small {
+    font-size: 11px;
     color: var(--text-muted);
 }
 
-/* ============================= */
-/* SCROLL AREAS */
-/* ============================= */
-.scroll-zone,
-.scroll-body,
-.scroll-cctv {
-    flex: 1;
-    overflow-y: auto;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-}
+/* ========================================================= */
+/* ==================== ROWS =============================== */
+/* ========================================================= */
 
-/* scrollbar */
-.scroll-zone::-webkit-scrollbar,
-.scroll-body::-webkit-scrollbar {
-    width: 5px;
-}
-
-.scroll-zone::-webkit-scrollbar-thumb,
-.scroll-body::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,0.2);
-    border-radius: 10px;
-}
-
-/* ============================= */
-/* CAMERA GRID */
-/* ============================= */
-.cctv-grid {
-    flex: 1;
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    grid-template-rows: repeat(2, 1fr);
-    gap: 6px;
-}
-
-/* ============================= */
-/* CAMERA TILE */
-/* ============================= */
-.camera-tile {
-    position: relative;
-    border-radius: var(--radius-sm);
-    overflow: hidden;
-    border: 1px solid var(--border);
-    background: black;
-}
-
-.cctv-video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: transform 0.3s ease;
-}
-
-/* overlay */
-.camera-overlay {
-    position: absolute;
-    inset: 0;
+.entry-row {
     display: flex;
     justify-content: space-between;
-    align-items: flex-end;
-    padding: 6px;
-}
-
-/* label */
-.cam-label {
-    font-size: 10px;
-    background: rgba(0,0,0,0.6);
-    padding: 3px 6px;
-    border-radius: 4px;
-}
-
-/* live */
-.live-dot {
-    position: absolute;
-    top: 5px;
-    right: 6px;
-    font-size: 10px;
-    color: var(--green);
-    font-weight: 600;
-}
-
-/* hover zoom */
-.camera-tile:hover .cctv-video {
-    transform: scale(1.05);
-}
-
-/* ============================= */
-/* EVENTS */
-/* ============================= */
-.event-item {
-    display: flex;
-    gap: var(--space-1);
-    padding: var(--space-1);
-    border-radius: var(--radius-sm);
-    background: rgba(255,255,255,0.02);
-}
-
-.event-item:hover {
-    background: rgba(255,255,255,0.05);
-}
-
-.event-icon {
-    width: 26px;
-    height: 26px;
-    border-radius: 6px;
-    display: flex;
     align-items: center;
-    justify-content: center;
+    padding: 10px;
+    border-radius: var(--radius);
+    background: var(--bg-hover);
 }
 
-.event-content h4 {
-    font-size: 12px;
+.entry-row.success {
+    border-left: 3px solid var(--status-active);
 }
 
-.event-content p {
-    font-size: 10px;
-    color: var(--text-muted);
+.entry-row.danger {
+    border-left: 3px solid var(--status-locked);
 }
 
-/* ============================= */
-/* ALERTS */
-/* ============================= */
-.alert-card {
-    padding: var(--space-2);
-    border-radius: var(--radius-sm);
-    background: linear-gradient(145deg, #020617, #0f172a);
-    border: 1px solid var(--border);
-}
-
-.alert-card h4 {
-    font-size: 12px;
-}
-
-.alert-card p {
-    font-size: 10px;
-    color: var(--text-muted);
-}
-
-/* ============================= */
-/* EMPTY */
-/* ============================= */
-.empty-state {
-    margin: auto;
+.entry-icon {
+    width: 30px;
     text-align: center;
+}
+
+.entry-text strong {
+    display: block;
+}
+
+.entry-text small {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.entry-time {
     font-size: 12px;
     color: var(--text-muted);
 }
 
-/* ============================= */
-/* RESPONSIVE */
-/* ============================= */
-@media (max-width: 900px) {
-    body {
-        overflow: auto;
+/* ========================================================= */
+/* ==================== EMPTY STATE ======================== */
+/* ========================================================= */
+
+.empty-state {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 20px;
+}
+
+/* ========================================================= */
+/* ==================== RESPONSIVE ========================= */
+/* ========================================================= */
+
+@media (max-width: 1000px) {
+    .stats-row {
+        grid-template-columns: 1fr 1fr;
     }
 
-    .dashboard-grid {
+    .data-grid {
         grid-template-columns: 1fr;
     }
 
-    .grid-right {
-        grid-template-rows: auto;
-    }
-
-    .stats {
+    .quick-actions-row {
         grid-template-columns: repeat(2, 1fr);
     }
+}
+
+@media (max-width: 600px) {
+    .stats-row {
+        grid-template-columns: 1fr;
+    }
+
+    .emergency-cluster {
+        flex-direction: column;
+    }
+
+    .horizontal-camera-slider {
+        flex-direction: column;
+    }
+
+    .quick-actions-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ========================================================= */
+/* ==================== ALERT CARDS (DASHBOARD) =========== */
+/* ========================================================= */
+
+.alerts-container-dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 280px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.alerts-container-dashboard::-webkit-scrollbar {
+    width: 5px;
+}
+
+.alerts-container-dashboard::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.35);
+    border-radius: 10px;
+}
+
+.alerts-container-dashboard::-webkit-scrollbar-thumb:hover {
+    background: rgba(148, 163, 184, 0.55);
+}
+
+.alert-card-dash {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.alert-card-dash::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 3px;
+    height: 100%;
+    border-radius: var(--radius) 0 0 var(--radius);
+}
+
+.alert-card-dash.critical::before {
+    background: var(--status-locked);
+}
+
+.alert-card-dash.warning::before {
+    background: #C86C20;
+}
+
+.alert-card-dash.info::before {
+    background: var(--accent);
+}
+
+.alert-card-dash:hover {
+    background: var(--bg-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+}
+
+.alert-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+    min-width: 24px;
+    text-align: center;
+}
+
+.alert-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.alert-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-main);
+    margin-bottom: 2px;
+}
+
+.alert-description {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+}
+
+.alert-time {
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.alert-actions-dash {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.btn-alert-secondary,
+.btn-alert-primary {
+    padding: 6px 10px;
+    border: none;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.btn-alert-secondary {
+    background: rgba(212, 163, 115, 0.15);
+    color: var(--accent);
+    border: 1px solid rgba(212, 163, 115, 0.3);
+}
+
+.btn-alert-secondary:hover {
+    background: rgba(212, 163, 115, 0.25);
+    border-color: rgba(212, 163, 115, 0.4);
+}
+
+.btn-alert-primary {
+    background: var(--accent);
+    color: white;
+}
+
+.btn-alert-primary:hover {
+    background: var(--accent-dark);
+}
+
+/* ========================================================= */
+/* ==================== ACCESS LOG CARDS (DASHBOARD) ====== */
+/* ========================================================= */
+
+.log-scroll-dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 280px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.log-scroll-dashboard::-webkit-scrollbar {
+    width: 5px;
+}
+
+.log-scroll-dashboard::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.35);
+    border-radius: 10px;
+}
+
+.log-scroll-dashboard::-webkit-scrollbar-thumb:hover {
+    background: rgba(148, 163, 184, 0.55);
+}
+
+.log-card-dash {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    border-left: 3px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.log-card-dash.success {
+    border-left-color: var(--status-active);
+}
+
+.log-card-dash.danger {
+    border-left-color: var(--status-locked);
+}
+
+.log-card-dash:hover {
+    background: var(--bg-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+}
+
+.log-avatar-box {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--bg-hover);
+}
+
+.log-avatar-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.log-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.log-name {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-main);
+    margin-bottom: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.log-details {
+    display: flex;
+    gap: 6px;
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.log-room {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.log-time {
+    white-space: nowrap;
+    font-weight: 600;
+}
+
+.log-status {
+    flex-shrink: 0;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.status-badge.success {
+    background: rgba(45, 122, 86, 0.15);
+    color: var(--status-active);
+}
+
+.status-badge.danger {
+    background: rgba(196, 48, 43, 0.15);
+    color: var(--status-locked);
 }

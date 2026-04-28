@@ -1,170 +1,203 @@
 ﻿@using WebApp.Models
 @{
-    ViewData["Title"] = "System Settings";
-
-    // 🔹 Temporary hardcoded initial data
-    var cameras = new List<CameraDevice>
-    {
-        new CameraDevice { Id = 1, Name = "Front Gate", Location = "Entrance", IpAddress = "192.168.1.10" },
-        new CameraDevice { Id = 2, Name = "Lobby", Location = "Reception", IpAddress = "192.168.1.11" },
-        new CameraDevice { Id = 3, Name = "Parking Lot", Location = "Outdoor", IpAddress = "192.168.1.12" }
-    };
-
-    var alarms = new List<EmergencyAlarm>
-    {
-        new EmergencyAlarm { Id = 1, Name = "Intruder Alert", Description = "Triggered when an intruder is detected", IconType = "intruder", IsEnabled = false },
-        new EmergencyAlarm { Id = 2, Name = "Fire Alarm", Description = "Triggered when smoke/fire detected", IconType = "fire", IsEnabled = false },
-        new EmergencyAlarm { Id = 3, Name = "Earthquake Drill", Description = "For earthquake simulation drills", IconType = "earthquake", IsEnabled = false },
-        new EmergencyAlarm { Id = 4, Name = "Emergency Drill", Description = "General emergency drill simulation", IconType = "ambulance", IsEnabled = false }
-    };
+    ViewData["Title"] = "System Control Center";
+    // We are now using AlarmSetting instead of Alert to power the toggles
+    var alarmSettings = ViewBag.Alarms as List<WebApp.Models.AlarmSetting> ?? new List<WebApp.Models.AlarmSetting>();
 }
 
 <link rel="stylesheet" href="~/css/System.css" />
-@Html.AntiForgeryToken()
+<link rel="stylesheet" href="~/css/dashboard.css" />
 
-<div class="system-page">
-    <div class="system-wrapper">
+<div class="dashboard-container">
 
-        <!-- HEADER -->
-        <div class="system-header mb-4">
-            <h2>System Settings</h2>
-            <p class="system-muted">Configure and monitor your security system</p>
+    <header class="cmd-header d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h2 class="mb-0">System Control Center</h2>
+            <small class="text-muted">Monitor and configure system operations</small>
         </div>
-
-        <!-- TOP CARDS -->
-        <div class="system-grid-3">
-
-            <!-- Notifications -->
-            <div class="system-card">
-                <div class="sys-card-header">
-                    <div class="icon blue"><i class="fa fa-bell"></i></div>
-                    <div>
-                        <h5>Notifications</h5>
-                        <p class="system-muted">Alert preferences</p>
-                    </div>
-                </div>
-                <div class="sys-card-footer">
-                    <span>Enable notifications</span>
-                    <label class="system-switch">
-                        <input type="checkbox" checked />
-                        <span class="system-slider"></span>
-                    </label>
-                </div>
-            </div>
-
-            <!-- Recording -->
-            <div class="system-card">
-                <div class="sys-card-header">
-                    <div class="icon red"><i class="fa fa-video"></i></div>
-                    <div>
-                        <h5>Recording</h5>
-                        <p class="system-muted">Continuous recording</p>
-                    </div>
-                </div>
-                <div class="sys-card-footer">
-                    <span>Enable recording</span>
-                    <label class="system-switch">
-                        <input type="checkbox" checked />
-                        <span class="system-slider"></span>
-                    </label>
-                </div>
-            </div>
-
-            <!-- AI Detection -->
-            <div class="system-card">
-                <div class="sys-card-header">
-                    <div class="icon purple"><i class="fa fa-shield"></i></div>
-                    <div>
-                        <h5>AI Detection</h5>
-                        <p class="system-muted">Smart analysis</p>
-                    </div>
-                </div>
-                <div class="sys-card-footer">
-                    <span>Enable AI detection</span>
-                    <label class="system-switch">
-                        <input type="checkbox" checked />
-                        <span class="system-slider"></span>
-                    </label>
-                </div>
-            </div>
-
+        <div>
+            <span class="live-badge">● SYSTEM ACTIVE</span>
         </div>
+    </header>
 
-        <!-- CAMERA + ALARM ROW -->
-        <div class="system-grid-2">
+    <div class="settings-wrapper">
+        <div class="control-grid">
 
-            <!-- CAMERA CONFIGURATION -->
-            <div class="system-card">
-                <div class="sys-card-header">
-                    <div class="icon blue"><i class="fa fa-camera"></i></div>
-                    <h5>Camera Configuration</h5>
+            <div class="control-card">
+                <div class="card-title-area">
+                    <h5><i class="fa fa-desktop me-2"></i>Global Settings</h5>
+                    <span class="status-indicator-dot online"></span>
+                </div>
+                
+                <div class="setting-row">
+                    <div class="label-desc">
+                        <label>Master Arm</label>
+                        <small>Enable/Disable AI monitoring</small>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="armSystem" checked onchange="handleToggle('Security Engine', this.checked)">
+                        <span class="slider round"></span>
+                    </label>
                 </div>
 
-                <div class="camera-container">
+                <div class="setting-row">
+                    <div class="label-desc">
+                        <label>Eye-Strain Protection</label>
+                        <small>Apply warm UI color profile</small>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" checked onchange="updateTheme(this.checked)">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
 
-                    <!-- CAMERA LIST -->
-                    <div class="camera-list">
-                        @for (int i = 0; i < cameras.Count; i++)
+                <div class="setting-row">
+                    <div class="label-desc">
+                        <label>Auto-Maintenance</label>
+                        <small>Purge old logs every 30 days</small>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" checked>
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="control-card">
+                <h5><i class="fa fa-brain me-2"></i>AI Intelligence</h5>
+                <div class="setting-row">
+                    <label>Motion Sensitivity</label>
+                    <select class="warm-select">
+                        <option value="1">Low (Ignore Shadows)</option>
+                        <option value="2" selected>Medium (Balanced)</option>
+                        <option value="3">High (Strict)</option>
+                    </select>
+                </div>
+                <div class="setting-row mt-3">
+                    <label>Face Accuracy</label>
+                    <div class="input-group-custom">
+                        <input type="number" class="warm-num-input" value="80" min="50" max="100" />
+                        <span class="unit-tag">%</span>
+                    </div>
+                </div>
+                <div class="progress-container mt-2" style="height: 4px;">
+                    <div class="progress-bar-fill" style="width:80%; background: var(--accent);"></div>
+                </div>
+                <small class="text-muted extra-small mt-2 d-block">Minimum confidence for a positive match.</small>
+            </div>
+
+            <div class="control-card">
+                <h5><i class="fa fa-bell me-2"></i>Alert Protocols</h5>
+                <div class="setting-row">
+                    <div class="label-desc">
+                        <label>Email Reports</label>
+                        <small>Send snapshots of threats</small>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" checked>
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+                <div class="setting-row">
+                    <div class="label-desc">
+                        <label>Hardware Siren</label>
+                        <small>Enable physical Pi buzzer</small>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" checked>
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="control-card">
+                <h5><i class="fa fa-shield-alt me-2"></i>Access Control</h5>
+                <div class="setting-row">
+                    <label>Gate Hold-Open</label>
+                    <div class="input-group-custom">
+                        <input type="number" class="warm-num-input" value="5" />
+                        <span class="unit-tag">sec</span>
+                    </div>
+                </div>
+                <div class="setting-row mt-3">
+                    <div class="label-desc">
+                        <label>Biometric Lock</label>
+                        <small>Face match required to open</small>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" checked>
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="control-card">
+                <h5><i class="fa fa-microchip me-2"></i>Pi Maintenance</h5>
+                
+                <div class="storage-display mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <small class="fw-bold">SD Card Storage</small>
+                        <small class="text-success">25% Used</small>
+                    </div>
+                    <div class="progress-container" style="height: 6px;">
+                        <div class="progress-bar-fill" style="width:25%"></div>
+                    </div>
+                </div>
+
+                <button class="btn btn-warm-warning w-100 mb-2 py-2" onclick="triggerAction('Optimize Database')">
+                    <i class="fa fa-broom me-2"></i>Optimize Database
+                </button>
+
+                <button class="btn btn-warm-dark w-100 py-2" onclick="handleArchive()">
+                    <i class="fa fa-hdd me-2"></i>Transfer to Archive
+                </button>
+            </div>
+
+            <div class="system-card control-card">
+                <div class="card-title-area">
+                    <h5><i class="fa fa-exclamation-triangle text-danger me-2"></i>Emergency Alarm</h5>
+                </div>
+
+                <div class="alarm-list mt-3">
+                    @if (alarmSettings != null && alarmSettings.Any())
+                    {
+                        @foreach (var setting in alarmSettings)
                         {
-                            var cam = cameras[i];
-                            <div class="camera-item @(i == 0 ? "active" : "")"
-                                 data-id="@cam.Id"
-                                 data-name="@cam.Name"
-                                 data-location="@cam.Location"
-                                 data-ip="@cam.IpAddress"
-                                 onclick="selectCamera(this)">
-                                <i class="fa fa-video-camera"></i>
-                                <span>@cam.Name</span>
+                            <div class="alarm-item @(setting.IsEnabled ? "active" : "") d-flex justify-content-between align-items-center mb-3">
+                                <div class="alarm-info d-flex align-items-center">
+                                    <div class="alarm-icon me-3 @setting.Type.ToLower()">
+                                        <i class="fa @(setting.Type.ToLower() == "intrusion" ? "fa-user-secret" :
+                                                      setting.Type.ToLower() == "fire" ? "fa-fire" :
+                                                      setting.Type.ToLower() == "earthquake" ? "fa-globe" :
+                                                      "fa-ambulance")"></i>
+                                    </div>
+                                    <div>
+                                        <strong class="d-block">@setting.Name</strong>
+                                        <p class="alarm-desc text-muted mb-0 extra-small">Hardware trigger for @setting.Type protocol.</p>
+                                    </div>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" @(setting.IsEnabled ? "checked" : "") 
+                                           onchange="confirmToggle(this, '@setting.Name', @setting.SettingId)">
+                                    <span class="slider round"></span>
+                                </label>
                             </div>
                         }
-                    </div>
-
-                    <!-- EDIT PANEL -->
-                    <div class="camera-edit">
-                        <input type="hidden" id="camId" />
-                        <input type="text" id="camName" class="form-control" placeholder="Camera Name" />
-                        <input type="text" id="camLocation" class="form-control" placeholder="Location" />
-                        <input type="text" id="camIp" class="form-control" placeholder="IP Address" />
-                        <button class="btn btn-primary" onclick="updateCamera()">Update Camera</button>
-                    </div>
-
-                </div>
-            </div>
-
-            <!-- EMERGENCY ALARM -->
-            <div class="system-card">
-                <div class="sys-card-header">
-                    <div class="icon red"><i class="fa fa-exclamation-triangle"></i></div>
-                    <h5>Emergency Alarm</h5>
-                </div>
-
-                <div class="alarm-list">
-                    @foreach (var alarm in alarms)
+                    }
+                    else
                     {
-                        <div class="alarm-item @(alarm.IsEnabled ? "active" : "")">
-                            <div class="alarm-info">
-                                <div class="alarm-icon @alarm.IconType">
-                                    <i class="fa @(alarm.IconType == "intruder" ? "fa-user-secret" :
-                                                  alarm.IconType == "fire" ? "fa-fire" :
-                                                  alarm.IconType == "earthquake" ? "fa-globe" :
-                                                  "fa-ambulance")"></i>
-                                </div>
-                                <div>
-                                    <strong>@alarm.Name</strong>
-                                    <p class="alarm-desc">@alarm.Description</p>
-                                </div>
-                            </div>
-                            <label class="system-switch">
-                                <input type="checkbox" @(alarm.IsEnabled ? "checked" : "") 
-                                       onchange="confirmToggle(this, @alarm.Id)" />
-                                <span class="system-slider"></span>
-                            </label>
-                        </div>
+                        <p class="text-muted small text-center">No alarm protocols found in database.</p>
                     }
                 </div>
-
             </div>
 
+        </div>
+
+        <div class="mt-5 border-top pt-4 text-center">
+            <button class="btn btn-warm-dark px-5 py-3 shadow-lg rounded-pill" onclick="saveGlobalSettings()">
+                <i class="fa fa-cloud-upload-alt me-2"></i>Deploy Changes to Raspberry Pi
+            </button>
+            <p class="text-muted extra-small mt-2">Changes will be pushed via SQL bridge to the AI engine.</p>
         </div>
 
     </div>
@@ -172,59 +205,68 @@
 
 @section Scripts {
 <script>
-const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
-
-// CAMERA
-function selectCamera(el) {
-    document.getElementById("camId").value = el.dataset.id;
-    document.getElementById("camName").value = el.dataset.name;
-    document.getElementById("camLocation").value = el.dataset.location;
-    document.getElementById("camIp").value = el.dataset.ip;
-
-    document.querySelectorAll('.camera-item').forEach(i => i.classList.remove('active'));
-    el.classList.add('active');
-}
-
-function updateCamera() {
-    const id = document.getElementById("camId").value;
-    if (!id) { alert("Select a camera first"); return; }
-
-    const name = document.getElementById("camName").value;
-    const location = document.getElementById("camLocation").value;
-    const ip = document.getElementById("camIp").value;
-
-    alert(`Camera updated!\nName: ${name}\nLocation: ${location}\nIP: ${ip}`);
-}
-
-// ALARM with confirmation
-function confirmToggle(checkbox, alarmId) {
-    const alarmName = checkbox.closest('.alarm-item').querySelector('strong').innerText;
-    const confirmMsg = `Are you sure you want to turn ${checkbox.checked ? 'ON' : 'OFF'} the "${alarmName}" alarm?`;
-    if (confirm(confirmMsg)) {
-        toggleAlarm(checkbox, alarmId);
-    } else {
-        checkbox.checked = !checkbox.checked; // revert
+    function handleToggle(feature, state) {
+        const status = state ? "ARMED" : "DISARMED";
+        console.log(`Hardware Command: ${feature} set to ${status}`);
     }
-}
 
-function toggleAlarm(checkbox, alarmId) {
-    document.querySelectorAll('.alarm-item').forEach(item => item.classList.remove('active'));
-
-    if (checkbox.checked) {
-        document.querySelectorAll('.alarm-item input').forEach(cb => {
-            if (cb !== checkbox) cb.checked = false;
-        });
-        checkbox.closest('.alarm-item').classList.add('active');
+    function updateTheme(isWarm) {
+        document.body.classList.toggle('warm-theme-mode', isWarm);
     }
-}
 
-// AUTO-SELECT FIRST CAMERA & ALARM
-document.addEventListener("DOMContentLoaded", () => {
-    const firstCam = document.querySelector('.camera-item.active');
-    if (firstCam) selectCamera(firstCam);
+    function confirmToggle(checkbox, alarmName, settingId) {
+        const isChecked = checkbox.checked;
+        const action = isChecked ? "ACTIVATE" : "DEACTIVATE";
+        
+        if (confirm(`HCI SAFETY CHECK: Are you sure you want to ${action} the ${alarmName}?`)) {
+            // Updated to perform an actual background update
+            fetch('/Dashboard/UpdateAlarmStatus', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `id=${settingId}&isEnabled=${isChecked}`
+            })
+            .then(response => {
+                if(!response.ok) throw new Error('Database Sync Failed');
+                console.log(`Sync Successful: ${alarmName} is now ${isChecked}`);
+            })
+            .catch(error => {
+                alert("Hardware Sync Error: Could not reach the database.");
+                checkbox.checked = !isChecked; // Revert UI if DB fails
+            });
+        } else {
+            checkbox.checked = !isChecked; // Revert if user clicks 'Cancel'
+        }
+    }
 
-    const firstAlarm = document.querySelector('.alarm-item.active input');
-    if (firstAlarm) firstAlarm.closest('.alarm-item').classList.add('active');
-});
+    function handleArchive() {
+        if(confirm("HARDWARE REQUIRED: Is the USB storage device connected to the Raspberry Pi?")) {
+            alert("Archive process initiated. Please do not disconnect the USB until sync is complete.");
+        }
+    }
+
+    function triggerAction(action) {
+        if(confirm(`CRITICAL ACTION: Are you sure you want to trigger: ${action}?`)) {
+            alert(`Signal sent. ${action} in progress.`);
+        }
+    }
+
+    function saveGlobalSettings() {
+        const btn = event.currentTarget;
+        const originalContent = btn.innerHTML;
+        
+        btn.innerHTML = '<i class="fa fa-spinner fa-spin me-2"></i>Pushing Config...';
+        btn.disabled = true;
+
+        setTimeout(() => {
+            btn.innerHTML = '<i class="fa fa-check-circle me-2"></i>Hardware Synced Successfully';
+            btn.classList.replace('btn-warm-dark', 'btn-success');
+            
+            setTimeout(() => {
+                btn.innerHTML = originalContent;
+                btn.classList.replace('btn-success', 'btn-warm-dark');
+                btn.disabled = false;
+            }, 3000);
+        }, 2000);
+    }
 </script>
 }

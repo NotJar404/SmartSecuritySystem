@@ -1,357 +1,181 @@
-﻿/* =========================================
-   SYSTEM PAGE — FINAL POLISHED UI (UPGRADED)
-   ========================================= */
+﻿/* =========================================================
+   SECUREVISION — DYNAMIC GRID UI
+   Uses standard variables from layouts.css
+   ========================================================= */
 
-.system-page {
-    background: #0b0f19;
-    color: #e5e7eb;
-    padding: 24px;
+.settings-wrapper {
+    background: var(--bg-main);
+    color: var(--text-main);
+    padding: 20px 40px; /* Balanced padding */
     min-height: 100vh;
     font-family: 'Inter', sans-serif;
 }
 
-/* HEADER */
-.system-header h2 {
-    font-size: 28px;
-    font-weight: 700;
-    margin-bottom: 4px;
-}
-
-.system-muted {
-    color: #9ca3af;
-    font-size: 13px;
-}
-
 /* =========================================
-   GRID LAYOUT
+   TOP RIGHT HARDWARE PINS
    ========================================= */
-
-.system-grid-3 {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 18px;
-    margin-bottom: 20px;
-}
-
-.system-grid-2 {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 18px;
-}
-
-/* =========================================
-   CARD DESIGN
-   ========================================= */
-
-.system-card {
-    background: radial-gradient(circle at top left, #111827, #0b0f19);
-    border-radius: 16px;
-    padding: 18px;
-    border: 1px solid rgba(255,255,255,0.04);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.45);
-    transition: all 0.25s ease;
-}
-
-    .system-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 24px rgba(0,0,0,0.6);
-    }
-
-/* =========================================
-   CARD HEADER
-   ========================================= */
-
-.sys-card-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 14px;
-}
-
-    .sys-card-header h5 {
-        margin: 0;
-        font-size: 16px;
-        font-weight: 600;
-    }
-
-/* =========================================
-   ICONS
-   ========================================= */
-
-.icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-}
-
-    .icon.blue {
-        background: linear-gradient(135deg, #2563eb, #1d4ed8);
-    }
-
-    .icon.red {
-        background: linear-gradient(135deg, #ef4444, #dc2626);
-    }
-
-    .icon.purple {
-        background: linear-gradient(135deg, #9333ea, #7e22ce);
-    }
-
-/* =========================================
-   SWITCH
-   ========================================= */
-
-.sys-card-footer {
+.header-flex {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    font-size: 13px;
+    align-items: flex-start;
+    margin-bottom: 30px;
 }
 
-.system-switch {
-    position: relative;
-    width: 44px;
-    height: 22px;
+.pi-status-container {
+    text-align: right;
 }
 
-    .system-switch input {
-        display: none;
-    }
-
-.system-slider {
-    position: absolute;
-    inset: 0;
-    background: #1f2937;
-    border-radius: 999px;
-    cursor: pointer;
-    transition: 0.3s;
-}
-
-    .system-slider:before {
-        content: "";
-        position: absolute;
-        width: 16px;
-        height: 16px;
-        background: white;
-        border-radius: 50%;
-        top: 3px;
-        left: 4px;
-        transition: 0.3s;
-    }
-
-.system-switch input:checked + .system-slider {
-    background: linear-gradient(135deg, #2563eb, #1d4ed8);
-}
-
-    .system-switch input:checked + .system-slider:before {
-        transform: translateX(20px);
-    }
-
-/* =========================================
-   CAMERA CONFIGURATION
-   ========================================= */
-
-.camera-container {
-    display: grid;
-    grid-template-columns: 1fr 2fr;
-    gap: 14px;
-}
-
-/* CAMERA LIST */
-.camera-list {
-    background: #0f172a;
-    border-radius: 10px;
-    padding: 10px;
-    max-height: 260px;
-    overflow-y: auto;
-}
-
-.camera-item {
-    padding: 10px;
-    border-radius: 8px;
-    cursor: pointer;
-    display: flex;
+.pi-status-pill {
+    background: white;
+    border: 1px solid var(--border);
+    padding: 6px 16px;
+    border-radius: 50px;
+    display: inline-flex;
     align-items: center;
     gap: 8px;
-    font-size: 13px;
-    transition: 0.2s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
 }
-
-    .camera-item:hover {
-        background: rgba(37,99,235,0.2);
-    }
-
-    .camera-item.active {
-        background: #2563eb;
-        color: white;
-        box-shadow: 0 0 10px rgba(37,99,235,0.5);
-    }
-
-/* EDIT PANEL */
-.camera-edit {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-/* INPUT */
-.form-control {
-    background: #111827;
-    border: 1px solid rgba(255,255,255,0.05);
-    border-radius: 8px;
-    padding: 8px 10px;
-    font-size: 13px;
-    color: #e5e7eb;
-    outline: none;
-    transition: 0.2s;
-}
-
-    .form-control:focus {
-        border-color: #2563eb;
-        box-shadow: 0 0 0 1px rgba(37,99,235,0.3);
-    }
-
-/* BUTTON */
-.btn {
-    border: none;
-    border-radius: 8px;
-    padding: 8px;
-    font-size: 13px;
-    cursor: pointer;
-    transition: 0.2s;
-}
-
-.btn-primary {
-    background: linear-gradient(135deg, #2563eb, #1d4ed8);
-    color: white;
-}
-
-    .btn-primary:hover {
-        opacity: 0.9;
-    }
 
 /* =========================================
-   EMERGENCY ALARM (ENHANCED UX)
+   NOT-SO-PLAIN GRID SYSTEM
    ========================================= */
-
-.alarm-list {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+.control-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr); /* 3 column base */
+    gap: 20px;
 }
 
-.alarm-item {
+.control-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    border: 1px solid var(--border);
+    box-shadow: 0 4px 12px rgba(62, 54, 46, 0.05);
+    transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+    display: flex;
+    flex-direction: column;
+}
+
+/* Feature: Spanning to break the symmetry */
+.span-2 { grid-column: span 2; } /* Makes specific cards wider */
+.tall { grid-row: span 2; }       /* Makes specific cards taller */
+
+.control-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 30px rgba(212, 163, 115, 0.15);
+}
+
+/* =========================================
+   CARD INTERIORS
+   ========================================= */
+.card-header-main {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: #111827;
-    padding: 10px 12px;
-    border-radius: 10px;
-    border: 1px solid rgba(255,255,255,0.05);
-    transition: all 0.25s ease;
+    border-bottom: 2px solid var(--bg-main);
+    padding-bottom: 12px;
+    margin-bottom: 15px;
 }
 
-    .alarm-item:hover {
-        border-color: rgba(239,68,68,0.4);
-    }
+.card-header-main h5 { 
+    margin: 0; 
+    font-weight: 800; 
+    color: var(--accent-dark); 
+    font-size: 1.1rem;
+}
 
-/* LEFT SIDE */
-.alarm-info {
+.setting-row {
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    gap: 10px;
+    padding: 12px 0;
 }
 
-    .alarm-info div {
-        display: flex;
-        flex-direction: column;
-    }
-
-    .alarm-info strong {
-        font-size: 13px;
-    }
-
-/* DESCRIPTION */
-.alarm-desc {
-    font-size: 12px;
-    color: #9ca3af;
-    margin-top: 2px;
-    line-height: 1.3;
+.label-desc label {
+    display: block;
+    font-weight: 700;
+    font-size: 14px;
 }
 
-/* ICON */
-.alarm-icon {
-    width: 30px;
-    height: 30px;
+.label-desc small {
+    display: block;
+    color: var(--text-muted);
+    font-size: 11px;
+    max-width: 200px;
+}
+
+/* =========================================
+   HCI CONTROLS
+   ========================================= */
+.warm-select, .input-group-custom {
+    background: var(--bg-main);
+    border: 1px solid var(--border);
     border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 13px;
+    transition: 0.2s;
 }
 
-    /* ICON COLORS */
-    .alarm-icon.intruder {
-        background: linear-gradient(135deg, #ef4444, #b91c1c);
-    }
+.input-group-custom input {
+    border: none;
+    background: transparent;
+    padding: 6px;
+    width: 50px;
+    text-align: center;
+}
 
-    .alarm-icon.earthquake {
-        background: linear-gradient(135deg, #f59e0b, #d97706);
-    }
+.unit-tag {
+    background: var(--border);
+    padding: 6px 10px;
+    font-size: 11px;
+    font-weight: 700;
+}
 
-    .alarm-icon.fire {
-        background: linear-gradient(135deg, #dc2626, #991b1b);
-    }
+/* Switch */
+.switch { position: relative; width: 44px; height: 22px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider {
+    position: absolute; cursor: pointer; inset: 0;
+    background-color: #E2D9CF; transition: .3s; border-radius: 34px;
+}
+.slider:before {
+    content: ""; position: absolute; height: 16px; width: 16px;
+    left: 3px; bottom: 3px; background-color: white;
+    transition: .3s; border-radius: 50%;
+}
+input:checked + .slider { background-color: var(--accent); }
+input:checked + .slider:before { transform: translateX(22px); }
 
-    .alarm-icon.emergency {
-        background: linear-gradient(135deg, #2563eb, #1d4ed8);
-    }
+/* Buttons */
+.btn-maint {
+    border: none;
+    border-radius: 8px;
+    padding: 12px;
+    font-weight: 700;
+    color: white;
+    transition: 0.2s;
+}
 
-/* ACTIVE STATE (🔥 IMPROVED) */
-.alarm-item.active {
-    border-color: #ef4444;
-    background: linear-gradient(135deg, rgba(239,68,68,0.15), transparent);
-    box-shadow: 0 0 14px rgba(239,68,68,0.6);
+.btn-warning-warm { background: #F4A261; }
+.btn-danger-warm { background: #E76F51; }
+
+.btn-maint:hover { opacity: 0.9; transform: scale(0.98); }
+
+/* Health Stats Box */
+.health-meta {
+    background: var(--bg-main);
+    border-radius: 12px;
+    padding: 15px;
+    margin-top: auto; /* Pushes to bottom of card */
 }
 
 /* =========================================
-   TEXT COLORS
+   RESPONSIVE LAYOUT
    ========================================= */
-
-.text-success {
-    color: #22c55e !important;
-    font-weight: 600;
+@media (max-width: 1100px) {
+    .control-grid { grid-template-columns: 1fr 1fr; }
+    .span-2 { grid-column: span 1; }
 }
 
-.text-warning {
-    color: #facc15 !important;
-    font-weight: 600;
-}
-
-/* =========================================
-   LAYOUT FIX
-   ========================================= */
-
-.system-wrapper {
-    max-width: 1300px;
-    margin: auto;
-}
-
-/* =========================================
-   RESPONSIVE
-   ========================================= */
-
-@media (max-width: 900px) {
-    .system-grid-3,
-    .system-grid-2,
-    .camera-container {
-        grid-template-columns: 1fr;
-    }
-
-    .camera-list {
-        max-height: 180px;
-    }
+@media (max-width: 768px) {
+    .control-grid { grid-template-columns: 1fr; }
+    .settings-wrapper { padding: 15px; }
 }

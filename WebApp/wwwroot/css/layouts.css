@@ -1,0 +1,507 @@
+﻿/* ========================================================= */
+/* ==================== ROOT THEME ========================= */
+/* ========================================================= */
+
+:root {
+    --bg-main: #FFF9F2;
+    --bg-side: #F8F1E7;
+    --bg-top: #FFFFFF;
+    --bg-card: #FFFFFF;
+    --bg-hover: #F5F3ED;
+
+    --text-main: #3E362E;
+    --text-muted: #7D6E5D;
+
+    --accent: #D4A373;
+    --accent-dark: #B88A5D;
+    --border: #E9E0D2;
+    --alert: #E07A5F;
+
+    --status-active: #2D7A56;
+    --status-locked: #C4302B;
+
+    --radius: 10px;
+    --radius-lg: 14px;
+
+    --shadow-sm: 0 2px 6px rgba(0,0,0,0.06);
+    --shadow-md: 0 6px 18px rgba(0,0,0,0.10);
+}
+
+/* DARK MODE */
+body.dark-mode {
+    --bg-main: #1A1714;
+    --bg-side: #231F1C;
+    --bg-top: #2A2420;
+    --bg-card: #3D3330;
+
+    --text-main: #E8E2DB;
+    --text-muted: #A09384;
+
+    --border: #3D352F;
+}
+
+/* ========================================================= */
+/* ==================== BASE LAYOUT ======================== */
+/* ========================================================= */
+
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+.dashboard-wrapper {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+}
+
+/* ========================================================= */
+/* ==================== SIDEBAR ============================ */
+/* ========================================================= */
+
+.sidebar {
+    width: 280px;
+    height: 100vh;
+    background-color: var(--bg-side);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+}
+
+.sidebar-logo {
+    padding: 25px;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+}
+
+.logo-icon {
+    color: var(--accent);
+    font-size: 1.8rem;
+    margin-right: 12px;
+}
+
+.logo-text h2 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.logo-text p {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* PROFILE */
+.profile-preview {
+    margin: 15px;
+    padding: 15px;
+    display: flex;
+    align-items: center;
+    background: rgba(212, 163, 115, 0.08);
+    border-radius: 12px;
+    text-decoration: none;
+    color: inherit;
+}
+
+.avatar-box {
+    width: 42px;
+    height: 42px;
+    background: var(--accent);
+    color: white;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    margin-right: 12px;
+    font-size: 1.2rem;
+}
+
+.profile-meta strong {
+    display: block;
+    font-size: 0.9rem;
+}
+
+.profile-meta small {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+/* NAV */
+.sidebar-nav {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.sidebar-nav ul {
+    list-style: none;
+    padding: 10px;
+    margin: 0;
+}
+
+.nav-item a {
+    display: flex;
+    align-items: center;
+    padding: 12px 15px;
+    color: var(--text-main);
+    text-decoration: none;
+    border-radius: 8px;
+    margin-bottom: 4px;
+    transition: 0.2s;
+}
+
+.nav-item.active a,
+.nav-item a:hover {
+    background-color: var(--accent);
+    color: white !important;
+}
+
+.nav-item i {
+    width: 25px;
+    margin-right: 10px;
+    font-size: 1.1rem;
+}
+
+.alert-nav a {
+    color: var(--alert) !important;
+    font-weight: bold;
+}
+
+/* FOOTER */
+.sidebar-footer {
+    padding: 20px;
+    border-top: 1px solid var(--border);
+}
+
+.logout-link {
+    color: var(--alert);
+    text-decoration: none;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* ========================================================= */
+/* ==================== MAIN VIEW ========================== */
+/* ========================================================= */
+
+.main-viewport {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    background-color: var(--bg-main);
+}
+
+/* TOPBAR */
+.topbar {
+    height: 75px;
+    background-color: var(--bg-top);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 30px;
+    flex-shrink: 0;
+    z-index: 10;
+}
+
+.top-info h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.date-display {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.top-actions {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.clock-box {
+    font-family: monospace;
+    font-weight: bold;
+    color: var(--accent);
+}
+
+.theme-switcher {
+    cursor: pointer;
+    color: var(--accent);
+    font-size: 1.3rem;
+}
+
+/* Update your existing .notif-bell section to this */
+.notif-bell {
+    position: relative;
+    color: var(--text-main);
+    font-size: 1.2rem;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background 0.2s;
+}
+
+.notif-bell:hover {
+    background: var(--bg-hover);
+}
+
+.badge {
+    position: absolute;
+    top: -5px;
+    right: -8px;
+    background: var(--alert);
+    color: white;
+    font-size: 10px;
+    padding: 2px 5px;
+    border-radius: 10px;
+}
+
+/* CONTENT SCROLL AREA */
+.page-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 30px;
+    background-color: var(--bg-main);
+}
+
+/* ========================================================= */
+/* ==================== DASHBOARD ========================== */
+/* ========================================================= */
+
+.dashboard-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 100%;
+}
+
+/* HEADER */
+.cmd-header {
+    background: var(--bg-card);
+    padding: 14px 16px;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* BUTTONS */
+.emergency-cluster {
+    display: flex;
+    gap: 10px;
+}
+
+.btn-lockdown,
+.btn-emergency {
+    border: none;
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* STATS */
+.stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+}
+
+/* GRID */
+.data-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+/* ========================================================= */
+/* ==================== RESPONSIVE ========================= */
+/* ========================================================= */
+
+@media (max-width: 1000px) {
+    .stats-row {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .data-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 600px) {
+    .stats-row {
+        grid-template-columns: 1fr;
+    }
+
+    .emergency-cluster {
+        flex-direction: column;
+    }
+}
+/* ========================================================= */
+/* ================= NOTIFICATION PANEL ==================== */
+/* ========================================================= */
+
+/* The actual sliding panel */
+.notification-panel {
+    position: fixed;
+    top: 0;
+    right: -380px; /* Hidden off-screen */
+    width: 350px;
+    height: 100vh;
+    background-color: var(--bg-top);
+    border-left: 1px solid var(--border);
+    box-shadow: var(--shadow-md);
+    z-index: 2000; /* Higher than topbar */
+    transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+}
+
+/* Open state for JS toggle */
+.notification-panel.open {
+    right: 0;
+}
+
+/* Dark background behind the panel when open */
+.notification-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(2px);
+    z-index: 1999;
+    display: none; /* Controlled by active class */
+}
+
+.notification-overlay.active {
+    display: block;
+}
+
+/* Panel Header */
+.notif-header {
+    padding: 20px;
+    background: var(--bg-side);
+    border-bottom: 1px solid var(--border);
+}
+
+.header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.notif-header h4 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: var(--text-main);
+}
+
+.notif-subtitle {
+    margin: 5px 0 0 0;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.close-notif {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+/* Notification Items */
+.notif-content {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.notif-item {
+    display: flex;
+    gap: 15px;
+    padding: 15px 20px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.2s;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.notif-item:hover {
+    background: var(--bg-hover);
+}
+
+.notif-icon {
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: var(--bg-side);
+    color: var(--accent);
+}
+
+/* Color Coding by Severity */
+.notif-item.critical .notif-icon {
+    background: rgba(224, 122, 95, 0.1);
+    color: var(--alert);
+}
+
+.notif-item.system .notif-icon {
+    background: rgba(45, 122, 86, 0.1);
+    color: var(--status-active);
+}
+
+.notif-info p {
+    margin: 0;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    color: var(--text-main);
+}
+
+.notif-info strong {
+    color: var(--accent-dark);
+}
+
+.notif-info small {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+/* Footer link */
+.notif-footer {
+    padding: 15px;
+    text-align: center;
+    border-top: 1px solid var(--border);
+}
+
+.notif-footer a {
+    font-size: 0.85rem;
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+}

@@ -1,19 +1,7 @@
-﻿﻿ /* ============================= */
+﻿﻿/* ============================= */
 /* ACTIVITY LOGS - PROFESSIONAL */
+/* Uses standard variables from layouts.css */
 /* ============================= */
-/* ============================= */
-/* GLOBAL RHYTHM */
-/* ============================= */
-:root {
-    --radius-lg: 16px;
-    --radius-md: 12px;
-    --radius-sm: 10px;
-    --spacing-xs: 6px;
-    --spacing-sm: 12px;
-    --spacing-md: 16px;
-    --spacing-lg: 24px;
-    --spacing-xl: 32px;
-}
 
 /* ============================= */
 /* PAGE HEADER */
@@ -22,24 +10,44 @@
     font-size: 28px;
     font-weight: 700;
     margin-bottom: 8px;
-    color: #ffffff;
+    color: var(--text-main);
     letter-spacing: -0.5px;
 }
 
 .subtitle {
     font-size: 14px;
-    color: #94a3b8;
+    color: var(--text-muted);
     margin-bottom: 28px;
 }
 
 /* ============================= */
-/* LOGS CONTAINER */
+/* LOGS CONTAINER (SCROLL FIXED) */
 /* ============================= */
 .logs-container {
     display: flex;
     flex-direction: column;
     gap: 14px;
     max-width: 100%;
+
+    /* 🔥 critical scroll setup */
+    max-height: var(--content-height);
+    overflow-y: auto;
+
+    /* 🔥 prevents flex overflow bugs */
+    min-height: 0;
+
+    padding-right: 6px;
+}
+
+/* Optional scrollbar styling */
+.logs-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.logs-container::-webkit-scrollbar-thumb {
+    background: var(--text-muted);
+    border-radius: 6px;
+    opacity: 0.4;
 }
 
 /* ============================= */
@@ -51,19 +59,18 @@
     gap: 16px;
     align-items: start;
     padding: 18px 20px;
-    background: #111827;
+    background: var(--bg-card);
     border-radius: var(--radius-md);
-    border: 1px solid rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
     transition: all 0.2s ease;
-    cursor: default;
 }
 
-    .log-card:hover {
-        background: #1f2937;
-        border-color: rgba(255,255,255,0.08);
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    }
+.log-card:hover {
+    background: var(--bg-hover);
+    border-color: rgba(255,255,255,0.08);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
 
 /* ICON */
 .log-icon {
@@ -75,7 +82,7 @@
     align-items: center;
     justify-content: center;
     height: fit-content;
-    color: #60a5fa;
+    color: var(--text-main);
     flex-shrink: 0;
 }
 
@@ -85,21 +92,21 @@
     min-width: 0;
 }
 
-    .log-content h3 {
-        margin: 0;
-        font-size: 15px;
-        font-weight: 700;
-        color: #e2e8f0;
-        margin-bottom: 4px;
-    }
+.log-content h3 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-main);
+    margin-bottom: 4px;
+}
 
-    .log-content p {
-        margin: 4px 0 0;
-        color: #94a3b8;
-        font-size: 13px;
-        line-height: 1.4;
-        word-break: break-word;
-    }
+.log-content p {
+    margin: 4px 0 0;
+    color: #94a3b8;
+    font-size: 13px;
+    line-height: 1.4;
+    word-break: break-word;
+}
 
 /* META */
 .log-meta {
@@ -125,7 +132,7 @@
 /* LIGHT MODE SUPPORT */
 /* ============================= */
 body.light-mode .page-title {
-    color: #0f172a;
+    color: var(--text-main);
 }
 
 body.light-mode .subtitle {
@@ -133,27 +140,27 @@ body.light-mode .subtitle {
 }
 
 body.light-mode .log-card {
-    background: #f8fafc;
-    border-color: #e2e8f0;
+    background: var(--bg-main);
+    border-color: var(--border);
 }
 
-    body.light-mode .log-card:hover {
-        background: #f1f5f9;
-        border-color: #cbd5f5;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-    }
+body.light-mode .log-card:hover {
+    background: var(--bg-hover);
+    border-color: var(--border);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
 
 body.light-mode .log-icon {
     background: rgba(59, 130, 246, 0.15);
-    color: #2563eb;
+    color: var(--accent);
 }
 
 body.light-mode .log-content h3 {
-    color: #0f172a;
+    color: var(--text-main);
 }
 
 body.light-mode .log-content p {
-    color: #475569;
+    color: var(--text-muted);
 }
 
 body.light-mode .log-meta,
