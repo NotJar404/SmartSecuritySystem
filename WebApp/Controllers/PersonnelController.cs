@@ -94,23 +94,38 @@ namespace SmartSecuritySystem.Controllers
         {
             ModelState.Remove("Id");
 
-            if (string.IsNullOrWhiteSpace(user.Username) || string.IsNullOrWhiteSpace(user.PasswordHash))
+            if (string.IsNullOrWhiteSpace(user.Username))
+                return;
+
+            // Gmail-only validation
+            if (!IsValidGmailAddress(user.Email))
                 return;
 
             if (_context.Users.Any(u => u.Username == user.Username))
                 return;
 
+            // Auto-generate secure temporary password
+            var tempPassword = GenerateSecurePassword(10);
+
             user.Role = "Security";
             user.Status = NormalizeStatus(user.Status);
-
-            if (!IsSha256Base64(user.PasswordHash))
-                user.PasswordHash = HashPassword(user.PasswordHash);
-
+            user.PasswordHash = HashPassword(tempPassword);
+            user.MustChangePassword = true;
             user.CreatedAt = DateTime.UtcNow;
             user.UpdatedAt = DateTime.UtcNow;
 
             _context.Users.Add(user);
             _context.SaveChanges();
+
+            // Send credentials via email
+            try
+            {
+                SendCredentialEmail(user.Email, user.FullName, user.Username, tempPassword);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Failed to send credentials email: {ex.Message}");
+            }
         }
 
         private void AddCampusMember(string? name, string? email, string? dept, string? rfid, string? phone)
@@ -234,6 +249,68 @@ namespace SmartSecuritySystem.Controllers
         {
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             return userId != null ? Convert.ToInt32(userId) : 0;
+        }
+
+        private string GenerateSecurePassword(int length)
+        {
+            const string upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+            const string lower = "abcdefghijkmnopqrstuvwxyz";
+            const string digits = "123456789";
+            const string special = "!@#$%&*";
+            const string all = upper + lower + digits + special;
+
+            length = Math.Max(length, 8);
+            var random = new Random();
+            var password = new char[length];
+
+            password[0] = upper[random.Next(upper.Length)];
+            password[1] = lower[random.Next(lower.Length)];
+            password[2] = digits[random.Next(digits.Length)];
+            password[3] = special[random.Next(special.Length)];
+
+            for (int i = 4; i < length; i++)
+                password[i] = all[random.Next(all.Length)];
+
+            for (int i = password.Length - 1; i > 0; i--)
+            {
+                int j = random.Next(i + 1);
+                (password[i], password[j]) = (password[j], password[i]);
+            }
+
+            return new string(password);
+        }
+
+        private bool IsValidGmailAddress(string? email)
+        {
+            if (string.IsNullOrWhiteSpace(email)) return false;
+            return email.Trim().EndsWith("@gmail.com", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void SendCredentialEmail(string toEmail, string fullName, string username, string tempPassword)
+        {
+            var fromEmail = "yourgmail@gmail.com";
+            var appPassword = "your_app_password";
+
+            var client = new System.Net.Mail.SmtpClient("smtp.gmail.com", 587)
+            {
+                EnableSsl = true,
+                Credentials = new System.Net.NetworkCredential(fromEmail, appPassword)
+            };
+
+            var mail = new System.Net.Mail.MailMessage
+            {
+                From = new System.Net.Mail.MailAddress(fromEmail),
+                Subject = "SecureVision — Your Account Credentials",
+                Body = $"Hello {fullName},\n\n" +
+                       $"Your SecureVision account has been created.\n\n" +
+                       $"Username: {username}\n" +
+                       $"Temporary Password: {tempPassword}\n\n" +
+                       $"This password is one-time use only. You will be required to change it upon first login.\n\n" +
+                       $"— SecureVision Security System"
+            };
+
+            mail.To.Add(toEmail);
+            client.Send(mail);
         }
     }
 }

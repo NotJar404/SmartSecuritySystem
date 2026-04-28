@@ -1,13 +1,13 @@
-﻿/* =========================================================
-   SECUREVISION — DYNAMIC GRID UI
+/* =========================================================
+   SECUREVISION — SYSTEM CONTROL CENTER
+   Instrument-like, interactive panel design
    Uses standard variables from layouts.css
    ========================================================= */
 
 .settings-wrapper {
     background: var(--bg-main);
     color: var(--text-main);
-    padding: 20px 40px; /* Balanced padding */
-    min-height: 100vh;
+    padding: 0;
     font-family: 'Inter', sans-serif;
 }
 
@@ -26,23 +26,24 @@
 }
 
 .pi-status-pill {
-    background: white;
+    background: var(--bg-card);
     border: 1px solid var(--border);
     padding: 6px 16px;
     border-radius: 50px;
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    box-shadow: var(--shadow-sm);
+    color: var(--text-main);
 }
 
 /* =========================================
-   NOT-SO-PLAIN GRID SYSTEM
+   INSTRUMENT-LIKE GRID SYSTEM
    ========================================= */
 .control-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr); /* 3 column base */
-    gap: 20px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 25px;
 }
 
 .control-card {
@@ -50,23 +51,51 @@
     border-radius: var(--radius-lg);
     padding: 24px;
     border: 1px solid var(--border);
-    box-shadow: 0 4px 12px rgba(62, 54, 46, 0.05);
-    transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+    border-left: 4px solid var(--accent);
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition-standard);
     display: flex;
     flex-direction: column;
+    position: relative;
+    gap: 8px;
+}
+
+/* Push buttons to the bottom with equal spacing */
+.control-card .btn {
+    margin-top: 8px;
+}
+
+/* Category accent borders — instrument-like visual clustering */
+.control-card:nth-child(1) { border-left-color: var(--accent); }
+.control-card:nth-child(2) { border-left-color: var(--info-blue); }
+.control-card:nth-child(3) { border-left-color: var(--warning-amber); }
+.control-card:nth-child(4) { border-left-color: var(--status-active); }
+.control-card:nth-child(5) { border-left-color: var(--accent-dark); }
+
+/* Emergency Alarm card — urgent but within warm design language */
+.control-card:nth-child(6) {
+    border-left-color: var(--status-locked);
+    box-shadow: var(--shadow-sm), inset 0 0 0 1px rgba(196, 48, 43, 0.08);
 }
 
 /* Feature: Spanning to break the symmetry */
-.span-2 { grid-column: span 2; } /* Makes specific cards wider */
-.tall { grid-row: span 2; }       /* Makes specific cards taller */
+.span-2 { grid-column: span 2; }
+.tall { grid-row: span 2; }
 
 .control-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 12px 30px rgba(212, 163, 115, 0.15);
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--accent);
+}
+
+/* Emergency card hover keeps its red accent */
+.control-card:nth-child(6):hover {
+    border-left-color: var(--status-locked);
+    box-shadow: var(--shadow-md), 0 0 20px rgba(196, 48, 43, 0.1);
 }
 
 /* =========================================
-   CARD INTERIORS
+   CARD INTERIORS — Instrument Panel Headers
    ========================================= */
 .card-header-main {
     display: flex;
@@ -77,11 +106,40 @@
     margin-bottom: 15px;
 }
 
-.card-header-main h5 { 
-    margin: 0; 
-    font-weight: 800; 
-    color: var(--accent-dark); 
+.card-title-area {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.card-header-main h5,
+.card-title-area h5 {
+    margin: 0;
+    font-weight: 800;
+    color: var(--text-main);
     font-size: 1.1rem;
+}
+
+.status-indicator-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.status-indicator-dot.online {
+    background: var(--status-active);
+    box-shadow: 0 0 6px rgba(45, 122, 86, 0.4);
+    animation: pulse-dot 2s infinite;
+}
+
+@keyframes pulse-dot {
+    0%, 100% { box-shadow: 0 0 4px rgba(45, 122, 86, 0.3); }
+    50% { box-shadow: 0 0 10px rgba(45, 122, 86, 0.6); }
 }
 
 .setting-row {
@@ -89,52 +147,79 @@
     justify-content: space-between;
     align-items: center;
     padding: 12px 0;
+    border-bottom: 1px solid var(--border-soft);
+}
+
+.setting-row:last-child {
+    border-bottom: none;
 }
 
 .label-desc label {
     display: block;
-    font-weight: 700;
+    font-weight: var(--font-weight-label);
     font-size: 14px;
+    color: var(--text-main);
 }
 
 .label-desc small {
     display: block;
     color: var(--text-muted);
     font-size: 11px;
-    max-width: 200px;
+    max-width: 220px;
 }
 
 /* =========================================
-   HCI CONTROLS
+   HCI CONTROLS — Visible & Dark-Mode Safe
    ========================================= */
 .warm-select, .input-group-custom {
-    background: var(--bg-main);
-    border: 1px solid var(--border);
+    background: var(--bg-input-visible);
+    border: 1.5px solid var(--border);
     border-radius: 8px;
-    transition: 0.2s;
+    transition: var(--transition-standard);
+    color: var(--text-main);
 }
 
-.input-group-custom input {
+.warm-select:focus,
+.input-group-custom:focus-within {
+    border-color: var(--accent);
+    box-shadow: var(--shadow-glow);
+}
+
+.warm-select {
+    padding: 8px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+.input-group-custom input,
+.warm-num-input {
     border: none;
     background: transparent;
-    padding: 6px;
+    padding: 8px;
     width: 50px;
     text-align: center;
+    color: var(--text-main);
+    font-weight: 600;
+    font-size: 14px;
 }
 
 .unit-tag {
-    background: var(--border);
+    background: var(--bg-hover);
     padding: 6px 10px;
     font-size: 11px;
     font-weight: 700;
+    color: var(--text-muted);
+    border-left: 1px solid var(--border);
 }
 
-/* Switch */
+/* Switch — Standardized 0.3s */
 .switch { position: relative; width: 44px; height: 22px; }
 .switch input { opacity: 0; width: 0; height: 0; }
 .slider {
     position: absolute; cursor: pointer; inset: 0;
-    background-color: #E2D9CF; transition: .3s; border-radius: 34px;
+    background-color: var(--border); transition: .3s; border-radius: 34px;
 }
 .slider:before {
     content: ""; position: absolute; height: 16px; width: 16px;
@@ -144,14 +229,15 @@
 input:checked + .slider { background-color: var(--accent); }
 input:checked + .slider:before { transform: translateX(22px); }
 
-/* Buttons */
+/* Buttons — Instrument Action Buttons */
 .btn-maint {
     border: none;
     border-radius: 8px;
     padding: 12px;
     font-weight: 700;
     color: white;
-    transition: 0.2s;
+    transition: var(--transition-standard);
+    cursor: pointer;
 }
 
 .btn-warning-warm { background: #F4A261; }
@@ -159,19 +245,181 @@ input:checked + .slider:before { transform: translateX(22px); }
 
 .btn-maint:hover { opacity: 0.9; transform: scale(0.98); }
 
+.btn-warm-warning {
+    background: rgba(244, 162, 97, 0.12);
+    color: #E8913A;
+    border: 1.5px solid rgba(244, 162, 97, 0.3);
+    font-weight: 700;
+    transition: var(--transition-standard);
+}
+
+.btn-warm-warning:hover {
+    background: rgba(244, 162, 97, 0.2);
+    border-color: #F4A261;
+}
+
+.btn-warm-dark {
+    background: var(--text-main);
+    color: var(--bg-card);
+    border: none;
+    font-weight: 700;
+    transition: var(--transition-standard);
+}
+
+.btn-warm-dark:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Unified System Action Buttons */
+.btn-system-action {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    transition: var(--transition-standard);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    letter-spacing: 0.3px;
+}
+
+.btn-system-action:hover {
+    background: var(--accent-dark);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(212, 163, 115, 0.3);
+}
+
+/* Ensure all buttons inside control-cards are visible */
+.control-card .btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    transition: var(--transition-standard);
+}
+
+.control-card .btn-warm-warning {
+    background: rgba(244, 162, 97, 0.15);
+    color: #E8913A;
+    border: 1.5px solid rgba(244, 162, 97, 0.3);
+}
+
+.control-card .btn-warm-warning:hover {
+    background: rgba(244, 162, 97, 0.25);
+    border-color: #F4A261;
+    transform: translateY(-1px);
+}
+
+.control-card .btn-warm-dark {
+    background: var(--text-main);
+    color: var(--bg-card);
+    border: none;
+}
+
+.control-card .btn-warm-dark:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Progress Bar */
+.progress-container {
+    background: var(--bg-hover);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    border-radius: 10px;
+    background: var(--accent);
+    transition: width 0.6s ease;
+}
+
 /* Health Stats Box */
 .health-meta {
-    background: var(--bg-main);
+    background: var(--bg-input-visible);
     border-radius: 12px;
     padding: 15px;
-    margin-top: auto; /* Pushes to bottom of card */
+    margin-top: auto;
+}
+
+/* Storage Display */
+.storage-display {
+    background: var(--bg-input-visible);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    border: 1px solid var(--border-soft);
+}
+
+/* =========================================
+   ALARM LIST — Emergency Section
+   ========================================= */
+.alarm-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.alarm-item {
+    padding: 12px 14px;
+    border-radius: var(--radius-md);
+    background: var(--bg-input-visible);
+    border: 1px solid var(--border-soft);
+    transition: var(--transition-standard);
+}
+
+.alarm-item.active {
+    background: rgba(196, 48, 43, 0.04);
+    border-color: rgba(196, 48, 43, 0.15);
+}
+
+.alarm-item:hover {
+    background: var(--bg-hover);
+}
+
+.alarm-icon {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+}
+
+.alarm-icon.intrusion { background: rgba(196, 48, 43, 0.1); color: var(--status-locked); }
+.alarm-icon.fire { background: rgba(224, 122, 95, 0.1); color: var(--alert); }
+.alarm-icon.earthquake { background: rgba(91, 140, 181, 0.1); color: var(--info-blue); }
+.alarm-icon.medical { background: rgba(45, 122, 86, 0.1); color: var(--status-active); }
+
+.alarm-info strong {
+    font-size: 13px;
+    color: var(--text-main);
+}
+
+.alarm-desc {
+    font-size: 11px;
+}
+
+.extra-small {
+    font-size: 11px;
 }
 
 /* =========================================
    RESPONSIVE LAYOUT
    ========================================= */
 @media (max-width: 1100px) {
-    .control-grid { grid-template-columns: 1fr 1fr; }
+    .control-grid { grid-template-columns: repeat(2, 1fr); }
     .span-2 { grid-column: span 1; }
 }
 

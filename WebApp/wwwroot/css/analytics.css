@@ -12,8 +12,13 @@ body {
 
 .dashboard-container {
     padding: 2rem;
-    max-width: 1600px;
     margin: 0 auto;
+}
+
+/* Force all sections to the same full container width */
+.dashboard-container > * {
+    width: 100%;
+    box-sizing: border-box;
 }
 
 /* ============================= */
@@ -70,7 +75,7 @@ body {
     align-items: center;
     gap: 12px;
     box-shadow: var(--shadow-sm);
-    transition: all 0.2s ease;
+    transition: var(--transition-standard);
 }
 
 .stat-card:hover {
@@ -122,9 +127,11 @@ body {
     background: var(--bg-card);
     border: 1px solid var(--border-soft);
     border-radius: var(--radius-lg);
-    padding: 12px;
+    padding: 16px;
     box-shadow: var(--shadow-sm);
     height: fit-content;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .filter-panel {
@@ -175,7 +182,7 @@ body {
 .filter-field label {
     display: block;
     font-size: 11px;
-    font-weight: 700;
+    font-weight: var(--font-weight-label);
     color: var(--text-muted);
     margin-bottom: 5px;
     text-transform: uppercase;
@@ -186,11 +193,11 @@ body {
     width: 100%;
     padding: 7px 10px;
     border-radius: 6px;
-    border: 1px solid var(--border-soft);
-    background: white;
+    border: 1.5px solid var(--border);
+    background: var(--bg-input-visible);
     font-size: 12px;
     color: var(--text-main);
-    transition: all 0.2s ease;
+    transition: var(--transition-standard);
     height: 34px;
     box-sizing: border-box;
 }
@@ -251,13 +258,15 @@ body {
 
 .warm-input {
     width: 100%;
-    border: 1px solid var(--border-soft);
-    background: white;
+    border: 1.5px solid var(--border);
+    background: var(--bg-input-visible);
     padding: 7px 10px;
     border-radius: 6px;
     font-size: 12px;
+    color: var(--text-main);
     height: 34px;
     box-sizing: border-box;
+    transition: var(--transition-standard);
 }
 
 .warm-input:focus {
@@ -278,26 +287,27 @@ body {
 
 .row.g-3 .btn {
     width: 100%;
-    padding: 8px 12px;
+    padding: 10px 20px;
     border-radius: 8px;
     font-size: 13px;
-    font-weight: 600;
-    border: 1px solid var(--border-soft);
-    background: rgba(212,163,115,0.1);
-    color: var(--accent);
+    font-weight: 700;
+    border: none;
+    background: var(--accent);
+    color: white;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: var(--transition-standard);
     height: 38px;
     box-sizing: border-box;
     display: flex;
     align-items: center;
     justify-content: center;
+    letter-spacing: 0.3px;
 }
 
 .row.g-3 .btn:hover {
-    background: rgba(212,163,115,0.2);
-    border-color: var(--accent);
-    box-shadow: var(--shadow-sm);
+    background: var(--accent-dark);
+    box-shadow: 0 4px 12px rgba(212, 163, 115, 0.3);
+    transform: translateY(-1px);
 }
 
 /* ============================= */
@@ -308,6 +318,19 @@ body {
     grid-template-columns: 1fr 1fr;
     gap: 16px;
     margin-bottom: 14px;
+    width: 100%;
+}
+
+/* Full-width reporting / intervention panels below charts */
+.panel.mt-4,
+.panel.mt-4.mb-5,
+section.panel.mt-4 {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.charts-grid.mt-4 {
+    width: 100%;
 }
 
 .panel-header {
@@ -434,12 +457,12 @@ body {
 
 .modal-body .form-control {
     padding: 10px 12px;
-    border: 1px solid var(--border-soft);
+    border: 1.5px solid var(--border);
     border-radius: 8px;
-    background: white;
+    background: var(--bg-input-visible);
     color: var(--text-main);
     font-size: 13px;
-    transition: all 0.2s ease;
+    transition: var(--transition-standard);
     width: 100%;
     box-sizing: border-box;
 }
@@ -448,7 +471,7 @@ body {
     outline: none;
     border-color: var(--accent);
     box-shadow: 0 0 0 3px rgba(212, 163, 115, 0.1);
-    background: white;
+    background: var(--bg-card);
 }
 
 .checkbox-group {
@@ -494,16 +517,16 @@ body {
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: var(--transition-standard);
 }
 
 .modal-footer .btn-light {
-    background: #f0f0f0;
+    background: var(--bg-hover);
     color: var(--text-main);
 }
 
 .modal-footer .btn-light:hover {
-    background: #e0e0e0;
+    background: var(--border);
 }
 
 .modal-footer .btn-primary {
@@ -525,6 +548,51 @@ body {
         opacity: 1;
     }
 }
+
+/* ============================= */
+/* INTERVENTION QUEUE ITEMS      */
+/* ============================= */
+.status-list-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 10px 0;
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: var(--bg-hover);
+    border-radius: 8px;
+    border: 1px solid var(--border-soft);
+    transition: var(--transition-standard);
+}
+
+.status-item:hover {
+    background: var(--bg-panel-hover);
+}
+
+.status-item p {
+    font-size: 13px;
+    margin: 0;
+}
+
+.status-item small {
+    font-size: 11px;
+}
+
+.status-dot-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.status-dot-indicator.red { background: var(--status-locked); }
+.status-dot-indicator.yellow { background: var(--accent); }
+.status-dot-indicator.green { background: var(--status-active); }
 
 /* ============================= */
 /* RESPONSIVE                    */

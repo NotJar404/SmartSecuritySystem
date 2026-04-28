@@ -1,8 +1,10 @@
-﻿@model List<WebApp.Models.LogEntry>
+@model List<WebApp.Models.LogEntry>
 
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
     ViewData["Title"] = "Activity Logs";
+    var currentFilter = (ViewBag.Filter as string ?? "all").ToLower();
+    var currentSearch = ViewBag.Search as string ?? "";
 }
 
 <link rel="stylesheet" href="~/css/logs.css" />
@@ -26,37 +28,101 @@
 
     </header>
 
-<div class="logs-container">
+    <!-- SEARCH & FILTERS -->
+    <div class="log-toolbar">
+        <form method="get" class="log-search-bar">
+            <i class="fas fa-search"></i>
+            <input type="text" name="search" placeholder="Search by action, user, or details..."
+                   value="@currentSearch" />
+            <input type="hidden" name="filter" value="@currentFilter" />
+            <button type="submit">Search</button>
+        </form>
 
-    @foreach (var log in Model)
-    {
-        <div class="log-card">
-
-            <!-- ICON -->
-            <div class="log-icon">
-                📝
-            </div>
-
-            <!-- CONTENT -->
-            <div class="log-content">
-                <h3>@log.Action</h3>
-                <p>@log.Details</p>
-
-                <div class="log-meta">
-                    👤 @log.User
-                    • 🌐 @log.IpAddress
-                    • ⏱ @((DateTime.Now - log.Timestamp).Minutes)m ago
-                </div>
-            </div>
-
-            <!-- TIME -->
-            <div class="log-time">
-                @log.Timestamp.ToString("g")
-            </div>
-
+        <div class="log-filters">
+            <a href="?filter=all&search=@currentSearch"
+               class="filter-chip @(currentFilter == "all" ? "active" : "")">
+                <i class="fas fa-list"></i> All
+            </a>
+            <a href="?filter=login&search=@currentSearch"
+               class="filter-chip @(currentFilter == "login" ? "active" : "")">
+                <i class="fas fa-sign-in-alt"></i> Login
+            </a>
+            <a href="?filter=access&search=@currentSearch"
+               class="filter-chip @(currentFilter == "access" ? "active" : "")">
+                <i class="fas fa-door-open"></i> Access
+            </a>
+            <a href="?filter=detection&search=@currentSearch"
+               class="filter-chip @(currentFilter == "detection" ? "active" : "")">
+                <i class="fas fa-eye"></i> Detection
+            </a>
+            <a href="?filter=alert&search=@currentSearch"
+               class="filter-chip @(currentFilter == "alert" ? "active" : "")">
+                <i class="fas fa-bell"></i> Alert
+            </a>
         </div>
-    }
+    </div>
 
-</div>
+    <div class="logs-container">
+
+        @if (!Model.Any())
+        {
+            <div class="empty-state">
+                <i class="fas fa-inbox" style="font-size:2rem;opacity:0.3;margin-bottom:10px;display:block;"></i>
+                No activity logs found
+            </div>
+        }
+
+        @foreach (var log in Model)
+        {
+            var iconClass = (log.Action?.ToLower() ?? "") switch
+            {
+                var a when a.Contains("login") => "fas fa-sign-in-alt",
+                var a when a.Contains("logout") => "fas fa-sign-out-alt",
+                var a when a.Contains("access") => "fas fa-door-open",
+                var a when a.Contains("detection") || a.Contains("motion") => "fas fa-eye",
+                var a when a.Contains("alert") => "fas fa-bell",
+                var a when a.Contains("camera") => "fas fa-video",
+                var a when a.Contains("create") || a.Contains("add") => "fas fa-plus-circle",
+                var a when a.Contains("delete") || a.Contains("remove") => "fas fa-trash-alt",
+                var a when a.Contains("update") || a.Contains("edit") => "fas fa-edit",
+                _ => "fas fa-clipboard-list"
+            };
+
+            var iconColor = (log.Action?.ToLower() ?? "") switch
+            {
+                var a when a.Contains("login") || a.Contains("access") => "color: var(--status-active);",
+                var a when a.Contains("alert") || a.Contains("delete") => "color: var(--alert);",
+                var a when a.Contains("detection") || a.Contains("camera") => "color: var(--accent);",
+                _ => "color: var(--text-muted);"
+            };
+
+            <div class="log-card">
+
+                <!-- ICON -->
+                <div class="log-icon">
+                    <i class="@iconClass" style="@iconColor"></i>
+                </div>
+
+                <!-- CONTENT -->
+                <div class="log-content">
+                    <h3>@log.Action</h3>
+                    <p>@log.Details</p>
+
+                    <div class="log-meta">
+                        <span><i class="fas fa-user"></i> @log.User</span>
+                        <span><i class="fas fa-globe"></i> @log.IpAddress</span>
+                        <span><i class="fas fa-clock"></i> @((DateTime.Now - log.Timestamp).Minutes)m ago</span>
+                    </div>
+                </div>
+
+                <!-- TIME -->
+                <div class="log-time">
+                    @log.Timestamp.ToString("g")
+                </div>
+
+            </div>
+        }
+
+    </div>
 
 </div>

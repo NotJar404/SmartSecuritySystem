@@ -1,4 +1,4 @@
-﻿@using WebApp.Models
+@using WebApp.Models
 @model List<Alert>
 
 @{
@@ -32,7 +32,7 @@
                            name="search"
                            placeholder="Search alerts by type, room, status..."
                            value="@Context.Request.Query["search"]" />
-                    <button type=\"submit\" aria-label=\"Search alerts\"><i class=\"fa fa-search\"></i></button>
+                    <button type="submit" aria-label="Search alerts"><i class="fa fa-search"></i></button>
                 </form>
 
                 <div class="alert-filters">
@@ -121,25 +121,28 @@
                         {
                             if (alert.Status == AlertStatus.New)
                             {
-                                <form method="post" asp-action="Acknowledge">
+                                <form method="post" asp-action="Acknowledge" id="ack-@alert.AlertId">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="id" value="@alert.AlertId" />
-                                    <button type="submit">Acknowledge</button>
+                                    <button type="button"
+                                            onclick="SecureConfirm.show({ title:'Acknowledge Alert', icon:'fas fa-check-circle', fields:[{label:'Type',value:'@alert.Type'},{label:'Status',value:'New → Acknowledged'}], onConfirm:function(){document.getElementById('ack-@alert.AlertId').submit();} })">Acknowledge</button>
                                 </form>
                             }
 
                             if (alert.Status == AlertStatus.Acknowledged)
                             {
-                                <form method="post" asp-action="Resolve" style="display:inline;">
+                                <form method="post" asp-action="Resolve" style="display:inline;" id="res-@alert.AlertId">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="id" value="@alert.AlertId" />
-                                    <button type="submit">Resolve</button>
+                                    <button type="button"
+                                            onclick="SecureConfirm.show({ title:'Resolve Alert', icon:'fas fa-check-double', fields:[{label:'Type',value:'@alert.Type'},{label:'Status',value:'Acknowledged → Resolved'}], onConfirm:function(){document.getElementById('res-@alert.AlertId').submit();} })">Resolve</button>
                                 </form>
 
-                                <form method="post" asp-action="Escalate" style="display:inline;">
+                                <form method="post" asp-action="Escalate" style="display:inline;" id="esc-@alert.AlertId">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="id" value="@alert.AlertId" />
-                                    <button type="submit">Escalate</button>
+                                    <button type="button"
+                                            onclick="SecureConfirm.show({ title:'Escalate Alert', icon:'fas fa-exclamation-triangle', isDelete:true, confirmText:'Escalate', confirmClass:'btn-danger', fields:[{label:'Type',value:'@alert.Type'},{label:'Action',value:'Escalate to admin'}], onConfirm:function(){document.getElementById('esc-@alert.AlertId').submit();} })">Escalate</button>
                                 </form>
                             }
                         }

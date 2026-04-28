@@ -1,4 +1,4 @@
-﻿@model SmartSecuritySystem.ViewModels.PersonnelManagementViewModel
+@model SmartSecuritySystem.ViewModels.PersonnelManagementViewModel
 @{
     ViewData["Title"] = "Personnel Management";
 }
@@ -69,9 +69,9 @@
 
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Dashboard Operators</h5>
-                    <div class="d-flex align-items-center">
-                        <button class="btn btn-sm btn-light border mr-2" onclick="applyQuickFilter('staffTable', 'Admin')">Admins</button>
-                        <input type="text" id="staffSearch" class="form-control form-control-sm" style="width: 180px;" placeholder="Search operators..." onkeyup="liveSearch('staffTable', 'staffSearch')">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                        <input type="text" id="staffSearch" class="form-control form-control-sm" placeholder="Search operators..." onkeyup="liveSearch('staffTable', 'staffSearch')">
                     </div>
                 </div>
 
@@ -123,11 +123,12 @@
 
                                         @if (user.Role != "Admin")
                                         {
-                                            <form method="post" asp-action="Delete" asp-controller="Personnel" style="display:inline;">
+                                            <form method="post" asp-action="Delete" asp-controller="Personnel" style="display:inline;" id="deleteStaff-@user.Id">
                                                 @Html.AntiForgeryToken()
                                                 <input type="hidden" name="id" value="@user.Id" />
-                                                <button type="submit"
-                                                        class="btn btn-link text-danger btn-sm">
+                                                <button type="button"
+                                                        class="btn btn-link text-danger btn-sm"
+                                                        onclick="SecureConfirm.confirmDelete('@user.FullName', function() { document.getElementById('deleteStaff-@user.Id').submit(); })">
                                                     <i class="fas fa-trash"></i>
                                                 </button>
                                             </form>
@@ -148,9 +149,9 @@
 
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Authorized Personnel</h5>
-                    <div class="d-flex align-items-center">
-                        <button class="btn btn-sm btn-light border mr-2" onclick="applyQuickFilter('memberTable', 'IT')">IT Dept</button>
-                        <input type="text" id="memberSearch" class="form-control form-control-sm" style="width: 180px;" placeholder="Search members..." onkeyup="liveSearch('memberTable', 'memberSearch')">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                        <input type="text" id="memberSearch" class="form-control form-control-sm" placeholder="Search members..." onkeyup="liveSearch('memberTable', 'memberSearch')">
                     </div>
                 </div>
 
@@ -254,8 +255,8 @@
                     </div>
 
                     <div class="form-group">
-                        <label>Email</label>
-                        <input id="email" name="Email" type="email" class="form-control" required />
+                        <label>Email <small style="color:var(--accent);">(Gmail only)</small></label>
+                        <input id="email" name="Email" type="email" class="form-control" placeholder="name@gmail.com" required pattern=".*@@gmail\.com$" title="Only Gmail addresses are accepted" />
                     </div>
 
                     <div id="staffFields" style="display:none;">
@@ -263,9 +264,12 @@
                             <label>Username</label>
                             <input id="username" name="Username" class="form-control" />
                         </div>
-                        <div class="form-group">
-                            <label>Password</label>
-                            <input id="password" name="Password" type="password" class="form-control" />
+                        <div class="form-group" style="background:var(--bg-input);padding:12px;border-radius:var(--radius-sm);">
+                            <small style="color:var(--text-dim);">
+                                <i class="fas fa-info-circle" style="color:var(--accent);"></i>
+                                A secure temporary password will be auto-generated and sent to the provided Gmail address.
+                                The user must change it upon first login.
+                            </small>
                         </div>
                     </div>
 
@@ -401,6 +405,9 @@ document.addEventListener('DOMContentLoaded', function() {
             closeModal();
         }
     });
+
+    // Intercept personnel form with two-step confirmation
+    SecureConfirm.interceptForm('userForm', 'Confirm Personnel Action', 'userModal');
 });
 </script>
 }

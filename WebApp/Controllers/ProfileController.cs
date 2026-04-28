@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SmartSecuritySystem.Models;
@@ -124,16 +125,34 @@ namespace SmartSecuritySystem.Controllers
                 return RedirectToAction("Index");
             }
 
-            if (model.NewPassword.Length < 6)
+            if (model.NewPassword.Length < 8)
             {
-                TempData["PasswordError"] = "Password must be at least 6 characters.";
+                TempData["PasswordError"] = "Password must be at least 8 characters.";
                 return RedirectToAction("Index");
             }
 
             user.PasswordHash = HashPassword(model.NewPassword);
+            user.MustChangePassword = false;
             user.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
+
+            // Re-issue auth cookie WITHOUT the MustChangePassword claim
+            var claims = new List<System.Security.Claims.Claim>
+            {
+                new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Name, user.Username ?? ""),
+                new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Role, user.Role ?? "Security"),
+                new System.Security.Claims.Claim("FullName", user.FullName ?? ""),
+                new System.Security.Claims.Claim("Email", user.Email ?? "")
+            };
+
+            var identity = new System.Security.Claims.ClaimsIdentity(claims, Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationDefaults.AuthenticationScheme);
+            var principal = new System.Security.Claims.ClaimsPrincipal(identity);
+
+            await HttpContext.SignInAsync(
+                Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationDefaults.AuthenticationScheme,
+                principal);
 
             TempData["PasswordSuccess"] = "Password updated successfully.";
             return RedirectToAction("Index");

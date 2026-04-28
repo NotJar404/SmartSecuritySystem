@@ -1,4 +1,4 @@
-﻿/* ========================================================= */
+/* ========================================================= */
 /* ==================== DASHBOARD ========================= */
 /* Uses standard variables from layouts.css */
 /* ========================================================= */
@@ -63,7 +63,7 @@
     border-radius: var(--radius);
     font-weight: 600;
     cursor: pointer;
-    transition: 0.2s ease;
+    transition: var(--transition-standard);
 }
 
 .btn-lockdown {
@@ -104,7 +104,7 @@
     gap: 14px;
     box-shadow: var(--shadow-sm);
     min-height: 70px;
-    transition: all 0.2s ease;
+    transition: var(--transition-standard);
 }
 
 .stat-card:hover {
@@ -159,6 +159,22 @@
     gap: 10px;
 }
 
+/* Shared header row pattern — matches .panel-header layout */
+.cctv-filmstrip-section .panel-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+}
+
+.section-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
 .horizontal-camera-slider {
     display: flex;
     gap: 12px;
@@ -198,7 +214,8 @@
     background: var(--bg-card);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-sm);
-    padding: 12px;
+    padding: 16px;
+    border: 1px solid var(--border);
 
     display: flex;
     flex-direction: column;
@@ -206,9 +223,13 @@
 }
 
 .panel-header {
-    margin-bottom: 8px;
-    padding-bottom: 6px;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
     border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
 }
 
 .panel-header h4 {
@@ -258,7 +279,7 @@
     align-items: center;
     gap: 10px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: var(--transition-standard);
     text-decoration: none;
     color: var(--text-main);
 }
@@ -344,6 +365,124 @@
 }
 
 /* ========================================================= */
+/* ==================== VIEW MORE LINK ==================== */
+/* ========================================================= */
+
+.view-more-link {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: var(--transition-fast);
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 4px 0;
+}
+
+.view-more-link:hover {
+    color: var(--accent-dark);
+    gap: 8px;
+}
+
+.view-more-link i {
+    font-size: 9px;
+    transition: transform 0.2s ease;
+}
+
+.view-more-link:hover i {
+    transform: translateX(3px);
+}
+
+/* ========================================================= */
+/* ==================== OVERLAY LOCATION ================== */
+/* ========================================================= */
+
+.overlay-location {
+    display: block;
+    font-size: 10px;
+    opacity: 0.7;
+    margin-top: 2px;
+}
+
+/* Camera card wrap hover */
+.camera-card-wrap {
+    transition: var(--transition-smooth);
+}
+
+.camera-card-wrap:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+}
+
+/* ========================================================= */
+/* ==================== FORCE PASSWORD BANNER ============= */
+/* ========================================================= */
+
+.force-password-banner {
+    background: linear-gradient(135deg, rgba(224,122,95,0.12), rgba(196,48,43,0.08));
+    border: 1px solid rgba(224,122,95,0.3);
+    border-radius: var(--radius);
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    font-size: 0.9rem;
+    color: var(--alert);
+    font-weight: 600;
+}
+
+.force-password-banner i {
+    font-size: 1.2rem;
+}
+
+.force-password-banner .banner-btn {
+    margin-left: auto;
+    background: var(--alert);
+    color: white;
+    padding: 8px 16px;
+    border-radius: var(--radius-sm);
+    text-decoration: none;
+    font-size: 0.8rem;
+    font-weight: 700;
+    transition: var(--transition-fast);
+}
+
+.force-password-banner .banner-btn:hover {
+    background: #c9634a;
+    transform: translateY(-1px);
+}
+
+/* ========================================================= */
+/* ==================== BTN EXPORT ======================== */
+/* ========================================================= */
+
+.btn-export {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: var(--radius);
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-export:hover {
+    background: var(--accent-dark);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(212, 163, 115, 0.3);
+}
+
+/* ========================================================= */
 /* ==================== RESPONSIVE ========================= */
 /* ========================================================= */
 
@@ -387,7 +526,7 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
-    max-height: 280px;
+    max-height: 340px;
     overflow-y: auto;
     padding-right: 4px;
 }
@@ -397,23 +536,23 @@
 }
 
 .alerts-container-dashboard::-webkit-scrollbar-thumb {
-    background: rgba(148, 163, 184, 0.35);
+    background: rgba(212, 163, 115, 0.3);
     border-radius: 10px;
 }
 
 .alerts-container-dashboard::-webkit-scrollbar-thumb:hover {
-    background: rgba(148, 163, 184, 0.55);
+    background: rgba(212, 163, 115, 0.5);
 }
 
 .alert-card-dash {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 12px;
+    padding: 14px;
     background: var(--bg-card);
-    border-radius: var(--radius);
+    border-radius: var(--radius-md);
     border: 1px solid var(--border);
-    transition: all 0.2s ease;
+    transition: var(--transition-smooth);
     position: relative;
 }
 
@@ -440,16 +579,21 @@
 }
 
 .alert-card-dash:hover {
-    background: var(--bg-hover);
+    background: var(--bg-panel-hover);
     transform: translateY(-1px);
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-sm);
 }
 
 .alert-icon {
     font-size: 18px;
     flex-shrink: 0;
-    min-width: 24px;
-    text-align: center;
+    min-width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    background: rgba(212, 163, 115, 0.1);
 }
 
 .alert-content {
@@ -458,7 +602,7 @@
 }
 
 .alert-title {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 700;
     color: var(--text-main);
     margin-bottom: 2px;
@@ -483,14 +627,17 @@
 
 .btn-alert-secondary,
 .btn-alert-primary {
-    padding: 6px 10px;
+    padding: 7px 12px;
     border: none;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     font-size: 11px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: var(--transition-fast);
     white-space: nowrap;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
 }
 
 .btn-alert-secondary {
@@ -521,7 +668,7 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
-    max-height: 280px;
+    max-height: 340px;
     overflow-y: auto;
     padding-right: 4px;
 }
@@ -531,24 +678,24 @@
 }
 
 .log-scroll-dashboard::-webkit-scrollbar-thumb {
-    background: rgba(148, 163, 184, 0.35);
+    background: rgba(212, 163, 115, 0.3);
     border-radius: 10px;
 }
 
 .log-scroll-dashboard::-webkit-scrollbar-thumb:hover {
-    background: rgba(148, 163, 184, 0.55);
+    background: rgba(212, 163, 115, 0.5);
 }
 
 .log-card-dash {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 10px;
+    padding: 12px;
     background: var(--bg-card);
-    border-radius: var(--radius);
+    border-radius: var(--radius-md);
     border: 1px solid var(--border);
     border-left: 3px solid transparent;
-    transition: all 0.2s ease;
+    transition: var(--transition-smooth);
 }
 
 .log-card-dash.success {
@@ -560,18 +707,30 @@
 }
 
 .log-card-dash:hover {
-    background: var(--bg-hover);
+    background: var(--bg-panel-hover);
     transform: translateY(-1px);
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-sm);
 }
 
 .log-avatar-box {
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
     flex-shrink: 0;
-    border-radius: 6px;
+    border-radius: 50%;
     overflow: hidden;
-    background: var(--bg-hover);
+    background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.log-avatar-box .avatar-initial {
+    font-size: 13px;
+    font-weight: 800;
+    color: white;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    line-height: 1;
 }
 
 .log-avatar-box img {

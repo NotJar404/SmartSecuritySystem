@@ -1,4 +1,4 @@
-﻿@model List<WebApp.Models.Camera>
+@model List<WebApp.Models.Camera>
 
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
@@ -56,17 +56,44 @@
                 var safeName = (cam.Name ?? "").Replace("'", "\\'");
                 var safeUrl = (cam.StreamUrl ?? "").Replace("'", "\\'");
                 var safeLoc = (cam.Location ?? "").Replace("'", "\\'");
+                var occupancy = ViewBag.OccupancyCounts != null && ((Dictionary<int,int>)ViewBag.OccupancyCounts).ContainsKey(cam.Id)
+                    ? ((Dictionary<int,int>)ViewBag.OccupancyCounts)[cam.Id] : 0;
+                var hasAlert = ViewBag.CameraAlerts != null && ((HashSet<int>)ViewBag.CameraAlerts).Contains(cam.RoomId);
 
-                <div class="grid-card"
+                <div class="grid-card @(hasAlert ? "alert-active" : "")"
                      onclick="openFromGrid(@cam.Id, '@safeName', '@safeUrl', '@safeLoc', @cam.RoomId)">
+
+                    @if (User.IsInRole("Admin"))
+                    {
+                        <button type="button" class="card-delete-btn" title="Delete Camera"
+                                onclick="event.stopPropagation(); deleteCamera(@cam.Id, '@safeName');">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    }
 
                     <div class="grid-header">
                         <span class="grid-title">@cam.Name</span>
-                        <span class="live-badge">LIVE</span>
+                        <span class="live-badge">@(hasAlert ? "⚠ ALERT" : "● LIVE")</span>
                     </div>
 
                     <div class="grid-body">
                         <i class="fa fa-camera"></i>
+                        <video class="grid-preview" muted autoplay playsinline data-src="@cam.StreamUrl"></video>
+                    </div>
+
+                    <div class="grid-meta">
+                        <div class="meta-item" title="Occupancy">
+                            <i class="fas fa-users"></i>
+                            <span>@occupancy</span>
+                        </div>
+                        <div class="meta-item" title="Face Recognition">
+                            <i class="fas fa-user-check"></i>
+                            <span class="face-status active">Active</span>
+                        </div>
+                        <div class="meta-item" title="Status">
+                            <span class="cam-status-dot @(cam.Status == "active" ? "online" : "offline")"></span>
+                            <span>@(cam.Status == "active" ? "Online" : "Offline")</span>
+                        </div>
                     </div>
 
                     <div class="grid-footer">
@@ -365,6 +392,22 @@ function editSelectedCamera() {
     document.body.style.overflow = 'hidden';
 }
 
+// Delete camera with confirmation
+function deleteCamera(id, name) {
+    SecureConfirm.confirmDelete(name || 'Camera', function() {
+        // Create and submit hidden form
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/Cameras/Delete';
+        form.innerHTML = `
+            <input type="hidden" name="id" value="${id}" />
+            <input type="hidden" name="__RequestVerificationToken" value="${document.querySelector('[name=__RequestVerificationToken]').value}" />
+        `;
+        document.body.appendChild(form);
+        form.submit();
+    });
+}
+
 // Modal event listeners
 document.addEventListener('DOMContentLoaded', function() {
     const modal = document.getElementById('cameraModal');
@@ -389,6 +432,24 @@ document.addEventListener('DOMContentLoaded', function() {
     modal.addEventListener('click', function(e) {
         if (e.target === modal) {
             closeModal();
+        }
+    });
+
+    // Intercept camera form with two-step confirmation
+    SecureConfirm.interceptForm('cameraForm', 'Confirm Camera Configuration', 'cameraModal');
+
+    // Init grid video previews
+    document.querySelectorAll('.grid-preview').forEach(async function(video) {
+        const url = video.getAttribute('data-src');
+        if (url && url.trim() !== '') {
+            video.src = url;
+            video.play().catch(() => {});
+        } else {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                video.play().catch(() => {});
+            } catch(e) {}
         }
     });
 });

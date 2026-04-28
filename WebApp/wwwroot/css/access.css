@@ -1,4 +1,4 @@
-﻿/* ========================================================= */
+/* ========================================================= */
 /* SECUREVISION ACCESS CONTROL - MAXIMIZED DASHBOARD UI      */
 /* HCI-Optimized for Space Efficiency & Visual Priority      */
 /* Uses standard variables from layouts.css */
@@ -58,10 +58,10 @@
 }
 
 .dashboard-container {
-    padding: 18px;
+    padding: 20px;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 16px;
     height: 100%;
 }
 
@@ -88,7 +88,7 @@
     height: 90px;
     border-radius: 10px;
     object-fit: cover;
-    border: 2px solid #fff;
+    border: 2px solid var(--border);
     flex-shrink: 0;
 }
 
@@ -152,29 +152,33 @@
 .data-row {
     display: flex;
     justify-content: space-between;
-    padding: 6px 0;
-    border-bottom: 1px solid #f9f9f9;
-    font-size: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-soft);
+    font-size: 13px;
 }
 
-.data-label { font-size: 12px; color: var(--text-muted); }
+.data-row:last-child {
+    border-bottom: none;
+}
+
+.data-label { font-size: 12px; color: var(--text-muted); font-weight: 500; }
 .data-value { font-size: 13px; font-weight: 700; color: var(--text-main); }
 
 /* ============================= */
 /* ACTION CONTAINER              */
 /* ============================= */
 .action-container-full {
-    padding: 12px;
+    padding: 14px;
     border-radius: var(--radius-md);
-    background: #F8F9FA;
-    border-left: 5px solid #DEE2E6;
+    background: var(--bg-input);
+    border-left: 4px solid var(--border);
     flex-shrink: 0;
-    margin-top: auto;
+    margin-top: 8px;
 }
 
-.severity-low { border-left-color: var(--clr-auth); background: #F0FAF4; }
-.severity-med { border-left-color: var(--clr-susp); background: #FFFBF2; }
-.severity-high { border-left-color: var(--clr-unauth); background: #FFF5F5; }
+.severity-low { border-left-color: var(--status-active); background: rgba(45, 122, 86, 0.06); }
+.severity-med { border-left-color: var(--accent); background: rgba(212, 163, 115, 0.06); }
+.severity-high { border-left-color: var(--alert); background: rgba(224, 122, 95, 0.06); }
 
 .action-title {
     font-size: 10px;
@@ -196,19 +200,22 @@
     border-radius: 6px;
     font-size: 11px;
     font-weight: 700;
-    border: 1px solid rgba(0,0,0,0.05);
+    border: 1px solid var(--border);
     cursor: pointer;
-    transition: 0.2s;
+    transition: var(--transition-standard);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.btn-neutral { background: white; color: var(--text-main); border: 1px solid var(--border-soft); }
-.btn-warning { background: var(--clr-susp); color: white; }
-.btn-danger { background: var(--clr-unauth); color: white; }
+.btn-neutral { background: var(--bg-card); color: var(--text-main); border: 1.5px solid var(--border); }
+.btn-neutral:hover { background: var(--bg-hover); border-color: var(--accent); }
+.btn-warning { background: var(--btn-flag-gold); color: white; border: 1.5px solid var(--btn-flag-gold-hover); }
+.btn-warning:hover { background: var(--btn-flag-gold-hover); }
+.btn-danger { background: var(--btn-lockdown-terracotta); color: white; border: 1.5px solid var(--btn-lockdown-terracotta-hover); }
+.btn-danger:hover { background: var(--btn-lockdown-terracotta-hover); }
 
-.btn-sec:hover { transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+.btn-sec:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
 
 /* ============================= */
 /* RIGHT PANEL (LOG LIST)        */
@@ -247,13 +254,13 @@
     border-radius: 8px;
     cursor: pointer;
     margin-bottom: 6px;
-    transition: 0.2s;
+    transition: var(--transition-standard);
     border: 1px solid transparent;
 }
 
 .log-card:hover {
-    background: var(--bg-hover);
-    border-color: var(--border-soft);
+    background: var(--bg-panel-hover);
+    border-color: var(--accent-light);
 }
 
 .log-info {
@@ -268,7 +275,7 @@
     width: 40px;
     height: 40px;
     border-radius: 8px;
-    background: var(--primary);
+    background: rgba(212, 163, 115, 0.15);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -290,8 +297,8 @@
     object-fit: cover;
 }
 
-.log-name { font-size: 12px; font-weight: 700; display: block; }
-.log-time { font-size: 10px; color: var(--primary); font-weight: 700; }
+.log-name { font-size: 12px; font-weight: 700; display: block; color: var(--text-main); }
+.log-time { font-size: 10px; color: var(--accent); font-weight: 700; }
 .log-sub { font-size: 10px; color: var(--text-muted); margin: 0; margin-top: 2px; }
 
 /* Empty State Styling */

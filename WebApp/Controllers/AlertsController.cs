@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using WebApp.Data;
@@ -22,12 +22,16 @@ namespace WebApp.Controllers
         // =========================
         // INDEX (FILTERED VIEW)
         // =========================
-        public async Task<IActionResult> Index(string filter = "all")
+        public async Task<IActionResult> Index(string filter = "all", string search = "")
         {
             filter = (filter ?? "all").ToLower();
+            search = (search ?? "").Trim().ToLower();
 
             IQueryable<Alert> query = _context.Alerts.AsNoTracking();
 
+            // =========================
+            // STATUS FILTER
+            // =========================
             query = filter switch
             {
                 "new" => query.Where(a => a.Status == AlertStatus.New),
@@ -37,12 +41,30 @@ namespace WebApp.Controllers
                 _ => query
             };
 
+            // =========================
+            // SEARCH FILTER (FIXED)
+            // =========================
+            if (!string.IsNullOrEmpty(search))
+            {
+                query = query.Where(a =>
+                    a.Type.ToString().ToLower().Contains(search) ||
+                    a.Status.ToString().ToLower().Contains(search) ||
+                    a.Severity.ToString().ToLower().Contains(search) ||
+                    (a.Description ?? "").ToLower().Contains(search) ||
+                    (a.RoomId != null && a.RoomId.Value.ToString().Contains(search))
+                );
+            }
+
+            // =========================
+            // SORTING
+            // =========================
             var data = await query
                 .OrderByDescending(a => a.Severity)
                 .ThenByDescending(a => a.Timestamp)
                 .ToListAsync();
 
             ViewBag.Filter = filter;
+            ViewBag.Search = search;
 
             return View(data);
         }
@@ -89,7 +111,7 @@ namespace WebApp.Controllers
             alert.EscalatedAt = DateTime.UtcNow;
             alert.EscalatedBy = User.Identity?.Name ?? "Unknown";
 
-            // keep consistent severity rule
+            // Ensure escalation = critical
             alert.Severity = SeverityLevel.CRITICAL;
 
             await _context.SaveChangesAsync();

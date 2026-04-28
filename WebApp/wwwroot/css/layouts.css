@@ -1,30 +1,78 @@
-﻿/* ========================================================= */
+/* ========================================================= */
 /* ==================== ROOT THEME ========================= */
+/* Premium V5 Design System — Warm Light Theme               */
 /* ========================================================= */
 
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
 :root {
+    /* Core Backgrounds */
     --bg-main: #FFF9F2;
     --bg-side: #F8F1E7;
     --bg-top: #FFFFFF;
     --bg-card: #FFFFFF;
     --bg-hover: #F5F3ED;
+    --bg-input: #F5F1EB;
+    --bg-input-visible: #F2EDE5;
+    --bg-panel: #FFFFFF;
+    --bg-panel-hover: #FAF7F2;
 
+    /* Typography */
     --text-main: #3E362E;
     --text-muted: #7D6E5D;
+    --text-dim: #9A8D7F;
 
+    /* Font Hierarchy */
+    --font-h1: 1.5rem;
+    --font-h2: 1.25rem;
+    --font-h3: 1rem;
+    --font-body: 0.875rem;
+    --font-small: 0.75rem;
+    --font-weight-heading: 700;
+    --font-weight-subheading: 700;
+    --font-weight-body: 500;
+    --font-weight-label: 700;
+
+    /* Accent & Brand */
     --accent: #D4A373;
     --accent-dark: #B88A5D;
-    --border: #E9E0D2;
-    --alert: #E07A5F;
+    --accent-light: #E8C9A8;
+    --accent-glow: rgba(212, 163, 115, 0.25);
 
+    /* High-Contrast Action Colors */
+    --btn-flag-gold: #C8981E;
+    --btn-flag-gold-hover: #B5870F;
+    --btn-lockdown-terracotta: #C0563A;
+    --btn-lockdown-terracotta-hover: #A8492E;
+
+    /* Borders */
+    --border: #E9E0D2;
+    --border-soft: #EDE6DA;
+
+    /* Status Colors */
+    --alert: #E07A5F;
     --status-active: #2D7A56;
     --status-locked: #C4302B;
+    --success-green: #2D7A56;
+    --warning-amber: #D4A373;
+    --info-blue: #5B8CB5;
 
+    /* Radii */
     --radius: 10px;
+    --radius-md: 10px;
     --radius-lg: 14px;
+    --radius-sm: 6px;
 
+    /* Shadows */
     --shadow-sm: 0 2px 6px rgba(0,0,0,0.06);
     --shadow-md: 0 6px 18px rgba(0,0,0,0.10);
+    --shadow-lg: 0 12px 32px rgba(0,0,0,0.12);
+    --shadow-glow: 0 0 0 4px var(--accent-glow);
+
+    /* Transitions — Unified 0.3s */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-standard: all 0.3s ease;
+    --transition-fast: all 0.15s ease;
 }
 
 /* DARK MODE */
@@ -33,11 +81,20 @@ body.dark-mode {
     --bg-side: #231F1C;
     --bg-top: #2A2420;
     --bg-card: #3D3330;
+    --bg-hover: #4A3F3A;
+    --bg-input: #332C27;
+    --bg-input-visible: #2A2420;
+    --bg-panel: #2A2420;
+    --bg-panel-hover: #3D3330;
 
     --text-main: #E8E2DB;
     --text-muted: #A09384;
+    --text-dim: #7D7168;
 
     --border: #3D352F;
+    --border-soft: #4A3F3A;
+
+    --accent-glow: rgba(212, 163, 115, 0.15);
 }
 
 /* ========================================================= */
@@ -51,7 +108,7 @@ html, body {
     overflow: hidden;
     background-color: var(--bg-main);
     color: var(--text-main);
-    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-family: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
 .dashboard-wrapper {

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using WebApp.Models;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -54,5 +54,9 @@ namespace SmartSecuritySystem.Models
 
         [Column("updated_at")]
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+        // Forces first-login password change for admin-created accounts
+        [Column("must_change_password")]
+        public bool MustChangePassword { get; set; } = false;
     }
 }

@@ -1,4 +1,4 @@
-﻿/* ============================= */
+/* ============================= */
 /* ALERT SYSTEM - PROFESSIONAL UI */
 /* Uses standard variables from layouts.css */
 /* ============================= */
@@ -92,19 +92,28 @@
     display: inline-block;
 
     width: 260px;
-    min-width: 160px;      /* 🔥 slightly reduced for safety */
+    min-width: 160px;
     max-width: 320px;
 
-    padding: 9px 12px;
+    padding: 10px 14px;
 
     border-radius: var(--radius-sm);
-    border: 1px solid var(--border-soft);
+    border: 1.5px solid var(--border);
 
-    background: rgba(255,255,255,0.03);
+    background: var(--bg-input);
     color: var(--text-main);
     outline: none;
+    font-family: inherit;
+    font-size: 13px;
+    transition: var(--transition-smooth);
 
-    box-sizing: border-box; /* 🔥 prevents overflow issues */
+    box-sizing: border-box;
+}
+
+.search-bar input:focus {
+    border-color: var(--accent);
+    box-shadow: var(--shadow-glow);
+    background: var(--bg-panel);
 }
 
 /* BUTTON - SEARCH ICON */
@@ -239,9 +248,9 @@
 }
 
 .alert-card:hover {
-    background: var(--bg-hover);
+    background: var(--bg-panel-hover);
     transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+    box-shadow: var(--shadow-md);
 }
 
 .alert-card::before {
@@ -271,7 +280,7 @@
     justify-content: center;
     padding: 12px;
     border-radius: var(--radius-sm);
-    background: rgba(255,255,255,0.05);
+    background: rgba(212, 163, 115, 0.1);
 }
 
 /* ============================= */
@@ -337,29 +346,29 @@
     white-space: nowrap;
 }
 
-/* COLORS */
+/* COLORS - WARM PALETTE */
 .alert-actions form:nth-child(1) button {
-    background: rgba(59,130,246,0.25);
-    color: #93c5fd;
+    background: rgba(212, 163, 115, 0.15);
+    color: var(--accent-dark);
 }
 .alert-actions form:nth-child(1) button:hover {
-    background: rgba(59,130,246,0.45);
+    background: rgba(212, 163, 115, 0.3);
 }
 
 .alert-actions form:nth-child(2) button {
-    background: rgba(16,185,129,0.25);
-    color: #6ee7b7;
+    background: rgba(45, 122, 86, 0.15);
+    color: var(--status-active);
 }
 .alert-actions form:nth-child(2) button:hover {
-    background: rgba(16,185,129,0.45);
+    background: rgba(45, 122, 86, 0.3);
 }
 
 .alert-actions form:nth-child(3) button {
-    background: rgba(239,68,68,0.25);
-    color: #fca5a5;
+    background: rgba(224, 122, 95, 0.15);
+    color: var(--alert);
 }
 .alert-actions form:nth-child(3) button:hover {
-    background: rgba(239,68,68,0.45);
+    background: rgba(224, 122, 95, 0.3);
 }
 
 .alert-actions .details-btn {
@@ -656,16 +665,7 @@
     to { transform: translateY(0); opacity: 1; }
 }
 
-/* LIGHT MODE */
-body.light-mode {
-    --bg-main: #f8fafc;
-    --bg-card: #ffffff;
-    --bg-hover: #f1f5f9;
-    --text-main: var(--text-main);
-    --text-muted: #475569;
-    --text-dim: #64748b;
-    --border-soft: #e2e8f0;
-}
+
 
 /* RESPONSIVE */
 @media (max-width: 768px) {

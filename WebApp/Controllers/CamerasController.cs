@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using WebApp.Data;
@@ -25,6 +25,20 @@ namespace WebApp.Controllers
 
             // PASS SELECTED CAMERA TO VIEW
             ViewBag.SelectedCameraId = selectedId;
+
+            // AI Metadata: Occupancy counts per camera
+            var occupancyCounts = _context.Set<RoomOccupancy>()
+                .GroupBy(o => o.CameraId)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(o => o.Timestamp).First().PeopleCount);
+            ViewBag.OccupancyCounts = occupancyCounts;
+
+            // AI Metadata: Rooms with active alerts
+            var alertRoomIds = _context.Alerts
+                .Where(a => a.Status == AlertStatus.New || a.Status == AlertStatus.Acknowledged)
+                .Where(a => a.RoomId != null)
+                .Select(a => a.RoomId!.Value)
+                .ToHashSet();
+            ViewBag.CameraAlerts = alertRoomIds;
 
             return View(GetCameras());
         }

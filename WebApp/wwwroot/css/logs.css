@@ -1,88 +1,178 @@
-﻿﻿/* ============================= */
-/* ACTIVITY LOGS - PROFESSIONAL */
+/* ============================= */
+/* ACTIVITY LOGS - PREMIUM V5    */
 /* Uses standard variables from layouts.css */
 /* ============================= */
 
 /* ============================= */
-/* PAGE HEADER */
+/* SEARCH TOOLBAR                */
 /* ============================= */
-.page-title {
-    font-size: 28px;
-    font-weight: 700;
-    margin-bottom: 8px;
-    color: var(--text-main);
-    letter-spacing: -0.5px;
+.log-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+    background: var(--bg-card);
+    padding: 14px 18px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
 }
 
-.subtitle {
+.log-search-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 200px;
+    position: relative;
+}
+
+.log-search-bar > i {
+    color: var(--text-dim);
     font-size: 14px;
-    color: var(--text-muted);
-    margin-bottom: 28px;
+    position: absolute;
+    left: 12px;
+}
+
+.log-search-bar input {
+    flex: 1;
+    padding: 10px 12px 10px 36px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-input);
+    color: var(--text-main);
+    font-size: 13px;
+    font-family: inherit;
+    transition: var(--transition-smooth);
+}
+
+.log-search-bar input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: var(--shadow-glow);
+    background: var(--bg-panel);
+}
+
+.log-search-bar button {
+    padding: 10px 16px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    font-family: inherit;
+}
+
+.log-search-bar button:hover {
+    background: var(--accent-dark);
+    transform: translateY(-1px);
 }
 
 /* ============================= */
-/* LOGS CONTAINER (SCROLL FIXED) */
+/* FILTER CHIPS                  */
+/* ============================= */
+.log-filters {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    color: var(--text-muted);
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    transition: var(--transition-fast);
+    white-space: nowrap;
+}
+
+.filter-chip:hover {
+    background: rgba(212, 163, 115, 0.08);
+    border-color: var(--accent);
+    color: var(--text-main);
+}
+
+.filter-chip.active {
+    background: rgba(212, 163, 115, 0.15);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.filter-chip i {
+    font-size: 11px;
+}
+
+/* ============================= */
+/* LOGS CONTAINER                */
 /* ============================= */
 .logs-container {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 10px;
     max-width: 100%;
-
-    /* 🔥 critical scroll setup */
-    max-height: var(--content-height);
+    max-height: calc(100vh - 280px);
     overflow-y: auto;
-
-    /* 🔥 prevents flex overflow bugs */
     min-height: 0;
-
     padding-right: 6px;
 }
 
-/* Optional scrollbar styling */
 .logs-container::-webkit-scrollbar {
-    width: 8px;
+    width: 6px;
 }
 
 .logs-container::-webkit-scrollbar-thumb {
-    background: var(--text-muted);
+    background: rgba(212, 163, 115, 0.3);
     border-radius: 6px;
-    opacity: 0.4;
+}
+
+.logs-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(212, 163, 115, 0.5);
 }
 
 /* ============================= */
-/* LOG CARD */
+/* LOG CARD                      */
 /* ============================= */
 .log-card {
     display: grid;
     grid-template-columns: 50px 1fr auto;
     gap: 16px;
     align-items: start;
-    padding: 18px 20px;
+    padding: 16px 18px;
     background: var(--bg-card);
     border-radius: var(--radius-md);
     border: 1px solid var(--border);
-    transition: all 0.2s ease;
+    transition: var(--transition-smooth);
 }
 
 .log-card:hover {
-    background: var(--bg-hover);
-    border-color: rgba(255,255,255,0.08);
+    background: var(--bg-panel-hover);
+    border-color: var(--accent-light);
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    box-shadow: var(--shadow-sm);
 }
 
 /* ICON */
 .log-icon {
-    font-size: 22px;
-    background: rgba(59, 130, 246, 0.1);
+    font-size: 18px;
+    background: rgba(212, 163, 115, 0.1);
     padding: 12px;
     border-radius: var(--radius-sm);
     display: flex;
     align-items: center;
     justify-content: center;
     height: fit-content;
-    color: var(--text-main);
+    color: var(--accent);
     flex-shrink: 0;
 }
 
@@ -94,7 +184,7 @@
 
 .log-content h3 {
     margin: 0;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 700;
     color: var(--text-main);
     margin-bottom: 4px;
@@ -102,7 +192,7 @@
 
 .log-content p {
     margin: 4px 0 0;
-    color: #94a3b8;
+    color: var(--text-muted);
     font-size: 13px;
     line-height: 1.4;
     word-break: break-word;
@@ -111,73 +201,41 @@
 /* META */
 .log-meta {
     font-size: 12px;
-    color: #64748b;
+    color: var(--text-dim);
     margin-top: 8px;
     display: flex;
     flex-wrap: wrap;
-    gap: 12px;
+    gap: 14px;
+}
+
+.log-meta span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.log-meta i {
+    font-size: 11px;
+    color: var(--accent);
 }
 
 /* TIME */
 .log-time {
     font-size: 12px;
-    color: #64748b;
+    color: var(--text-dim);
     white-space: nowrap;
     padding: 4px 10px;
-    background: rgba(255,255,255,0.03);
-    border-radius: 6px;
+    background: var(--bg-input);
+    border-radius: var(--radius-sm);
+    font-weight: 500;
 }
 
 /* ============================= */
-/* LIGHT MODE SUPPORT */
-/* ============================= */
-body.light-mode .page-title {
-    color: var(--text-main);
-}
-
-body.light-mode .subtitle {
-    color: #64748b;
-}
-
-body.light-mode .log-card {
-    background: var(--bg-main);
-    border-color: var(--border);
-}
-
-body.light-mode .log-card:hover {
-    background: var(--bg-hover);
-    border-color: var(--border);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-}
-
-body.light-mode .log-icon {
-    background: rgba(59, 130, 246, 0.15);
-    color: var(--accent);
-}
-
-body.light-mode .log-content h3 {
-    color: var(--text-main);
-}
-
-body.light-mode .log-content p {
-    color: var(--text-muted);
-}
-
-body.light-mode .log-meta,
-body.light-mode .log-time {
-    color: #64748b;
-}
-
-body.light-mode .log-time {
-    background: rgba(15, 23, 42, 0.05);
-}
-
-/* ============================= */
-/* RESPONSIVE */
+/* RESPONSIVE                    */
 /* ============================= */
 @media (max-width: 768px) {
     .log-card {
-        grid-template-columns: 48px 1fr;
+        grid-template-columns: 44px 1fr;
     }
 
     .log-time {
@@ -185,7 +243,12 @@ body.light-mode .log-time {
         margin-top: 8px;
     }
 
-    .page-title {
-        font-size: 24px;
+    .log-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .log-search-bar {
+        width: 100%;
     }
 }

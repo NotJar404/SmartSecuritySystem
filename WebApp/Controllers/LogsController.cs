@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using WebApp.Models;
 using WebApp.Data;
@@ -18,14 +18,17 @@ namespace WebApp.Controllers
             _context = context;
         }
 
-        public IActionResult Index(string type = "all")
+        public IActionResult Index(string filter = "all", string search = "")
         {
+            filter = (filter ?? "all").ToLower();
+            search = (search ?? "").Trim();
+
             var logs = new List<LogEntry>();
 
             // =========================
             // USER LOGIN LOGS
             // =========================
-            if (type == "all" || type == "login")
+            if (filter == "all" || filter == "login")
             {
                 logs.AddRange(_context.Users
                     .Where(u => u.LastLogin != null)
@@ -44,7 +47,7 @@ namespace WebApp.Controllers
             // =========================
             // ACCESS LOGS
             // =========================
-            if (type == "all" || type == "access")
+            if (filter == "all" || filter == "access")
             {
                 logs.AddRange(_context.AccessLogs.Select(a => new LogEntry
                 {
@@ -63,7 +66,7 @@ namespace WebApp.Controllers
             // =========================
             // DETECTION LOGS
             // =========================
-            if (type == "all" || type == "detection")
+            if (filter == "all" || filter == "detection")
             {
                 logs.AddRange(_context.DetectionLogs.Select(d => new LogEntry
                 {
@@ -82,7 +85,7 @@ namespace WebApp.Controllers
             // =========================
             // ALERT LOGS
             // =========================
-            if (type == "all" || type == "alert")
+            if (filter == "all" || filter == "alert")
             {
                 logs.AddRange(_context.Alerts.Select(a => new LogEntry
                 {
@@ -102,11 +105,22 @@ namespace WebApp.Controllers
                 }));
             }
 
+            // Apply search filter
+            if (!string.IsNullOrEmpty(search))
+            {
+                logs = logs.Where(l =>
+                    (l.Action != null && l.Action.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
+                    (l.User != null && l.User.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
+                    (l.Details != null && l.Details.Contains(search, StringComparison.OrdinalIgnoreCase))
+                ).ToList();
+            }
+
             var orderedLogs = logs
                 .OrderByDescending(x => x.Timestamp)
                 .ToList();
 
-            ViewBag.Filter = type;
+            ViewBag.Filter = filter;
+            ViewBag.Search = search;
 
             return View(orderedLogs);
         }

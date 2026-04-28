@@ -1,4 +1,4 @@
-﻿/* =========================================
+/* =========================================
    PERSONNEL MANAGEMENT CSS - OPTIMIZED
    Uses standard variables from layouts.css
    ========================================= */
@@ -10,7 +10,7 @@
 body {
     background: var(--bg-main);
     color: var(--text-main);
-    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
     font-size: 14px;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
@@ -23,9 +23,9 @@ h2, h3, h4, h5 {
     margin: 0;
 }
 
-h2 { font-size: 1.4rem; }
-h5 { font-size: 1rem; }
-small { color: var(--text-muted); font-size: 0.85rem; }
+h2 { font-size: var(--font-h2); }
+h5 { font-size: var(--font-h3); }
+small { color: var(--text-muted); font-size: var(--font-small); }
 
 /* =========================================
    LAYOUT
@@ -44,39 +44,45 @@ small { color: var(--text-muted); font-size: 0.85rem; }
    ========================================= */
 
 .input-group {
-    max-width: 360px;
+    max-width: 240px;
     border-radius: var(--radius);
     border: 1px solid var(--border);
     background: var(--bg-card);
     overflow: hidden;
     transition: all 0.2s ease;
-    box-shadow: var(--shadow-sm);
+    display: flex;
+    align-items: center;
 }
 
 .input-group:focus-within {
     border-color: var(--accent);
-    box-shadow: var(--shadow-md);
+    box-shadow: 0 0 0 3px rgba(212, 163, 115, 0.1);
+}
+
+.input-group .input-group-text {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    padding: 8px 4px 8px 12px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
 }
 
 .input-group .form-control {
     border: none !important;
-    padding: 10px 14px;
+    padding: 9px 12px 9px 6px;
     font-size: 13px;
     background: transparent;
     color: var(--text-main);
+    box-shadow: none !important;
 }
 
 .input-group .form-control::placeholder { color: var(--text-dim); }
 
 .input-group .btn {
-    border: none;
-    background: transparent;
-    color: var(--accent);
-    padding: 8px 12px;
-    transition: all 0.2s ease;
+    display: none;
 }
-
-.input-group .btn:hover { color: var(--text-main); }
 
 /* =========================================
    STATS CARDS - MATCHED WITH DASHBOARD/ANALYTICS
@@ -86,7 +92,14 @@ small { color: var(--text-muted); font-size: 0.85rem; }
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 16px;
-    margin-bottom: 20px !important;
+    margin-bottom: 28px !important;
+}
+
+/* Table Row — 2 columns with proper gap */
+.row:not(.mb-4) {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
 }
 
 .row.mb-4 .card {
@@ -98,7 +111,7 @@ small { color: var(--text-muted); font-size: 0.85rem; }
     align-items: center;
     gap: 14px;
     box-shadow: var(--shadow-sm);
-    transition: all 0.2s ease;
+    transition: var(--transition-standard);
 }
 
 .row.mb-4 .card:hover {
@@ -140,7 +153,7 @@ small { color: var(--text-muted); font-size: 0.85rem; }
     border-radius: var(--radius-lg);
     background: var(--bg-card);
     box-shadow: var(--shadow-sm);
-    transition: all 0.2s ease;
+    transition: var(--transition-standard);
     overflow: hidden;
 }
 
@@ -152,13 +165,16 @@ small { color: var(--text-muted); font-size: 0.85rem; }
 .card-header {
     background: var(--bg-card);
     border-bottom: 1px solid var(--border);
-    padding: var(--s-lg) var(--s-lg) var(--s-md);
+    padding: 18px 20px;
 }
 
 .card-header h5 {
     font-size: 0.95rem;
+    font-weight: 700;
     margin-bottom: 0;
     text-transform: capitalize;
+    line-height: 1.8;
+    letter-spacing: 0.3px;
 }
 
 /* =========================================
@@ -166,7 +182,7 @@ small { color: var(--text-muted); font-size: 0.85rem; }
    ========================================= */
 
 .row > .col-xl-6 {
-    margin-bottom: 18px;
+    margin-bottom: 30px;
 }
 
 .row > .col-xl-6:last-child {
@@ -192,14 +208,14 @@ small { color: var(--text-muted); font-size: 0.85rem; }
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    padding: 12px 14px;
+    padding: 12px 15px;
     background: var(--bg-hover);
     text-align: left;
 }
 
 .table tbody td {
     border-color: var(--border);
-    padding: 13px 14px;
+    padding: 12px 15px;
     vertical-align: middle;
     font-size: 13px;
     line-height: 1.5;
@@ -293,7 +309,7 @@ code {
     border: none;
     border-radius: var(--radius);
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: var(--transition-standard);
     display: inline-flex;
     align-items: center;
     gap: var(--s-sm);
@@ -390,7 +406,8 @@ code {
 }
 
 .modal-backdrop.show {
-    background-color: rgba(0, 0, 0, 0.3);
+    background-color: rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(4px);
 }
 
 /* Show modal - visible and centered */
@@ -536,7 +553,7 @@ code {
 }
 
 .form-group label {
-    font-weight: 600;
+    font-weight: var(--font-weight-label);
     color: var(--text-main);
     margin-bottom: 6px;
     font-size: 13px;
@@ -544,26 +561,24 @@ code {
 
 .form-group input,
 .form-group select {
-    padding: 10px 12px;
+    padding: 10px 14px;
     border-radius: 8px;
-    border: 1px solid var(--border);
-    background: white;
+    border: 1.5px solid var(--border);
+    background: var(--bg-input);
     color: var(--text-main);
     font-size: 13px;
-    transition: all 0.2s ease;
+    transition: var(--transition-smooth);
     width: 100%;
     box-sizing: border-box;
-    color: var(--text-main);
-    font-size: 13px;
-    transition: all 0.2s ease;
+    font-family: inherit;
 }
 
 .form-group input:focus,
 .form-group select:focus {
     outline: none;
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(212, 163, 115, 0.15);
-    background: white;
+    box-shadow: var(--shadow-glow);
+    background: var(--bg-panel);
 }
 
 .modal-body #confirmContent {
@@ -596,7 +611,7 @@ code {
     font-weight: 600;
     font-size: 13px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: var(--transition-standard);
     line-height: 1.4;
 }
 
@@ -636,13 +651,13 @@ code {
 
 .form-control,
 .custom-select {
-    background: var(--bg-hover);
-    border: 1px solid var(--border);
+    background: var(--bg-input-visible);
+    border: 1.5px solid var(--border);
     color: var(--text-main);
     padding: 10px 12px;
     border-radius: var(--radius);
     font-size: 13px;
-    transition: all 0.2s ease;
+    transition: var(--transition-standard);
     font-weight: 500;
 }
 

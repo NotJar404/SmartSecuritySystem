@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -119,6 +119,12 @@ namespace SmartSecuritySystem.Controllers
                 new Claim("FullName", user.FullName ?? ""),
                 new Claim("Email", user.Email ?? "")
             };
+
+            // Flag for forced password change on first login
+            if (user.MustChangePassword)
+            {
+                claims.Add(new Claim("MustChangePassword", "true"));
+            }
 
             var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
             var principal = new ClaimsPrincipal(identity);
@@ -289,11 +295,41 @@ namespace SmartSecuritySystem.Controllers
 
         private string GenerateRandomPassword(int length)
         {
-            const string chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz123456789";
-            var random = new Random();
+            // Guarantee at least: 1 uppercase, 1 lowercase, 1 digit, 1 special char
+            const string upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+            const string lower = "abcdefghijkmnopqrstuvwxyz";
+            const string digits = "123456789";
+            const string special = "!@#$%&*";
+            const string all = upper + lower + digits + special;
 
-            return new string(Enumerable.Range(0, length)
-                .Select(_ => chars[random.Next(chars.Length)]).ToArray());
+            length = Math.Max(length, 8);
+            var random = new Random();
+            var password = new char[length];
+
+            // Ensure one of each category
+            password[0] = upper[random.Next(upper.Length)];
+            password[1] = lower[random.Next(lower.Length)];
+            password[2] = digits[random.Next(digits.Length)];
+            password[3] = special[random.Next(special.Length)];
+
+            // Fill rest randomly
+            for (int i = 4; i < length; i++)
+                password[i] = all[random.Next(all.Length)];
+
+            // Shuffle
+            for (int i = password.Length - 1; i > 0; i--)
+            {
+                int j = random.Next(i + 1);
+                (password[i], password[j]) = (password[j], password[i]);
+            }
+
+            return new string(password);
+        }
+
+        private bool IsValidGmailAddress(string? email)
+        {
+            if (string.IsNullOrWhiteSpace(email)) return false;
+            return email.Trim().EndsWith("@gmail.com", StringComparison.OrdinalIgnoreCase);
         }
 
         private string HashPassword(string password)

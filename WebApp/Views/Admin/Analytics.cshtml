@@ -154,31 +154,30 @@
     </div>
 
     <div class="panel">
-            <div class="panel-header">
-                <h5>Active Intervention Queue</h5>
-                <small>Current alerts requiring attention</small>
+        <div class="panel-header">
+            <h5>Active Intervention Queue</h5>
+            <small>Current alerts requiring attention</small>
+        </div>
+        <div class="status-list-container">
+            <div class="status-item">
+                <span class="status-dot-indicator red"></span>
+                <div class="status-info">
+                    <p class="mb-0"><strong>Unauthorized Entry - Room 302</strong></p>
+                    <small class="text-muted">Security Team Dispatched (3 mins ago)</small>
+                </div>
             </div>
-            <div class="status-list-container" style="display: flex; flex-direction: column; gap: 12px; padding: 10px;">
-                <div class="status-item" style="display: flex; align-items: center; gap: 12px; padding: 12px; background: #fdfaf6; border-radius: 8px; border: 1px solid var(--border-soft);">
-                    <span class="status-dot red" style="width: 10px; height: 10px; border-radius: 50%; background: #bc4749;"></span>
-                    <div class="status-info">
-                        <p class="mb-0" style="font-size: 13px;"><strong>Unauthorized Entry - Room 302</strong></p>
-                        <small class="text-muted" style="font-size: 11px;">Security Team Dispatched (3 mins ago)</small>
-                    </div>
+            <div class="status-item">
+                <span class="status-dot-indicator yellow"></span>
+                <div class="status-info">
+                    <p class="mb-0"><strong>Motion Detected - Server Room A</strong></p>
+                    <small class="text-muted">Verifying via Camera Feed...</small>
                 </div>
-                <div class="status-item" style="display: flex; align-items: center; gap: 12px; padding: 12px; background: #fdfaf6; border-radius: 8px; border: 1px solid var(--border-soft);">
-                    <span class="status-dot yellow" style="width: 10px; height: 10px; border-radius: 50%; background: #D4A373;"></span>
-                    <div class="status-info">
-                        <p class="mb-0" style="font-size: 13px;"><strong>Motion Detected - Server Room A</strong></p>
-                        <small class="text-muted" style="font-size: 11px;">Verifying via Camera Feed...</small>
-                    </div>
-                </div>
-                <div class="status-item" style="display: flex; align-items: center; gap: 12px; padding: 12px; background: #fdfaf6; border-radius: 8px; border: 1px solid var(--border-soft);">
-                    <span class="status-dot green" style="width: 10px; height: 10px; border-radius: 50%; background: #4f772d;"></span>
-                    <div class="status-info">
-                        <p class="mb-0" style="font-size: 13px;"><strong>Door Forced - Lobby</strong></p>
-                        <small class="text-success" style="font-size: 11px;">Resolved - Maintenance issue identified</small>
-                    </div>
+            </div>
+            <div class="status-item">
+                <span class="status-dot-indicator green"></span>
+                <div class="status-info">
+                    <p class="mb-0"><strong>Door Forced - Lobby</strong></p>
+                    <small class="text-muted">Resolved - Maintenance issue identified</small>
                 </div>
             </div>
         </div>

@@ -1,4 +1,4 @@
-﻿@using System.Linq
+@using System.Linq
 @model WebApp.Models.DashboardViewModel
 
 @{
@@ -7,6 +7,7 @@
 }
 
 <link rel="stylesheet" href="~/css/dashboard.css" />
+<link rel="stylesheet" href="~/css/camera.css" />
 
 <div class="dashboard-container">
 
@@ -25,7 +26,7 @@
                 <i class="fas fa-lock"></i> LOCKDOWN
             </button>
 
-            <button class="btn-emergency">
+            <button class="btn-emergency" onclick="triggerEmergency()">
                 <i class="fas fa-phone-alt"></i> EMERGENCY
             </button>
         </div>
@@ -76,9 +77,12 @@
     <!-- ===================== -->
     <section class="cctv-filmstrip-section mb-4">
 
-        <div class="d-flex justify-content-between mb-2">
-            <span class="section-title">Live Surveillance</span>
-            <span class="live-badge">● LIVE</span>
+        <div class="panel-header-row">
+            <h5>Live Surveillance</h5>
+            <div class="d-flex align-items-center" style="gap:12px;">
+                <span class="live-badge">● LIVE</span>
+                <a href="/Cameras/Index" class="view-more-link">View All <i class="fas fa-arrow-right"></i></a>
+            </div>
         </div>
 
         <div class="horizontal-camera-slider">
@@ -87,21 +91,36 @@
             {
                 foreach (var cam in Model.Cameras)
                 {
-                    <div class="camera-card-wrap">
+                    <div class="grid-card dash-cam-card"
+                         onclick="window.location.href='/Cameras/Index?selectedId=@cam.Id'"
+                         style="cursor:pointer; min-width:280px; flex-shrink:0;">
 
-                        <div class="video-container">
-
-                            <video class="cctv-video"
-                                   muted autoplay playsinline
-                                   data-src="@cam.StreamUrl">
-                            </video>
-
-                            <div class="video-overlay">
-                                <span>@cam.Name</span>
-                            </div>
-
+                        <div class="grid-header">
+                            <span class="grid-title">@cam.Name</span>
+                            <span class="live-badge">● LIVE</span>
                         </div>
 
+                        <div class="grid-body">
+                            <i class="fa fa-camera"></i>
+                            <video class="cctv-video grid-preview" muted autoplay playsinline
+                                   data-src="@cam.StreamUrl"></video>
+                        </div>
+
+                        <div class="grid-meta">
+                            <div class="meta-item" title="Face Recognition">
+                                <i class="fas fa-user-check"></i>
+                                <span class="face-status active">Active</span>
+                            </div>
+                            <div class="meta-item" title="Status">
+                                <span class="cam-status-dot online"></span>
+                                <span>Online</span>
+                            </div>
+                        </div>
+
+                        <div class="grid-footer">
+                            <span>@cam.Location</span>
+                            <span>@cam.Room?.RoomName</span>
+                        </div>
                     </div>
                 }
             }
@@ -126,6 +145,7 @@
 
             <div class="panel-header">
                 <h5>Security Alerts</h5>
+                <a href="/Alerts/Index" class="view-more-link">View More <i class="fas fa-arrow-right"></i></a>
             </div>
 
             <div class="alerts-container-dashboard">
@@ -152,8 +172,16 @@
                             </div>
 
                             <div class="alert-actions-dash">
-                                <button class="btn-alert-secondary">Acknowledge</button>
-                                <button class="btn-alert-primary">Details</button>
+                                @if (item.TriggeredAlert)
+                                {
+                                    <form method="post" action="/Alerts/Acknowledge" style="display:inline;" id="ackDash-@item.DetectionId">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@item.DetectionId" />
+                                        <button type="button" class="btn-alert-secondary"
+                                                onclick="event.stopPropagation(); SecureConfirm.show({ title:'Acknowledge Alert', icon:'fas fa-check-circle', fields:[{label:'Type',value:'@item.DetectionType'},{label:'Action',value:'Mark as acknowledged'}], onConfirm:function(){document.getElementById('ackDash-@item.DetectionId').submit();} });">Acknowledge</button>
+                                    </form>
+                                }
+                                <a href="/Alerts/Index" class="btn-alert-primary">Details</a>
                             </div>
 
                         </div>
@@ -173,6 +201,7 @@
 
             <div class="panel-header">
                 <h5>Access Monitoring</h5>
+                <a href="/Access/Index" class="view-more-link">View More <i class="fas fa-arrow-right"></i></a>
             </div>
 
             <div class="log-scroll-dashboard">
@@ -182,13 +211,14 @@
                     foreach (var log in Model.RecentAccessLogs.Take(6))
                     {
                         var statusClass = log.IsAuthorized ? "success" : "danger";
+                        var initials = !string.IsNullOrEmpty(log.FullName) 
+                            ? new string(log.FullName.Split(' ').Select(n => n[0]).ToArray()) 
+                            : "??";
                         
                         <div class="log-card-dash @statusClass">
 
                             <div class="log-avatar-box">
-                                <img src="@(log.ImageUrl ?? "/images/default-user.png")" 
-                                     onerror="this.src='/images/default-user.png'" 
-                                     alt="@log.FullName" />
+                                <span class="avatar-initial">@initials</span>
                             </div>
 
                             <div class="log-info">
@@ -276,8 +306,39 @@ window.addEventListener("DOMContentLoaded", async function () {
 });
 
 function triggerLockdown() {
-    if (confirm("CRITICAL: Initiate full lockdown?")) {
-        console.log("Lockdown activated");
-    }
+    SecureConfirm.show({
+        title: 'INITIATE FULL LOCKDOWN?',
+        icon: 'fas fa-lock',
+        isDelete: true,
+        confirmText: 'LOCKDOWN NOW',
+        confirmClass: 'btn-danger',
+        fields: [
+            { label: 'Action', value: 'Lock all doors and restrict access' },
+            { label: 'Impact', value: 'All entry points will be secured' },
+            { label: 'Severity', value: 'CRITICAL' }
+        ],
+        onConfirm: function() {
+            console.log('Lockdown activated');
+            alert('Lockdown protocol initiated.');
+        }
+    });
+}
+
+function triggerEmergency() {
+    SecureConfirm.show({
+        title: 'EMERGENCY ALERT',
+        icon: 'fas fa-phone-alt',
+        isDelete: true,
+        confirmText: 'SEND ALERT',
+        confirmClass: 'btn-danger',
+        fields: [
+            { label: 'Action', value: 'Notify all security personnel' },
+            { label: 'Response', value: 'Emergency services will be contacted' }
+        ],
+        onConfirm: function() {
+            console.log('Emergency triggered');
+            alert('Emergency alert dispatched.');
+        }
+    });
 }
 </script>

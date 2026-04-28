@@ -1,28 +1,43 @@
-﻿/* ================= LOGIN PAGE - Uses standard variables from layouts.css ================= */
+/* ================= LOGIN PAGE - Uses standard variables from layouts.css ================= */
+/* All theme variables inherited from layouts.css :root */
 :root {
-    --bg-main: #FFF9F2;
-    --bg-side: #F8F1E7;
-    --bg-top: #FFFFFF;
-    --text-main: #3E362E;
-    --text-muted: #7D6E5D;
-    --accent: #D4A373;
-    --border: #E9E0D2;
-    --alert: #E07A5F;
-    --accent-light: #E8D5BA;
-    --text-light: #5A5247;
+    /* --- Warm Theme Core --- */
+    --bg-main: #FDFBF9;      /* Very soft warm white - prevents "monitor burn" */
+    --bg-top: #FFFFFF;       /* Pure white for the login card itself */
+    --bg-side: #F5EFE6;      /* Slightly darker cream for the left panel */
+    --bg-panel: #FAF7F2;     /* For focused inputs to make them "sink" */
+    
+    /* --- High Contrast Text --- */
+    --text-main: #2C2724;    /* Deep charcoal (better than pure black) */
+    --text-muted: #6B635B;   /* Mid-tone for subtitles/labels */
+    --text-light: #8E847B;   /* For descriptions */
+    
+    /* --- SECUREVISION Brand --- */
+    --accent: #D4A373;       /* Your signature warm gold/tan */
+    --accent-dark: #BC8F62;  /* For button hover states */
+    --accent-light: #E9D5C3; /* For soft glows */
+    
+    /* --- Visibility & Borders --- */
+    --border: #E2DCD5;       /* Clearly visible input borders */
+    --shadow-glow: 0 0 0 3px rgba(212, 163, 115, 0.15); /* Focus state */
+    --alert: #E07A5F;        /* Soft terracotta for errors */
 }
 
-body.dark-mode {
-    --bg-main: #2A2420;
-    --bg-side: #231F1C;
-    --bg-top: #3D3330;
-    --text-main: #F0EBE5;
-    --text-muted: #C9BDB6;
-    --accent: #D4A373;
-    --border: #4A4038;
-    --accent-light: #E8D5BA;
-    --text-light: #C9BDB6;
+/* --- Dark Mode Override --- */
+[data-theme="dark"] {
+    --bg-main: #1A1816;      /* Deep midnight brown/black */
+    --bg-top: #24211E;       /* Elevated panel color */
+    --bg-side: #1E1B19;
+    --bg-panel: #2C2825;
+    
+    --text-main: #F5F1ED;    /* Warm off-white text */
+    --text-muted: #A39B94;
+    --text-light: #857D75;
+    
+    --border: #3D3732;       /* Stronger border for dark mode visibility */
+    --shadow-glow: 0 0 0 3px rgba(212, 163, 115, 0.25);
 }
+/* Dark mode inherited from layouts.css */
 /* ================= RESET ================= */
 * {
     box-sizing: border-box;
@@ -30,7 +45,7 @@ body.dark-mode {
 
 body {
     margin: 0;
-    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
     background: var(--bg-main);
     color: var(--text-main);
     transition: background-color 0.3s ease, color 0.3s ease;
@@ -231,15 +246,15 @@ input[type="email"] {
     outline: none;
     transition: 0.2s;
     font-size: 14px;
-    font-family: 'Segoe UI', sans-serif;
+    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
 }
 
 input[type="text"]:focus,
 input[type="password"]:focus,
 input[type="email"]:focus {
     border-color: var(--accent);
-    background: white;
-    box-shadow: 0 0 0 3px rgba(212, 163, 115, 0.1);
+    background: var(--bg-panel);
+    box-shadow: var(--shadow-glow);
 }
 
 input::placeholder {
@@ -286,6 +301,11 @@ input::placeholder {
     font-size: 13px;
     gap: 12px;
     flex-wrap: nowrap;
+}
+
+/* Reset inherited label margin inside options */
+.options label {
+    margin-top: 0;
 }
 
 /* REMEMBER ME FIX */
@@ -365,7 +385,7 @@ button {
 }
 
 button:hover {
-    background: var(--accent-light);
+    background: var(--accent-dark);
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(212, 163, 115, 0.3);
 }

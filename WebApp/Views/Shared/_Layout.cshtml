@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -7,6 +7,7 @@
     
     <link rel="stylesheet" href="~/css/layouts.css" />
     <link rel="stylesheet" href="~/css/shared.css" />
+    <link rel="stylesheet" href="~/css/modal-system.css" />
     <link rel="stylesheet" href="~/css/dashboard.css" />
     <link rel="stylesheet" href="~/css/admin.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
@@ -96,6 +97,21 @@
             </header>
 
             <section class="page-content">
+                @{
+                    var mustChangePass = User.HasClaim("MustChangePassword", "true");
+                    var isProfilePage = ViewContext.RouteData.Values["controller"]?.ToString() == "Profile";
+                }
+                @if (mustChangePass)
+                {
+                    <div class="force-password-banner">
+                        <i class="fas fa-shield-alt"></i>
+                        <span>You must change your temporary password before accessing the system.</span>
+                        @if (!isProfilePage)
+                        {
+                            <a href="/Profile/Index" class="banner-btn">Change Password Now</a>
+                        }
+                    </div>
+                }
                 @RenderBody()
             </section>
         </main>
@@ -145,6 +161,7 @@
         </aside>
     </div>
 
+    <script src="~/js/confirmation-modal.js"></script>
     @RenderSection("Scripts", required: false)
 
     <script>
@@ -179,9 +196,19 @@
         })();
 
         function confirmLogout() {
-            if (confirm("Are you sure you want to logout?")) {
-                window.location.href = '/Auth/Logout';
-            }
+            SecureConfirm.show({
+                title: 'Confirm Logout',
+                icon: 'fas fa-right-from-bracket',
+                fields: [
+                    { label: 'Action', value: 'Sign out of SecureVision' },
+                    { label: 'Session', value: 'Your current session will be terminated' }
+                ],
+                confirmText: 'Logout',
+                confirmClass: 'btn-danger',
+                onConfirm: function() {
+                    window.location.href = '/Auth/Logout';
+                }
+            });
         }
 
         /* Notification Panel Logic */
@@ -190,6 +217,17 @@
             const overlay = document.getElementById("notifOverlay");
             panel.classList.toggle("open");
             overlay.classList.toggle("active");
+        }
+
+        /* Force Password Change - Block Navigation */
+        @if (mustChangePass && !isProfilePage)
+        {
+            <text>
+            document.addEventListener('DOMContentLoaded', function() {
+                // Redirect to profile page
+                window.location.href = '/Profile/Index';
+            });
+            </text>
         }
     </script>
 </body>
