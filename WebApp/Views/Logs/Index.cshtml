@@ -2,7 +2,7 @@
 
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
-    ViewData["Title"] = "Activity Logs";
+    ViewData["Title"] = "AI Assisted Smart Security and Intrusion Detection System";
     var currentFilter = (ViewBag.Filter as string ?? "all").ToLower();
     var currentSearch = ViewBag.Search as string ?? "";
 }
@@ -31,11 +31,12 @@
     <!-- SEARCH & FILTERS -->
     <div class="log-toolbar">
         <form method="get" class="log-search-bar">
-            <i class="fas fa-search"></i>
             <input type="text" name="search" placeholder="Search by action, user, or details..."
                    value="@currentSearch" />
             <input type="hidden" name="filter" value="@currentFilter" />
-            <button type="submit">Search</button>
+            <button type="submit">
+                <i class="fa fa-search"></i>
+            </button>
         </form>
 
         <div class="log-filters">

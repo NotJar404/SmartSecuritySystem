@@ -3,8 +3,11 @@
 
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
-    ViewData["Title"] = "Alerts";
-    var filter = (ViewBag.Filter as string ?? "all").ToLower();
+    ViewData["Title"] = "AI Assisted Smart Security and Intrusion Detection System";
+
+    var filter = (Context.Request.Query["filter"].ToString() ?? "all").ToLower();
+    var search = Context.Request.Query["search"].ToString() ?? "";
+
     var activeCount = Model.Count(a => a.Status != AlertStatus.Resolved);
 }
 
@@ -27,30 +30,47 @@
 
         <div class="alert-toolbar">
             <div class="toolbar-left">
-                <form method="get" class="search-bar">
+
+                <!-- ✅ FIXED SEARCH FORM -->
+                <form method="get" asp-action="Index" class="search-bar">
                     <input type="text"
                            name="search"
-                           placeholder="Search alerts by type, room, status..."
-                           value="@Context.Request.Query["search"]" />
-                    <button type="submit" aria-label="Search alerts"><i class="fa fa-search"></i></button>
+                           placeholder="Search alerts..."
+                           value="@search" />
+
+                    <!-- preserve filter -->
+                    <input type="hidden" name="filter" value="@filter" />
+
+                    <button type="submit">
+                        <i class="fa fa-search"></i>
+                    </button>
                 </form>
 
+                <!-- ✅ FIXED FILTERS (preserve search) -->
                 <div class="alert-filters">
-                    <a asp-action="Index" asp-route-filter="all"
+                    <a asp-action="Index" asp-route-filter="all" asp-route-search="@search"
                        class="filter-btn @(filter == "all" ? "active" : "")">
-                        All (@Model.Count)
+                        All (@ViewBag.TotalAll)
                     </a>
-                    <a asp-action="Index" asp-route-filter="new"
+
+                    <a asp-action="Index" asp-route-filter="new" asp-route-search="@search"
                        class="filter-btn @(filter == "new" ? "active" : "")">
-                        New (@Model.Count(a => a.Status == AlertStatus.New))
+                        New (@ViewBag.TotalNew)
                     </a>
-                    <a asp-action="Index" asp-route-filter="acknowledged"
+
+                    <a asp-action="Index" asp-route-filter="acknowledged" asp-route-search="@search"
                        class="filter-btn @(filter == "acknowledged" ? "active" : "")">
-                        Acknowledged (@Model.Count(a => a.Status == AlertStatus.Acknowledged))
+                        Acknowledged (@ViewBag.TotalAcknowledged)
                     </a>
-                    <a asp-action="Index" asp-route-filter="resolved"
+
+                    <a asp-action="Index" asp-route-filter="escalated" asp-route-search="@search"
+                       class="filter-btn @(filter == "escalated" ? "active" : "")">
+                        Escalated (@ViewBag.TotalEscalated)
+                    </a>
+
+                    <a asp-action="Index" asp-route-filter="resolved" asp-route-search="@search"
                        class="filter-btn @(filter == "resolved" ? "active" : "")">
-                        Resolved (@Model.Count(a => a.Status == AlertStatus.Resolved))
+                        Resolved (@ViewBag.TotalResolved)
                     </a>
                 </div>
             </div>
@@ -70,7 +90,6 @@
                 var isCritical = alert.Severity == SeverityLevel.CRITICAL;
                 var isWarning = alert.Severity == SeverityLevel.WARNING;
                 var isResolved = alert.Status == AlertStatus.Resolved;
-                // Check if the alert has an associated recording path
                 var hasVideo = !string.IsNullOrEmpty(alert.VideoPath);
 
                 var cardClass = "alert-card";
@@ -93,9 +112,13 @@
 
                     <div class="alert-content">
                         <div class="alert-title">
-                            @alert.Type 
-                            @if(hasVideo){ <i class="fa fa-video" style="font-size: 0.8rem; margin-left: 8px; color: var(--accent);"></i> }
+                            @alert.Type
+                            @if (hasVideo)
+                            {
+                                <i class="fa fa-video" style="margin-left:8px;"></i>
+                            }
                         </div>
+
                         <div class="alert-status">@alert.Status</div>
 
                         <div class="alert-description">
@@ -112,46 +135,19 @@
                     <div class="alert-actions">
                         @if (hasVideo)
                         {
-                            <button type="button" class="video-btn" onclick="openAlertModal(this.closest('.alert-card').dataset, true)">
-                                <i class="fa fa-play"></i> Watch
+                            <button type="button" class="video-btn"
+                                    onclick="openAlertModal(this.closest('.alert-card').dataset, true)">
+                                Watch
                             </button>
                         }
 
-                        @if (!isResolved)
-                        {
-                            if (alert.Status == AlertStatus.New)
-                            {
-                                <form method="post" asp-action="Acknowledge" id="ack-@alert.AlertId">
-                                    @Html.AntiForgeryToken()
-                                    <input type="hidden" name="id" value="@alert.AlertId" />
-                                    <button type="button"
-                                            onclick="SecureConfirm.show({ title:'Acknowledge Alert', icon:'fas fa-check-circle', fields:[{label:'Type',value:'@alert.Type'},{label:'Status',value:'New → Acknowledged'}], onConfirm:function(){document.getElementById('ack-@alert.AlertId').submit();} })">Acknowledge</button>
-                                </form>
-                            }
-
-                            if (alert.Status == AlertStatus.Acknowledged)
-                            {
-                                <form method="post" asp-action="Resolve" style="display:inline;" id="res-@alert.AlertId">
-                                    @Html.AntiForgeryToken()
-                                    <input type="hidden" name="id" value="@alert.AlertId" />
-                                    <button type="button"
-                                            onclick="SecureConfirm.show({ title:'Resolve Alert', icon:'fas fa-check-double', fields:[{label:'Type',value:'@alert.Type'},{label:'Status',value:'Acknowledged → Resolved'}], onConfirm:function(){document.getElementById('res-@alert.AlertId').submit();} })">Resolve</button>
-                                </form>
-
-                                <form method="post" asp-action="Escalate" style="display:inline;" id="esc-@alert.AlertId">
-                                    @Html.AntiForgeryToken()
-                                    <input type="hidden" name="id" value="@alert.AlertId" />
-                                    <button type="button"
-                                            onclick="SecureConfirm.show({ title:'Escalate Alert', icon:'fas fa-exclamation-triangle', isDelete:true, confirmText:'Escalate', confirmClass:'btn-danger', fields:[{label:'Type',value:'@alert.Type'},{label:'Action',value:'Escalate to admin'}], onConfirm:function(){document.getElementById('esc-@alert.AlertId').submit();} })">Escalate</button>
-                                </form>
-                            }
-                        }
                         <button type="button" class="details-btn">Details</button>
                     </div>
                 </div>
             }
         </div>
     </div>
+</div>
 
     <div id="alertModal" class="modal fade" tabindex="-1" role="dialog">
         <div class="modal-dialog modal-dialog-centered modal-lg">

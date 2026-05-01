@@ -700,6 +700,7 @@
     border-radius: 8px;
     font-size: 13px;
     transition: all 0.2s ease;
+    box-sizing: border-box;
 }
 
 .modal-body input:focus,

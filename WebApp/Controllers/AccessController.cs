@@ -22,21 +22,44 @@ namespace WebApp.Controllers
         public async Task<IActionResult> Index()
         {
             var logs = await _context.AccessLogs
+                .Include(x => x.Person)
+                .Include(x => x.RoomEntity)
                 .OrderByDescending(x => x.Timestamp)
                 .Take(50)
-                .ToListAsync(); // ✅ Fetch first
+                .ToListAsync();
 
-            // ✅ Populate UI-only fields safely
             foreach (var log in logs)
             {
-                log.FullName = log.FullName ?? "Unknown User";
-                log.PersonnelId = log.PersonnelId ?? "N/A";
-                log.Department = log.Department ?? "-";
-                log.Email = log.Email ?? "-";
-                log.Phone = log.Phone ?? "-";
-                log.Room = log.Room ?? "Unknown Room";
-                log.Location = log.Location ?? "Unknown Location";
-                log.ImageUrl = log.ImageUrl ?? "/images/default-user.png";
+                // =========================
+                // PERSON MAPPING (REAL FIELDS ONLY)
+                // =========================
+                log.FullName = log.Person?.FullName;
+                log.PersonnelId = log.PersonId?.ToString();
+                log.Department = log.Person?.Department;
+                log.Email = log.Person?.Email;
+                log.Phone = log.Person?.Phone;
+
+                // No ImageUrl in DB → keep default UI image
+                log.ImageUrl = "/images/default-user.png";
+
+                // =========================
+                // ROOM MAPPING (ONLY ROOM NAME AVAILABLE)
+                // =========================
+                log.Room = log.RoomEntity?.RoomName;
+
+                // You do NOT have Location column in DB → safe fallback
+                log.Location = "Unknown Location";
+
+                // =========================
+                // FALLBACK SAFETY (UI ONLY)
+                // =========================
+                log.FullName ??= "Unknown User";
+                log.PersonnelId ??= "N/A";
+                log.Department ??= "-";
+                log.Email ??= "-";
+                log.Phone ??= "-";
+                log.Room ??= "Unknown Room";
+                log.Location ??= "Unknown Location";
             }
 
             return View(logs);
@@ -48,8 +71,6 @@ namespace WebApp.Controllers
         [HttpPost]
         public IActionResult UnlockDoor()
         {
-            // 🔌 Future IoT integration here
-
             TempData["Message"] = "Door unlocked successfully.";
             return RedirectToAction(nameof(Index));
         }
@@ -61,22 +82,26 @@ namespace WebApp.Controllers
         public async Task<IActionResult> GetLatestLogs()
         {
             var logs = await _context.AccessLogs
+                .Include(x => x.Person)
+                .Include(x => x.RoomEntity)
                 .OrderByDescending(x => x.Timestamp)
                 .Take(20)
-                .ToListAsync(); // ✅ IMPORTANT FIX
+                .ToListAsync();
 
-            // ✅ Now safe to use NotMapped fields
             var result = logs.Select(log => new
             {
-                FullName = log.FullName ?? "Unknown User",
-                StudentId = log.PersonnelId ?? "N/A",
-                Department = log.Department ?? "-",
-                Email = log.Email ?? "-",
-                Phone = log.Phone ?? "-",
-                Room = log.Room ?? "Unknown Room",
-                Location = log.Location ?? "Unknown Location",
+                FullName = log.Person?.FullName ?? "Unknown User",
+                StudentId = log.PersonId?.ToString() ?? "N/A",
+
+                Department = log.Person?.Department ?? "-",
+                Email = log.Person?.Email ?? "-",
+                Phone = log.Person?.Phone ?? "-",
+
+                Room = log.RoomEntity?.RoomName ?? "Unknown Room",
+                Location = "Unknown Location",
+
                 Time = log.Timestamp.ToString("hh:mm tt"),
-                ImageUrl = log.ImageUrl ?? "/images/default-user.png",
+                ImageUrl = "/images/default-user.png",
                 Status = log.Status
             });
 

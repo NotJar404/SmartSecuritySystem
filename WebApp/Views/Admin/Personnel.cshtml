@@ -1,10 +1,9 @@
 @model SmartSecuritySystem.ViewModels.PersonnelManagementViewModel
 @{
-    ViewData["Title"] = "Personnel Management";
+    ViewData["Title"] = "AI Assisted Smart Security and Intrusion Detection System";
 }
 
 <link rel="stylesheet" href="~/css/personnel.css" />
-<link rel="stylesheet" href="~/css/dashboard.css" />
 
 <div class="dashboard-container">
 
@@ -377,8 +376,8 @@ function openEditModal(id, name, user, email, type, dept, rfid, phone, profileIm
 
 function toggleFields() {
     const type = document.getElementById("RegType").value;
-    document.getElementById("staffFields").style.display = (type === "staff") ? "grid" : "none";
-    document.getElementById("campusFields").style.display = (type === "campus") ? "grid" : "none";
+    document.getElementById("staffFields").style.display = (type === "staff") ? "flex" : "none";
+    document.getElementById("campusFields").style.display = (type === "campus") ? "flex" : "none";
 }
 
 function closeModal() {

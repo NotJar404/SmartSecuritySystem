@@ -20,38 +20,63 @@ namespace WebApp.Controllers
         }
 
         // =========================
-        // INDEX (FILTERED VIEW)
+        // INDEX (FILTER + SEARCH)
         // =========================
         public async Task<IActionResult> Index(string filter = "all", string search = "")
         {
-            filter = (filter ?? "all").ToLower();
-            search = (search ?? "").Trim().ToLower();
+            filter = (filter ?? "all").Trim().ToLower();
+            search = (search ?? "").Trim();
 
             IQueryable<Alert> query = _context.Alerts.AsNoTracking();
 
             // =========================
-            // STATUS FILTER
+            // FILTER BY STATUS
             // =========================
-            query = filter switch
+            switch (filter)
             {
-                "new" => query.Where(a => a.Status == AlertStatus.New),
-                "acknowledged" => query.Where(a => a.Status == AlertStatus.Acknowledged),
-                "escalated" => query.Where(a => a.Status == AlertStatus.Escalated),
-                "resolved" => query.Where(a => a.Status == AlertStatus.Resolved),
-                _ => query
-            };
+                case "new":
+                    query = query.Where(a => a.Status == AlertStatus.New);
+                    break;
+
+                case "acknowledged":
+                    query = query.Where(a => a.Status == AlertStatus.Acknowledged);
+                    break;
+
+                case "escalated":
+                    query = query.Where(a => a.Status == AlertStatus.Escalated);
+                    break;
+
+                case "resolved":
+                    query = query.Where(a => a.Status == AlertStatus.Resolved);
+                    break;
+
+                default:
+                    break;
+            }
 
             // =========================
-            // SEARCH FILTER (FIXED)
+            // SEARCH (SAFE + CASE INSENSITIVE)
             // =========================
-            if (!string.IsNullOrEmpty(search))
+            // =========================
+            // TOTAL COUNTS (BEFORE FILTERING — for filter button labels)
+            // =========================
+            var allAlerts = _context.Alerts.AsNoTracking();
+            ViewBag.TotalAll = await allAlerts.CountAsync();
+            ViewBag.TotalNew = await allAlerts.CountAsync(a => a.Status == AlertStatus.New);
+            ViewBag.TotalAcknowledged = await allAlerts.CountAsync(a => a.Status == AlertStatus.Acknowledged);
+            ViewBag.TotalEscalated = await allAlerts.CountAsync(a => a.Status == AlertStatus.Escalated);
+            ViewBag.TotalResolved = await allAlerts.CountAsync(a => a.Status == AlertStatus.Resolved);
+
+            if (!string.IsNullOrWhiteSpace(search))
             {
+                var s = search.ToLower();
+
                 query = query.Where(a =>
-                    a.Type.ToString().ToLower().Contains(search) ||
-                    a.Status.ToString().ToLower().Contains(search) ||
-                    a.Severity.ToString().ToLower().Contains(search) ||
-                    (a.Description ?? "").ToLower().Contains(search) ||
-                    (a.RoomId != null && a.RoomId.Value.ToString().Contains(search))
+                    a.Type.ToString().ToLower().Contains(s) ||
+                    a.Status.ToString().ToLower().Contains(s) ||
+                    a.Severity.ToString().ToLower().Contains(s) ||
+                    (a.Description != null && a.Description.ToLower().Contains(s)) ||
+                    (a.RoomId.HasValue && a.RoomId.Value.ToString().Contains(s))
                 );
             }
 
@@ -63,6 +88,7 @@ namespace WebApp.Controllers
                 .ThenByDescending(a => a.Timestamp)
                 .ToListAsync();
 
+            // Pass back to view
             ViewBag.Filter = filter;
             ViewBag.Search = search;
 
@@ -111,7 +137,7 @@ namespace WebApp.Controllers
             alert.EscalatedAt = DateTime.UtcNow;
             alert.EscalatedBy = User.Identity?.Name ?? "Unknown";
 
-            // Ensure escalation = critical
+            // Force critical severity when escalated
             alert.Severity = SeverityLevel.CRITICAL;
 
             await _context.SaveChangesAsync();

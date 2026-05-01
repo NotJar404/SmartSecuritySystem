@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using WebApp.Data;
@@ -28,6 +28,7 @@ namespace WebApp.Controllers
         public async Task<IActionResult> Index()
         {
             var model = await BuildDashboardModel();
+            ViewBag.Rooms = await _context.Rooms.ToListAsync();
             return View(model);
         }
 

@@ -1,74 +1,162 @@
 import cv2
 import threading
-from collections import deque
-from datetime import datetime
+import time
+import platform
+from flask import Flask, Response
 
+
+# =========================
+# CAMERA MODULE (UNIVERSAL)
+# =========================
 class CameraModule:
-    """Handles camera capture and frame management"""
-    
-    def __init__(self, camera_id=0, frame_buffer_size=10):
+    """
+    Supports:
+    - Laptop webcam (Windows/Linux)
+    - Raspberry Pi Camera Module
+    - USB external cameras
+    """
+
+    def __init__(self, camera_id=0, width=640, height=480, fps=30):
         self.camera_id = camera_id
+        self.width = width
+        self.height = height
+        self.fps = fps
+
         self.cap = None
-        self.frame_buffer = deque(maxlen=frame_buffer_size)
-        self.latest_frame = None
-        self.is_running = False
+        self.frame = None
         self.lock = threading.Lock()
-        
+        self.running = False
+
     def initialize(self):
-        """Initialize camera"""
+        """Initialize camera with fallback support"""
+
         try:
+            # =========================
+            # AUTO DETECTION MODE
+            # =========================
+            system = platform.system().lower()
+
+            # Raspberry Pi usually uses /dev/video0 or libcamera
+            if system == "linux":
+                print("Detected Linux system (likely Raspberry Pi)")
+
+            # Open camera (works for both Pi + laptop)
             self.cap = cv2.VideoCapture(self.camera_id)
+
             if not self.cap.isOpened():
-                raise Exception(f"Failed to open camera {self.camera_id}")
-            # Set camera properties for better performance
-            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-            self.cap.set(cv2.CAP_PROP_FPS, 30)
+                print("Primary camera failed, trying fallback index 1...")
+                self.cap = cv2.VideoCapture(1)
+
+            if not self.cap.isOpened():
+                raise Exception("Cannot open any camera device")
+
+            # Optimize camera settings
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+            self.cap.set(cv2.CAP_PROP_FPS, self.fps)
+
+            print("Camera initialized successfully")
             return True
+
         except Exception as e:
-            print(f"Camera initialization error: {e}")
+            print("Camera init error:", e)
             return False
-    
-    def start_capture(self):
-        """Start camera capture in background thread"""
-        if self.is_running:
+
+    def start(self):
+        """Start camera capture thread"""
+        if self.running:
             return
-        self.is_running = True
-        capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
-        capture_thread.start()
-    
-    def _capture_loop(self):
+
+        self.running = True
+        thread = threading.Thread(target=self._loop, daemon=True)
+        thread.start()
+
+    def _loop(self):
         """Continuous frame capture loop"""
-        while self.is_running:
+        while self.running:
             try:
                 ret, frame = self.cap.read()
+
                 if ret:
                     with self.lock:
-                        self.latest_frame = frame
-                        self.frame_buffer.append(frame)
+                        self.frame = frame
+
             except Exception as e:
-                print(f"Capture error: {e}")
-    
-    def get_latest_frame(self):
-        """Get the most recent frame"""
+                print("Camera loop error:", e)
+
+            time.sleep(0.01)
+
+    def get_frame(self):
+        """Get latest frame safely"""
         with self.lock:
-            return self.latest_frame.copy() if self.latest_frame is not None else None
-    
-    def get_frame_buffer(self):
-        """Get all frames in buffer"""
-        with self.lock:
-            return list(self.frame_buffer)
-    
-    def stop_capture(self):
-        """Stop camera capture"""
-        self.is_running = False
+            return None if self.frame is None else self.frame.copy()
+
+    def stop(self):
+        """Stop camera safely"""
+        self.running = False
         if self.cap:
             self.cap.release()
-    
-    def save_frame(self, filename):
-        """Save current frame to file"""
-        frame = self.get_latest_frame()
-        if frame is not None:
-            cv2.imwrite(filename, frame)
-            return True
-        return False
+
+
+# =========================
+# FLASK STREAM SERVER
+# =========================
+app = Flask(__name__)
+camera = CameraModule(camera_id=0)
+
+
+def generate_frames():
+    """
+    MJPEG stream for ASP.NET <video> tag
+    Works for:
+    - Raspberry Pi stream
+    - Laptop webcam stream
+    - USB camera stream
+    """
+
+    while True:
+        frame = camera.get_frame()
+
+        if frame is None:
+            continue
+
+        # Encode frame to JPEG
+        success, buffer = cv2.imencode('.jpg', frame)
+        if not success:
+            continue
+
+        frame_bytes = buffer.tobytes()
+
+        yield (
+            b'--frame\r\n'
+            b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n'
+        )
+
+
+@app.route('/video')
+def video_feed():
+    """Streaming endpoint for ASP.NET"""
+    return Response(
+        generate_frames(),
+        mimetype='multipart/x-mixed-replace; boundary=frame'
+    )
+
+
+# =========================
+# MAIN START
+# =========================
+if __name__ == "__main__":
+    print("===================================")
+    print(" Smart Camera Stream Starting...")
+    print(" Supports: Laptop + Raspberry Pi")
+    print(" Stream URL: http://<IP>:5000/video")
+    print("===================================")
+
+    if not camera.initialize():
+        print("Failed to start camera")
+        exit()
+
+    camera.start()
+
+    # IMPORTANT: 0.0.0.0 allows network access (Raspberry Pi / LAN)
+    app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)

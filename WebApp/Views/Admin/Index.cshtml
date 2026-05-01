@@ -1,7 +1,7 @@
-﻿@model WebApp.Models.AdminDashboardViewModel
+@model WebApp.Models.AdminDashboardViewModel
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
-    ViewData["Title"] = "Admin Command Center";
+    ViewData["Title"] = "AI Assisted Smart Security and Intrusion Detection System";
 }
 
 <link rel="stylesheet" href="~/css/dashboard.css" />
@@ -196,19 +196,19 @@
 
 </div>
 
-<link rel="stylesheet" href="~/css/personnel.css" />
+
 
 <!-- ===================================================== -->
 <!-- MODALS (STANDARDIZED) -->
 <!-- ===================================================== -->
 
-<!-- PERSONNEL MODAL -->
+<!-- PERSONNEL MODAL (MIRRORED FROM PERSONNEL.CSHTML) -->
 <div class="modal fade" id="userModal" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
             <form method="post" id="userForm" asp-controller="Personnel" asp-action="Add">
                 @Html.AntiForgeryToken()
-                <input type="hidden" id="userId" name="Id" />
+                <input type="hidden" id="userId" name="Id" value="0" />
 
                 <div class="modal-header d-flex justify-content-between align-items-center">
                     <h5 id="userModalTitle" class="mb-0">Add Personnel</h5>
@@ -219,20 +219,54 @@
 
                 <div class="modal-body">
                     <div class="form-group">
+                        <label>Account Type</label>
+                        <select id="adminRegType" name="RegType" class="form-control" onchange="adminToggleFields()">
+                            <option value="staff">System Operator</option>
+                            <option value="campus">Authorized Personnel (RFID)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
                         <label>Full Name</label>
-                        <input id="fullName" name="FullName" class="form-control" required />
+                        <input id="adminFullName" name="FullName" class="form-control" required />
                     </div>
+
                     <div class="form-group">
-                        <label>Username</label>
-                        <input id="username" name="Username" class="form-control" required />
+                        <label>Email <small style="color:var(--accent);">(Gmail only)</small></label>
+                        <input id="adminEmail" name="Email" type="email" class="form-control" placeholder="name@gmail.com" required pattern=".*@@gmail\.com$" title="Only Gmail addresses are accepted" />
                     </div>
-                    <div class="form-group">
-                        <label>Email</label>
-                        <input id="email" name="Email" type="email" class="form-control" required />
+
+                    <div id="adminStaffFields" style="display:none;">
+                        <div class="form-group">
+                            <label>Username</label>
+                            <input id="adminUsername" name="Username" class="form-control" />
+                        </div>
+                        <div class="form-group" style="background:var(--bg-hover);padding:12px;border-radius:8px;">
+                            <small style="color:var(--text-muted);">
+                                <i class="fas fa-info-circle" style="color:var(--accent);"></i>
+                                A secure temporary password will be auto-generated and sent to the provided Gmail address.
+                                The user must change it upon first login.
+                            </small>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label>Password</label>
-                        <input id="password" name="Password" type="password" class="form-control" required />
+
+                    <div id="adminCampusFields" style="display:none;">
+                        <div class="form-group">
+                            <label>Profile Image</label>
+                            <input id="adminProfileImage" name="ProfileImage" type="file" accept="image/*" class="form-control" />
+                        </div>
+                        <div class="form-group">
+                            <label>RFID Tag</label>
+                            <input id="adminRfidTag" name="RfidTag" class="form-control" placeholder="Enter RFID tag ID" />
+                        </div>
+                        <div class="form-group">
+                            <label>Department</label>
+                            <input id="adminDepartment" name="Department" class="form-control" placeholder="Enter department" />
+                        </div>
+                        <div class="form-group">
+                            <label>Phone Number</label>
+                            <input id="adminPhone" name="PhoneNumber" type="tel" class="form-control" placeholder="Enter phone number" />
+                        </div>
                     </div>
                 </div>
 
@@ -245,12 +279,14 @@
     </div>
 </div>
 
-<!-- RFID MODAL -->
+<!-- RFID MODAL (POSTS TO PERSONNEL/ADD WITH CAMPUS TYPE) -->
 <div class="modal fade" id="rfidModal" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
-            <form method="post" id="rfidForm" asp-controller="Admin" asp-action="EnrollRfid">
+            <form method="post" id="rfidForm" asp-controller="Personnel" asp-action="Add">
                 @Html.AntiForgeryToken()
+                <input type="hidden" name="RegType" value="campus" />
+                <input type="hidden" name="Id" value="0" />
 
                 <div class="modal-header d-flex justify-content-between align-items-center">
                     <h5 id="rfidModalTitle" class="mb-0">RFID Enrollment</h5>
@@ -265,12 +301,16 @@
                         <input id="profileImage" name="ProfileImage" type="file" accept="image/*" class="form-control" />
                     </div>
                     <div class="form-group">
-                        <label>RFID Tag</label>
-                        <input id="rfidTag" name="RfidTag" class="form-control" placeholder="Enter RFID tag ID" required />
-                    </div>
-                    <div class="form-group">
                         <label>Full Name</label>
                         <input id="rfidFullName" name="FullName" class="form-control" placeholder="Enter full name" required />
+                    </div>
+                    <div class="form-group">
+                        <label>Email <small style="color:var(--accent);">(Gmail only)</small></label>
+                        <input id="rfidEmail" name="Email" type="email" class="form-control" placeholder="name@gmail.com" required pattern=".*@@gmail\.com$" title="Only Gmail addresses are accepted" />
+                    </div>
+                    <div class="form-group">
+                        <label>RFID Tag</label>
+                        <input id="rfidTag" name="RfidTag" class="form-control" placeholder="Enter RFID tag ID" required />
                     </div>
                     <div class="form-group">
                         <label>Department</label>
@@ -278,11 +318,7 @@
                     </div>
                     <div class="form-group">
                         <label>Phone Number</label>
-                        <input id="rfidPhone" name="PhoneNumber" type="tel" class="form-control" placeholder="Enter phone number" />
-                    </div>
-                    <div class="form-group">
-                        <label>Email</label>
-                        <input id="rfidEmail" name="Email" type="email" class="form-control" placeholder="Enter email address" required />
+                        <input id="rfidPhone" name="Phone" type="tel" class="form-control" placeholder="Enter phone number" />
                     </div>
                 </div>
 
@@ -295,13 +331,14 @@
     </div>
 </div>
 
-<!-- CAMERA MODAL -->
+<!-- CAMERA MODAL (MIRRORED FROM CAMERAS/INDEX.CSHTML) -->
 <div class="modal fade" id="cameraModal" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
             <form method="post" id="cameraForm" asp-controller="Cameras" asp-action="Add">
                 @Html.AntiForgeryToken()
-                <input type="hidden" id="camId" name="Id" />
+                <input type="hidden" id="camId" name="Id" value="0" />
+                <input type="hidden" name="Status" value="active" />
 
                 <div class="modal-header d-flex justify-content-between align-items-center">
                     <h5 id="cameraModalTitle" class="mb-0">Camera Configuration</h5>
@@ -320,8 +357,29 @@
                         <input id="camLocation" name="Location" class="form-control" required />
                     </div>
                     <div class="form-group">
+                        <label>Room</label>
+                        <select id="camRoom" name="RoomId" class="form-control" required>
+                            <option value="">-- Select Room --</option>
+                            @{
+                                var adminRooms = ViewBag.Rooms as List<WebApp.Models.Room>;
+                                if (adminRooms != null)
+                                {
+                                    foreach (var room in adminRooms)
+                                    {
+                                        <option value="@room.RoomId">@room.RoomName</option>
+                                    }
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label>Stream URL</label>
                         <input id="camSource" name="StreamUrl" type="text" class="form-control" placeholder="Enter Raspberry Pi / IP camera URL or leave empty for webcam test" />
+                        <small style="color:var(--text-muted); font-size:12px; margin-top:6px; display:block;">
+                            ✔ Raspberry Pi: http://192.168.x.x:xxxx<br />
+                            ✔ IP Camera / OBS stream supported<br />
+                            ✔ Leave EMPTY for laptop webcam (TEST MODE ONLY)
+                        </small>
                     </div>
                 </div>
 
@@ -464,6 +522,13 @@ function closeExportModal() {
     document.body.style.overflow = 'auto';
 }
 
+/* Toggle conditional fields for Admin Personnel modal */
+function adminToggleFields() {
+    const type = document.getElementById('adminRegType').value;
+    document.getElementById('adminStaffFields').style.display = (type === 'staff') ? 'block' : 'none';
+    document.getElementById('adminCampusFields').style.display = (type === 'campus') ? 'block' : 'none';
+}
+
 /* Modal backdrop click handlers */
 document.addEventListener('DOMContentLoaded', function() {
     const modals = ['userModal', 'rfidModal', 'cameraModal', 'exportModal'];
@@ -508,12 +573,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 const modalId = target.replace('#', '');
                 const modal = document.getElementById(modalId);
                 if (modal) {
+                    // Reset forms when opening
+                    if (modalId === 'userModal') {
+                        document.getElementById('userForm').reset();
+                        document.getElementById('adminRegType').value = 'staff';
+                        adminToggleFields();
+                    }
                     modal.classList.add('show');
                     document.body.style.overflow = 'hidden';
                 }
             }
         });
     });
+
+    // Initialize conditional fields
+    adminToggleFields();
+
+    // Intercept forms with two-step confirmation
+    SecureConfirm.interceptForm('userForm', 'Confirm Personnel Action', 'userModal');
+    SecureConfirm.interceptForm('rfidForm', 'Confirm RFID Enrollment', 'rfidModal');
+    SecureConfirm.interceptForm('cameraForm', 'Confirm Camera Configuration', 'cameraModal');
 });
 
 /* ============================= */

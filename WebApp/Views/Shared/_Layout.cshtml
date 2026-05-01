@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -86,12 +86,15 @@
 
                 <div class="top-actions">
                     <div class="clock-box" id="liveTime"></div>
+
                     <div class="theme-switcher" onclick="toggleTheme()">
                         <i id="themeIcon" class="fa fa-moon"></i>
                     </div>
+
+                    <!-- 🔔 REAL-TIME NOTIFICATION BADGE -->
                     <div class="notif-bell" onclick="toggleNotifPanel()" style="cursor: pointer; position: relative;">
                         <i class="fa fa-bell"></i>
-                        <span class="badge">3</span>
+                        <span class="badge" id="notifBadge">0</span>
                     </div>
                 </div>
             </header>
@@ -101,6 +104,7 @@
                     var mustChangePass = User.HasClaim("MustChangePassword", "true");
                     var isProfilePage = ViewContext.RouteData.Values["controller"]?.ToString() == "Profile";
                 }
+
                 @if (mustChangePass)
                 {
                     <div class="force-password-banner">
@@ -112,11 +116,13 @@
                         }
                     </div>
                 }
+
                 @RenderBody()
             </section>
         </main>
 
         <div class="notification-overlay" id="notifOverlay" onclick="toggleNotifPanel()"></div>
+
         <aside class="notification-panel" id="notifPanel">
             <div class="notif-header">
                 <div class="header-top">
@@ -125,34 +131,9 @@
                 </div>
                 <p class="notif-subtitle">Real-time Security & System Updates</p>
             </div>
-            
-            <div class="notif-content">
-                @if (User.IsInRole("Admin"))
-                {
-                    <div class="notif-item system">
-                        <div class="notif-icon"><i class="fa fa-server"></i></div>
-                        <div class="notif-info">
-                            <p><strong>System Backup:</strong> Weekly database backup completed.</p>
-                            <small>30 mins ago</small>
-                        </div>
-                    </div>
-                }
-                
-                <div class="notif-item critical">
-                    <div class="notif-icon"><i class="fa fa-triangle-exclamation"></i></div>
-                    <div class="notif-info">
-                        <p><strong>Security Alert:</strong> Access Denied - Unauthorized RFID at Lab A.</p>
-                        <small>Just now</small>
-                    </div>
-                </div>
 
-                <div class="notif-item info">
-                    <div class="notif-icon"><i class="fa fa-door-open"></i></div>
-                    <div class="notif-info">
-                        <p><strong>Access Granted:</strong> Staff #124 entered Security Room.</p>
-                        <small>12 mins ago</small>
-                    </div>
-                </div>
+            <div class="notif-content" id="notifContent">
+                <p>Loading...</p>
             </div>
 
             <div class="notif-footer">
@@ -165,17 +146,80 @@
     @RenderSection("Scripts", required: false)
 
     <script>
+        // =========================
+        // CLOCK
+        // =========================
         function updateTime() {
             const now = new Date();
             const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
             const el = document.getElementById("liveTime");
             if (el) el.textContent = timeStr;
         }
-        setInterval(updateTime, 1000); updateTime();
+        setInterval(updateTime, 1000);
+        updateTime();
 
+        // =========================
+        // NOTIFICATIONS (REAL TIME)
+        // =========================
+        async function updateNotifBadge() {
+            try {
+                const res = await fetch('/Notifications/GetUnreadCount');
+                const count = await res.json();
+
+                document.getElementById("notifBadge").textContent = count ?? 0;
+            } catch {
+                document.getElementById("notifBadge").textContent = 0;
+            }
+        }
+
+        async function loadNotifications() {
+            try {
+                const res = await fetch('/Notifications/GetLatest');
+                const data = await res.json();
+
+                const container = document.getElementById("notifContent");
+                container.innerHTML = "";
+
+                data.forEach(n => {
+                    container.innerHTML += `
+                        <div class="notif-item ${n.severity ?? 'info'}">
+                            <div class="notif-info">
+                                <p><strong>${n.title}</strong></p>
+                                <small>${n.message}</small>
+                            </div>
+                        </div>
+                    `;
+                });
+
+            } catch {
+                document.getElementById("notifContent").innerHTML =
+                    "<p>Failed to load notifications</p>";
+            }
+        }
+
+        function toggleNotifPanel() {
+            document.getElementById("notifPanel").classList.toggle("open");
+            document.getElementById("notifOverlay").classList.toggle("active");
+
+            // mark as read
+            fetch('/Notifications/MarkAsRead', { method: 'POST' });
+
+            document.getElementById("notifBadge").textContent = "0";
+        }
+
+        setInterval(updateNotifBadge, 3000);
+        setInterval(loadNotifications, 5000);
+
+        updateNotifBadge();
+        loadNotifications();
+
+        // =========================
+        // THEME
+        // =========================
         function applyTheme(theme) {
             const body = document.body;
             const icon = document.getElementById("themeIcon");
+
             if (theme === "light") {
                 body.classList.remove("dark-mode");
                 icon.className = "fa fa-sun";
@@ -183,6 +227,7 @@
                 body.classList.add("dark-mode");
                 icon.className = "fa fa-moon";
             }
+
             localStorage.setItem("selected-theme", theme);
         }
 
@@ -195,6 +240,9 @@
             applyTheme(localStorage.getItem("selected-theme") || "light");
         })();
 
+        // =========================
+        // LOGOUT
+        // =========================
         function confirmLogout() {
             SecureConfirm.show({
                 title: 'Confirm Logout',
@@ -209,25 +257,6 @@
                     window.location.href = '/Auth/Logout';
                 }
             });
-        }
-
-        /* Notification Panel Logic */
-        function toggleNotifPanel() {
-            const panel = document.getElementById("notifPanel");
-            const overlay = document.getElementById("notifOverlay");
-            panel.classList.toggle("open");
-            overlay.classList.toggle("active");
-        }
-
-        /* Force Password Change - Block Navigation */
-        @if (mustChangePass && !isProfilePage)
-        {
-            <text>
-            document.addEventListener('DOMContentLoaded', function() {
-                // Redirect to profile page
-                window.location.href = '/Profile/Index';
-            });
-            </text>
         }
     </script>
 </body>

@@ -15,21 +15,21 @@ namespace WebApp.Data
         // DBSets
         // =========================
         public DbSet<User> Users { get; set; }
-        
-        // NEW: Register the AuthorizedPersonnel model
+
         public DbSet<AuthorizedPersonnel> AuthorizedPersonnel { get; set; }
-        
         public DbSet<LoginLog> LoginLogs { get; set; }
         public DbSet<Room> Rooms { get; set; }
         public DbSet<Camera> CameraDevices { get; set; }
         public DbSet<Alert> Alerts { get; set; }
-        
-        // NEW: Register the AlarmSetting model for the 4 toggle switches
         public DbSet<AlarmSetting> AlarmSettings { get; set; }
-        
         public DbSet<AccessLog> AccessLogs { get; set; }
         public DbSet<DetectionLog> DetectionLogs { get; set; }
         public DbSet<RoomOccupancy> RoomOccupancy { get; set; }
+
+        // =========================
+        // NEW: NOTIFICATIONS TABLE
+        // =========================
+        public DbSet<Notification> Notifications { get; set; }
 
         // =========================
         // CONFIGURATION
@@ -38,20 +38,28 @@ namespace WebApp.Data
         {
             base.OnModelCreating(modelBuilder);
 
+            // =========================
             // USERS
+            // =========================
             modelBuilder.Entity<User>()
                 .ToTable("users");
 
-            // AUTHORIZED PERSONNEL (NEW MAPPING)
+            // =========================
+            // AUTHORIZED PERSONNEL
+            // =========================
             modelBuilder.Entity<AuthorizedPersonnel>()
                 .ToTable("authorized_personnel")
-                .HasKey(ap => ap.PersonId); // Maps the primary key
+                .HasKey(ap => ap.PersonId);
 
+            // =========================
             // ROOMS
+            // =========================
             modelBuilder.Entity<Room>()
                 .ToTable("rooms");
 
+            // =========================
             // CAMERAS
+            // =========================
             modelBuilder.Entity<Camera>()
                 .ToTable("camera_devices");
 
@@ -60,7 +68,7 @@ namespace WebApp.Data
                 .HasDefaultValue("active");
 
             // =========================
-            // ALERTS (HISTORY LOGS)
+            // ALERTS
             // =========================
             modelBuilder.Entity<Alert>()
                 .ToTable("alerts");
@@ -78,7 +86,7 @@ namespace WebApp.Data
                 .HasConversion<string>();
 
             // =========================
-            // ALARM SETTINGS (TOGGLE SWITCHES)
+            // ALARM SETTINGS
             // =========================
             modelBuilder.Entity<AlarmSetting>()
                 .ToTable("alarm_settings");
@@ -96,7 +104,7 @@ namespace WebApp.Data
                 .ToTable("detection_logs");
 
             // =========================
-            // OCCUPANCY
+            // ROOM OCCUPANCY
             // =========================
             modelBuilder.Entity<RoomOccupancy>()
                 .ToTable("room_occupancy");
@@ -106,6 +114,20 @@ namespace WebApp.Data
             // =========================
             modelBuilder.Entity<LoginLog>()
                 .ToTable("login_logs");
+
+            // =========================
+            // NOTIFICATIONS
+            // =========================
+            modelBuilder.Entity<Notification>()
+                .ToTable("notifications");
+
+            modelBuilder.Entity<Notification>()
+                .Property(n => n.IsRead)
+                .HasDefaultValue(false);
+
+            modelBuilder.Entity<Notification>()
+                .Property(n => n.Timestamp)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
         }
     }
 }

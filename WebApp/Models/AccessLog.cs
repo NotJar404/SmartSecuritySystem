@@ -14,8 +14,16 @@ namespace WebApp.Models
         [Column("person_id")]
         public int? PersonId { get; set; }
 
+        // 🔗 NAVIGATION PROPERTY (JOIN → authorized_personnel)
+        [ForeignKey("PersonId")]
+        public AuthorizedPersonnel? Person { get; set; }
+
         [Column("room_id")]
         public int? RoomId { get; set; }
+
+        // 🔗 NAVIGATION PROPERTY (JOIN → rooms)
+        [ForeignKey("RoomId")]
+        public Room? RoomEntity { get; set; }
 
         [Column("access_result")]
         public string AccessResult { get; set; } = "denied";
@@ -30,9 +38,8 @@ namespace WebApp.Models
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
 
         // =========================
-        // NEW: VIDEO LINKING
+        // VIDEO LINKING
         // =========================
-        
         [Column("video_path")]
         public string? VideoPath { get; set; }
 
@@ -51,29 +58,22 @@ namespace WebApp.Models
         public string Status => IsAuthorized ? "Authorized" : "Denied";
 
         [NotMapped]
-        public string StatusColor => IsAuthorized ? "#2ecc71" : "#e74c3c"; // Using Hex for premium UI colors
+        public string StatusColor => IsAuthorized ? "#2ecc71" : "#e74c3c";
 
         [NotMapped]
         public bool HasVideo => !string.IsNullOrEmpty(VideoPath);
 
         // ==========================================
-        // JOINED DATA (Populated via SQL/Controller)
+        // UI DATA (FILLED FROM JOINED TABLES)
         // ==========================================
 
         [NotMapped] public string? FullName { get; set; }
-        
-        [NotMapped] public string? PersonnelId { get; set; } // Renamed from StudentId
-        
+        [NotMapped] public string? PersonnelId { get; set; }
         [NotMapped] public string? Department { get; set; }
-        
         [NotMapped] public string? Email { get; set; }
-        
         [NotMapped] public string? Phone { get; set; }
-        
         [NotMapped] public string? ImageUrl { get; set; }
-        
         [NotMapped] public string? Room { get; set; }
-        
         [NotMapped] public string? Location { get; set; }
     }
 }

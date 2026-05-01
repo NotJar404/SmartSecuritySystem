@@ -28,16 +28,9 @@
     position: relative;
 }
 
-.log-search-bar > i {
-    color: var(--text-dim);
-    font-size: 14px;
-    position: absolute;
-    left: 12px;
-}
-
 .log-search-bar input {
     flex: 1;
-    padding: 10px 12px 10px 36px;
+    padding: 10px 12px;
     border: 1.5px solid var(--border);
     border-radius: var(--radius-sm);
     background: var(--bg-input);

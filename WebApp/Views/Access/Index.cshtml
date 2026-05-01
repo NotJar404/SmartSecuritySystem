@@ -2,7 +2,7 @@
 
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
-    ViewData["Title"] = "Access Control Dashboard";
+    ViewData["Title"] = "AI Assisted Smart Security and Intrusion Detection System";
 }
 
 <link rel="stylesheet" href="~/css/access.css" />
@@ -179,16 +179,24 @@ function setStatus(status, personName) {
         badge.classList.add("suspicious");
         container.classList.add("severity-med");
 
-        // If there is a video recorded, add the Review Footage button
-        let videoBtn = "";
-        if (currentVideoPath && currentVideoPath !== "") {
-            videoBtn = `<button class="btn-sec btn-warning" onclick="playLogVideo()"><i class="fa fa-video me-2"></i>Review Footage</button>`;
-        }
+        let videoBtn = currentVideoPath ? `<button class="btn-sec btn-warning" onclick="playLogVideo()"><i class="fa fa-video me-2"></i>Review Footage</button>` : "";
 
         panel.innerHTML = `
             ${videoBtn}
             <button class="btn-sec btn-neutral"><i class="fa fa-flag me-2"></i>Flag for Admin</button>
             <button class="btn-sec btn-danger"><i class="fa fa-lock me-2"></i>Lockdown Room</button>
+        `;
+    }
+    // NEW: Added the Unauthorized/Intrusion state
+    else if (status === "UNAUTHORIZED") {
+        badge.innerText = "UNAUTHORIZED INTRUSION";
+        badge.classList.add("unauthorized"); // Ensure this class is in your CSS for Red color
+        container.classList.add("severity-high");
+
+        panel.innerHTML = `
+            <button class="btn-sec btn-danger" onclick="triggerAlarm()"><i class="fa fa-shield-exclamation me-2"></i>TRIGGER ALARM</button>
+            <button class="btn-sec btn-dark"><i class="fa fa-user-slash me-2"></i>Blacklist Biometrics</button>
+            <button class="btn-sec btn-warning" onclick="playLogVideo()"><i class="fa fa-eye me-2"></i>Live Tracking</button>
         `;
     }
 }

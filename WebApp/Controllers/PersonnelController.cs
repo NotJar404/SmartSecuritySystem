@@ -4,11 +4,13 @@ using Microsoft.Extensions.Logging;
 using System.Security.Cryptography;
 using System.Text;
 using WebApp.Data;
+using WebApp.Models; // ✅ FIXED (important)
 using SmartSecuritySystem.Models;
 using SmartSecuritySystem.ViewModels;
 using System.Linq;
 using System;
 using System.Security.Claims;
+using System.Collections.Generic;
 
 namespace SmartSecuritySystem.Controllers
 {
@@ -25,7 +27,7 @@ namespace SmartSecuritySystem.Controllers
         }
 
         // =====================================================
-        // MAIN VIEW (ONLY ENTRY POINT THAT RETURNS THE VIEW)
+        // MAIN VIEW
         // =====================================================
         public IActionResult Index(string? search)
         {
@@ -34,7 +36,7 @@ namespace SmartSecuritySystem.Controllers
         }
 
         // =====================================================
-        // VIEWMODEL BUILDER (CENTRALIZED - PREVENTS TYPE ERRORS)
+        // VIEWMODEL BUILDER
         // =====================================================
         private PersonnelManagementViewModel BuildViewModel(string? search)
         {
@@ -70,13 +72,13 @@ namespace SmartSecuritySystem.Controllers
                     SecurityLevel = m.SecurityLevel,
                     HasFaceData = !string.IsNullOrEmpty(m.FaceEmbedding),
                     CreatedAt = m.CreatedAt,
-                    LastAccess = null
+                    LastAccess = null // 🔥 can be upgraded later from access_logs
                 }).ToList()
             };
         }
 
         // =====================================================
-        // ADD (UNIFIED SAFE FLOW)
+        // ADD (UNIFIED FLOW)
         // =====================================================
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -97,14 +99,12 @@ namespace SmartSecuritySystem.Controllers
             if (string.IsNullOrWhiteSpace(user.Username))
                 return;
 
-            // Gmail-only validation
             if (!IsValidGmailAddress(user.Email))
                 return;
 
             if (_context.Users.Any(u => u.Username == user.Username))
                 return;
 
-            // Auto-generate secure temporary password
             var tempPassword = GenerateSecurePassword(10);
 
             user.Role = "Security";
@@ -117,7 +117,6 @@ namespace SmartSecuritySystem.Controllers
             _context.Users.Add(user);
             _context.SaveChanges();
 
-            // Send credentials via email
             try
             {
                 SendCredentialEmail(user.Email, user.FullName, user.Username, tempPassword);
@@ -155,7 +154,7 @@ namespace SmartSecuritySystem.Controllers
         }
 
         // =====================================================
-        // EDIT (USERS ONLY - SAFE)
+        // EDIT USERS
         // =====================================================
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -183,7 +182,7 @@ namespace SmartSecuritySystem.Controllers
         }
 
         // =====================================================
-        // DELETE (USERS ONLY - SAFE GUARD)
+        // DELETE USERS
         // =====================================================
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -305,7 +304,7 @@ namespace SmartSecuritySystem.Controllers
                        $"Your SecureVision account has been created.\n\n" +
                        $"Username: {username}\n" +
                        $"Temporary Password: {tempPassword}\n\n" +
-                       $"This password is one-time use only. You will be required to change it upon first login.\n\n" +
+                       $"Please change your password upon first login.\n\n" +
                        $"— SecureVision Security System"
             };
 

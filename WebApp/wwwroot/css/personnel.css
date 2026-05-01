@@ -28,6 +28,55 @@ h5 { font-size: var(--font-h3); }
 small { color: var(--text-muted); font-size: var(--font-small); }
 
 /* =========================================
+   HEADER (LOCAL FROM DASHBOARD.CSS)
+   ========================================= */
+
+.cmd-header {
+    background: var(--bg-card);
+    padding: 14px 16px;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.cmd-header h2 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.cmd-header small {
+    color: var(--text-muted);
+}
+
+/* =========================================
+   BTN EXPORT (LOCAL FROM DASHBOARD.CSS)
+   ========================================= */
+
+.btn-export {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: var(--radius);
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-export:hover {
+    background: var(--accent-dark);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(212, 163, 115, 0.3);
+}
+
+/* =========================================
    LAYOUT
    ========================================= */
 
@@ -155,6 +204,11 @@ small { color: var(--text-muted); font-size: var(--font-small); }
     box-shadow: var(--shadow-sm);
     transition: var(--transition-standard);
     overflow: hidden;
+}
+
+.card .card-body {
+    min-height: 400px;
+    overflow-y: auto;
 }
 
 .card:hover {
@@ -390,6 +444,8 @@ code {
     height: 100%;
     overflow: hidden;
     outline: 0;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(4px);
     transition: opacity 0.3s ease, visibility 0.3s ease;
 }
 
@@ -683,9 +739,9 @@ code {
 #staffFields,
 #campusFields {
     animation: fadeIn 0.2s ease;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--s-lg);
+    display: flex;
+    flex-direction: column;
+    gap: 0;
 }
 
 #staffFields.full-width,
@@ -725,6 +781,6 @@ code {
     #staffFields,
     #campusFields {
         grid-template-columns: 1fr;
-        gap: var(--s-md);
+        gap: 0;
     }
 }

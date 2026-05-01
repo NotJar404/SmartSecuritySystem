@@ -8,6 +8,29 @@
 /* ============================= */
 
 /* ============================= */
+/* HEADER (LOCAL FROM DASHBOARD) */
+/* ============================= */
+.cmd-header {
+    background: var(--bg-card);
+    padding: 14px 16px;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.cmd-header h2 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.cmd-header small {
+    color: var(--text-muted);
+}
+
+/* ============================= */
 /* PAGE HEADER */
 /* ============================= */
 .page-title {
@@ -21,7 +44,7 @@
 .subtitle {
     font-size: 14px;
     color: var(--text-muted);
-    margin: 0;  /* 🔥 FIX: remove margin-bottom to prevent conflicts */
+    margin: 0;
     margin-bottom: var(--spacing-lg);
 }
 
@@ -68,6 +91,33 @@
     color: var(--text-muted);
     margin: 0;
     white-space: nowrap;
+}
+
+/* ============================= */
+/* TOOLBAR (SEARCH + FILTERS) */
+/* ============================= */
+
+/* 🔥 PASTE IT HERE */
+.alert-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    width: 100%;
+
+    gap: 16px;
+    flex-wrap: nowrap;
+
+    margin-bottom: 20px;
+
+    background: var(--bg-card);
+    padding: 14px 18px;
+
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+
+    box-shadow: var(--shadow-sm);
+    box-sizing: border-box;
 }
 
 /* ============================= */
@@ -454,6 +504,7 @@
     flex-direction: column;
     max-height: 85vh;
     min-height: auto;
+    margin: auto;
 }
 
 /* Modal Header - Gradient with Close Button at Right */
@@ -510,12 +561,12 @@
     outline: none;
 }
 
-/* Modal Body - No Scrollbar */
+/* Modal Body */
 .modal-body {
     padding: 24px;
     background: var(--bg-card);
     color: var(--text-main);
-    overflow: hidden;
+    overflow-y: auto;
     flex: 1;
     margin-top: 0;
     display: flex;
@@ -554,6 +605,7 @@
     border-radius: 8px;
     font-size: 13px;
     transition: all 0.2s ease;
+    box-sizing: border-box;
 }
 
 .modal-body input:focus,
@@ -562,6 +614,12 @@
     outline: none;
     border-color: var(--accent);
     box-shadow: 0 0 0 3px rgba(212, 163, 115, 0.1);
+}
+
+.modal-body input[type="text"],
+.modal-body input[type="email"],
+.field input {
+    box-sizing: border-box;
 }
 
 .modal-body small {
@@ -574,12 +632,21 @@
 .description-box {
     background: var(--bg-hover);
     border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
     padding: 12px;
-    border-radius: var(--radius);
+    border-radius: var(--radius, 10px);
     font-size: 13px;
     color: var(--text-main);
     max-height: 150px;
     overflow-y: auto;
+    min-height: 60px;
+    line-height: 1.5;
+    margin: 0;
 }
 
 /* Modal Footer / Actions */
@@ -735,7 +802,11 @@
 }
 
 .modal-lg {
-    max-width: 900px; /* Wider to fit video and info side-by-side */
+    max-width: 520px;
+}
+
+.modal-lg .modal-content {
+    width: 520px;
 }
 
 .video-wrapper {
@@ -752,17 +823,13 @@
 /* Modal Body Layout */
 .modal-body .row {
     display: flex;
-    gap: 20px;
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: 16px;
 }
 
-.description-box {
-    background: rgba(0,0,0,0.03);
-    padding: 12px;
-    border-radius: 8px;
-    border-left: 4px solid var(--accent);
-    min-height: 60px;
-    font-size: 0.9rem;
+.modal-body .row > div {
+    width: 100%;
+    box-sizing: border-box;
 }
 
 /* ========================================================= */
