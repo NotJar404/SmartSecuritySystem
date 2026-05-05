@@ -21,86 +21,62 @@ namespace SmartSecuritySystem.Controllers
             _context = context;
         }
 
-        // =========================
-        // LOGIN (GET)
-        // =========================
         [HttpGet]
-        public IActionResult Login()
-        {
-            return View();
-        }
+        public IActionResult Login() => View();
 
-        // =========================
-        // LOGIN (POST)
-        // =========================
         [HttpPost]
         public async Task<IActionResult> Login(string username, string password, bool rememberMe)
         {
             var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
             var now = DateTime.UtcNow;
 
-            // Check for empty username or password
             if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
             {
                 await LogLogin(username, ipAddress, false);
-                ViewBag.LoginError = "Invalid username or password"; // Error message
+                ViewBag.LoginError = "Invalid username or password";
                 return View("Login");
             }
 
-            // Look for the user in the database
-            var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Username == username);
-
-            // Check if the user exists
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == username);
             if (user == null)
             {
                 await LogLogin(username, ipAddress, false);
-                ViewBag.LoginError = "Account does not exist"; // Specific error for non-existing account
+                ViewBag.LoginError = "Account does not exist";
                 return View("Login");
             }
 
-            // Check for failed login attempts in the last 10 minutes
-            var tenMinutesAgo = now.AddMinutes(-10);
-            var failedAttempts = await _context.LoginLogs
-                .Where(l => l.Username == username && !l.Success && l.Timestamp >= tenMinutesAgo)
-                .CountAsync();
-
-            if (failedAttempts >= 3)
+            if (!string.Equals(user.Status?.Trim(), "Active", StringComparison.OrdinalIgnoreCase))
             {
                 await LogLogin(username, ipAddress, false);
-                ViewBag.LoginError = "Account temporarily locked. Try again after 10 minutes."; // Lock message
+                ViewBag.LoginError = "Account is inactive or locked";
                 return View("Login");
             }
 
-            // Check if the account is active
-            if (!string.Equals(user.Status?.Trim(), "active", StringComparison.OrdinalIgnoreCase))
-            {
-                await LogLogin(username, ipAddress, false);
-                ViewBag.LoginError = "Account is inactive or locked"; // Account status message
-                return View("Login");
-            }
-
-            // Validate the password
             var storedPassword = user.PasswordHash?.Trim() ?? "";
-            var inputPassword = password?.Trim() ?? "";
-            var hashedInput = HashPassword(inputPassword);
+            var hashedInput = HashPassword(password?.Trim() ?? "");
 
-            bool passwordMatches =
-                string.Equals(storedPassword, inputPassword, StringComparison.Ordinal) ||
-                string.Equals(storedPassword, hashedInput, StringComparison.Ordinal);
+            
+            bool passwordMatches = string.Equals(storedPassword, password, StringComparison.Ordinal) ||
+                                  string.Equals(storedPassword, hashedInput, StringComparison.Ordinal);
 
             if (!passwordMatches)
             {
                 await LogLogin(username, ipAddress, false);
-                ViewBag.LoginError = "Invalid username or password"; // Password mismatch message
+                ViewBag.LoginError = "Invalid username or password";
                 return View("Login");
             }
 
-            // If login is successful
+            // --- REDIRECT IF MUST CHANGE PASSWORD ---
+            if (user.MustChangePassword)
+            {
+                TempData["ForcedChangeUserId"] = user.Id;
+                return RedirectToAction("ForcedChangePassword");
+            }
+
             await LogLogin(username, ipAddress, true);
 
-            // Auto hash password upgrade if it's in plain text
-            if (string.Equals(storedPassword, inputPassword, StringComparison.Ordinal))
+           
+            if (string.Equals(storedPassword, password, StringComparison.Ordinal))
             {
                 user.PasswordHash = hashedInput;
                 user.UpdatedAt = now;
@@ -110,260 +86,145 @@ namespace SmartSecuritySystem.Controllers
             await _context.SaveChangesAsync();
 
             var role = user.Role?.Trim() ?? "Security";
-
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Name, user.Username ?? ""),
-                new Claim(ClaimTypes.Role, role),
-                new Claim("FullName", user.FullName ?? ""),
-                new Claim("Email", user.Email ?? "")
+                new Claim(ClaimTypes.Role, role)
             };
 
-            // Flag for forced password change on first login
-            if (user.MustChangePassword)
-            {
-                claims.Add(new Claim("MustChangePassword", "true"));
-            }
-
             var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-            var principal = new ClaimsPrincipal(identity);
+            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), new AuthenticationProperties { IsPersistent = rememberMe });
 
-            await HttpContext.SignInAsync(
-                CookieAuthenticationDefaults.AuthenticationScheme,
-                principal,
-                new AuthenticationProperties
-                {
-                    IsPersistent = rememberMe
-                });
-
-            if (role.Equals("Admin", StringComparison.OrdinalIgnoreCase))
-                return RedirectToAction("Index", "Admin");
-
-            return RedirectToAction("Index", "Dashboard");
+            return role.Equals("Admin", StringComparison.OrdinalIgnoreCase) ? RedirectToAction("Index", "Admin") : RedirectToAction("Index", "Dashboard");
         }
 
-        // =========================
-        // FORGOT PASSWORD (UPDATED FOR SINGLE PAGE)
-        // =========================
         [HttpPost]
         public async Task<IActionResult> ForgotPassword(string email)
         {
-            ViewBag.ShowForgot = true;
-
-            // Validate email input
+            
             if (string.IsNullOrWhiteSpace(email))
             {
-                ViewBag.ForgotError = "Email is required"; // Error message for missing email
+                ViewBag.ForgotError = "Email is required";
                 return View("Login");
             }
 
-            // Check if the email exists in the database
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
-
             if (user == null)
             {
-                ViewBag.ForgotError = "Email not found"; // Error message for non-existing email
+                ViewBag.ForgotError = "Email not found in our system.";
                 return View("Login");
             }
 
-            // Generate a random password and update the user's password
-            var newPassword = GenerateRandomPassword(10);
-            user.PasswordHash = HashPassword(newPassword);
+            // Generate temporary password
+            var newPass = GenerateRandomPassword(10);
+            user.PasswordHash = HashPassword(newPass);
+            user.MustChangePassword = true;
             user.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
 
-            // Send the new password to the user's email
-            SendEmail(
-                user.Email ?? "",
-                "Your New Password",
-                $"Hello {user.FullName},\n\nYour new password is: {newPassword}\n\nPlease change it after login."
-            );
+            // Email details
+            string subject = "SecureVision - Temporary Password";
+            string body = $@"
+                <h3>Password Reset Request</h3>
+                <p>Hello {user.Username},</p>
+                <p>You have requested a password reset for your SecureVision account.</p>
+                <p>Your temporary password is: <b>{newPass}</b></p>
+                <p>Please login and change your password immediately for security purposes.</p>
+                <br>
+                <p><i>If you did not request this, please contact your administrator.</i></p>";
 
-            ViewBag.ForgotMessage = "A new password has been sent to your email."; // Success message
+            SendEmail(user.Email, subject, body);
+
+            ViewBag.ForgotMessage = "Check your email for the temporary password.";
             return View("Login");
         }
 
-        // =========================
-        // LOG LOGIN ATTEMPT
-        // =========================
-        private async Task LogLogin(string username, string ip, bool success)
-        {
-            var log = new LoginLog
-            {
-                Username = username,
-                IpAddress = ip,
-                Success = success,
-                Timestamp = DateTime.UtcNow
-            };
-
-            _context.LoginLogs.Add(log);
-            await _context.SaveChangesAsync();
-        }
-
-        // =========================
-        // LOGOUT
-        // =========================
         [HttpGet]
-        public async Task<IActionResult> Logout()
+        public IActionResult ForcedChangePassword()
         {
-            await HttpContext.SignOutAsync();
-            return RedirectToAction("Login");
+            if (TempData["ForcedChangeUserId"] == null) return RedirectToAction("Login");
+            ViewBag.UserId = TempData["ForcedChangeUserId"];
+            return View();
         }
 
-        // =========================
-        // PROFILE
-        // =========================
-        [HttpGet]
-        public async Task<IActionResult> Profile()
-        {
-            var userId = GetUserId();
-            if (userId == null) return RedirectToAction("Login");
-
-            var user = await _context.Users.FindAsync(userId);
-            if (user == null) return RedirectToAction("Login");
-
-            return View(user);
-        }
-
-        // =========================
-        // UPDATE PROFILE
-        // =========================
         [HttpPost]
-        public async Task<IActionResult> UpdateProfile(string fullName, string email)
+        public async Task<IActionResult> ForcedChangePassword(int userId, string newPassword, string confirmPassword)
         {
-            var userId = GetUserId();
-            if (userId == null) return RedirectToAction("Login");
-
-            var user = await _context.Users.FindAsync(userId);
-            if (user == null) return RedirectToAction("Login");
-
-            user.FullName = fullName;
-            user.Email = email;
-            user.UpdatedAt = DateTime.UtcNow;
-
-            await _context.SaveChangesAsync();
-
-            TempData["Success"] = "Profile updated successfully!"; // Success message
-            return RedirectToAction("Profile");
-        }
-
-        // =========================
-        // CHANGE PASSWORD
-        // =========================
-        [HttpPost]
-        public async Task<IActionResult> ChangePassword(string currentPassword, string newPassword)
-        {
-            var userId = GetUserId();
-            if (userId == null) return RedirectToAction("Login");
-
-            var user = await _context.Users.FindAsync(userId);
-            if (user == null) return RedirectToAction("Login");
-
-            var stored = user.PasswordHash?.Trim() ?? "";
-            var input = currentPassword?.Trim() ?? "";
-            var hashedInput = HashPassword(input);
-
-            bool matches =
-                string.Equals(stored, input, StringComparison.Ordinal) ||
-                string.Equals(stored, hashedInput, StringComparison.Ordinal);
-
-            if (!matches)
+            if (newPassword != confirmPassword)
             {
-                TempData["PasswordError"] = "Current password is incorrect"; // Error message
-                return RedirectToAction("Profile");
+                ViewBag.Error = "Passwords do not match.";
+                ViewBag.UserId = userId;
+                return View();
             }
 
-            user.PasswordHash = HashPassword(newPassword ?? "");
-            user.UpdatedAt = DateTime.UtcNow;
-
-            await _context.SaveChangesAsync();
-
-            TempData["PasswordSuccess"] = "Password updated successfully!"; // Success message
-            return RedirectToAction("Profile");
+            var user = await _context.Users.FindAsync(userId);
+            if (user != null)
+            {
+                user.PasswordHash = HashPassword(newPassword);
+                user.MustChangePassword = false;
+                user.UpdatedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+                return RedirectToAction("Login");
+            }
+            return RedirectToAction("Login");
         }
 
         // =========================
         // HELPERS
         // =========================
-        private int? GetUserId()
+        private async Task LogLogin(string username, string ip, bool success)
         {
-            var id = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            return int.TryParse(id, out var userId) ? userId : null;
-        }
-
-        private string GenerateRandomPassword(int length)
-        {
-            // Guarantee at least: 1 uppercase, 1 lowercase, 1 digit, 1 special char
-            const string upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
-            const string lower = "abcdefghijkmnopqrstuvwxyz";
-            const string digits = "123456789";
-            const string special = "!@#$%&*";
-            const string all = upper + lower + digits + special;
-
-            length = Math.Max(length, 8);
-            var random = new Random();
-            var password = new char[length];
-
-            // Ensure one of each category
-            password[0] = upper[random.Next(upper.Length)];
-            password[1] = lower[random.Next(lower.Length)];
-            password[2] = digits[random.Next(digits.Length)];
-            password[3] = special[random.Next(special.Length)];
-
-            // Fill rest randomly
-            for (int i = 4; i < length; i++)
-                password[i] = all[random.Next(all.Length)];
-
-            // Shuffle
-            for (int i = password.Length - 1; i > 0; i--)
+            try
             {
-                int j = random.Next(i + 1);
-                (password[i], password[j]) = (password[j], password[i]);
+                _context.LoginLogs.Add(new LoginLog { Username = username, IpAddress = ip, Success = success, Timestamp = DateTime.UtcNow });
+                await _context.SaveChangesAsync();
             }
-
-            return new string(password);
-        }
-
-        private bool IsValidGmailAddress(string? email)
-        {
-            if (string.IsNullOrWhiteSpace(email)) return false;
-            return email.Trim().EndsWith("@gmail.com", StringComparison.OrdinalIgnoreCase);
+            catch { /* Fail-safe */ }
         }
 
         private string HashPassword(string password)
         {
-            password ??= "";
-
             using var sha = SHA256.Create();
-            return Convert.ToBase64String(
-                sha.ComputeHash(Encoding.UTF8.GetBytes(password))
-            );
+            return Convert.ToBase64String(sha.ComputeHash(Encoding.UTF8.GetBytes(password ?? "")));
         }
 
-#pragma warning disable SYSLIB0014
+        private string GenerateRandomPassword(int length)
+        {
+            const string chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz123456789!@#$%&*";
+            var random = new Random();
+            return new string(Enumerable.Repeat(chars, length).Select(s => s[random.Next(s.Length)]).ToArray());
+        }
+
         private void SendEmail(string toEmail, string subject, string body)
         {
-            var fromEmail = "yourgmail@gmail.com";
-            var appPassword = "your_app_password";
-
-            var client = new SmtpClient("smtp.gmail.com", 587)
+            try
             {
-                EnableSsl = true,
-                Credentials = new NetworkCredential(fromEmail, appPassword)
-            };
+                var fromEmail = "abuanmarden4@gmail.com";
+                var appPassword = "womlpksgninuqgty";
 
-            var mail = new MailMessage
+                var client = new SmtpClient("smtp.gmail.com", 587)
+                {
+                    EnableSsl = true,
+                    Credentials = new NetworkCredential(fromEmail, appPassword)
+                };
+
+                var mail = new MailMessage
+                {
+                    From = new MailAddress(fromEmail, "SecureVision Admin"),
+                    Subject = subject,
+                    Body = body,
+                    IsBodyHtml = true 
+                };
+                mail.To.Add(toEmail);
+
+                client.Send(mail);
+            }
+            catch (Exception ex)
             {
-                From = new MailAddress(fromEmail),
-                Subject = subject ?? "",
-                Body = body ?? ""
-            };
-
-            mail.To.Add(toEmail ?? "");
-            client.Send(mail);
+                System.Diagnostics.Debug.WriteLine("Email Error: " + ex.Message);
+            }
         }
-#pragma warning restore SYSLIB0014
     }
 }
