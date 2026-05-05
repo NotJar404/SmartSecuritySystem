@@ -1,4 +1,4 @@
-﻿@{
+@{
     ViewData["Title"] = "Login";
     Layout = null;
 }
@@ -13,21 +13,15 @@
 <body>
 
 <div class="page-wrapper">
-
-    <!-- LEFT PANEL -->
+    <!-- LEFT PANEL (Logo and Features) -->
     <div class="left-panel">
         <div class="left-content">
             <div class="logo-circle">QCU</div>
-
             <h1>SecureVision</h1>
             <h3>Quezon City University</h3>
-
             <div class="underline"></div>
-
-            <p class="desc">
-                Advanced AI-Assisted Security & Intruder Detection Monitoring System
-            </p>
-
+            <p class="desc">Advanced AI-Assisted Security & Intruder Detection Monitoring System</p>
+            
             <div class="feature-box">
                 <i class="fa fa-shield"></i>
                 <div>
@@ -35,18 +29,10 @@
                     <p>24/7 surveillance with instant alerts</p>
                 </div>
             </div>
-
-            <div class="feature-box">
-                <i class="fa fa-lock"></i>
-                <div>
-                    <strong>Secure Access Control</strong>
-                    <p>Role-based authentication system</p>
-                </div>
-            </div>
         </div>
     </div>
 
-    <!-- RIGHT PANEL -->
+    <!-- RIGHT PANEL (Forms) -->
     <div class="right-panel">
         <div class="login-container">
 
@@ -54,9 +40,7 @@
             <div id="loginForm">
                 <h2>Sign In</h2>
                 <p class="subtitle">Enter your credentials to access the system</p>
-
                 <form method="post" asp-action="Login">
-
                     <label>Username</label>
                     <div class="input-group">
                         <i class="fa fa-user"></i>
@@ -70,7 +54,6 @@
                         <i class="fa fa-eye right-icon" onclick="togglePassword()"></i>
                     </div>
 
-                    <!-- Error message display (below password) -->
                     @if (ViewBag.LoginError != null)
                     {
                         <p class="error">@ViewBag.LoginError</p>
@@ -81,26 +64,18 @@
                             <input type="checkbox" name="rememberMe" />
                             <span>Remember me</span>
                         </label>
-
                         <a href="#" onclick="showForgot()">Forgot password?</a>
                     </div>
-
-                    <button type="submit">
-                        <i class="fa fa-lock"></i> Sign In
-                    </button>
+                    <button type="submit"><i class="fa fa-lock"></i> Sign In</button>
                 </form>
-
             </div>
 
             <!-- FORGOT PASSWORD FORM -->
             <div id="forgotForm" style="display:none;">
                 <h2>Forgot Password</h2>
-                <p class="subtitle">
-                    Enter your email and we’ll send you a reset link
-                </p>
+                <p class="subtitle">Enter your email and we’ll send you a temporary password</p>
 
-                <form method="post" asp-action="ForgotPassword">
-
+                <form method="post" asp-action="ForgotPassword" asp-controller="Auth">
                     <label>Email</label>
                     <div class="input-group">
                         <i class="fa fa-envelope"></i>
@@ -108,7 +83,7 @@
                     </div>
 
                     <button type="submit">
-                        <i class="fa fa-paper-plane"></i> Send Reset Link
+                        <i class="fa fa-paper-plane"></i> Send Password
                     </button>
                 </form>
 
@@ -116,20 +91,18 @@
                     <a href="#" onclick="showLogin()">← Back to Login</a>
                 </div>
 
-                @if (ViewBag.Message != null)
+                <!-- DITO LALABAS ANG MGA MESSAGES -->
+                @if (ViewBag.ForgotMessage != null)
                 {
-                    <p style="color:lightgreen">@ViewBag.Message</p>
+                    <p style="color:lightgreen; margin-top:10px;">@ViewBag.ForgotMessage</p>
                 }
-
-                @if (ViewBag.Error != null)
+                @if (ViewBag.ForgotError != null)
                 {
-                    <p class="error">@ViewBag.Error</p>
+                    <p class="error" style="margin-top:10px;">@ViewBag.ForgotError</p>
                 }
             </div>
-
         </div>
     </div>
-
 </div>
 
 <script>
@@ -148,10 +121,11 @@
         document.getElementById("forgotForm").style.display = "none";
     }
 
-    // Optional: auto-switch if coming from ForgotPassword with message/error
+    // Ito ang taga-check kung dapat bang ipakita ang Forgot Form pagka-refresh
     window.onload = function () {
-        const hasMessage = '@ViewBag.Message';
-        if (hasMessage) {
+        const hasMessage = '@ViewBag.ForgotMessage';
+        const hasError = '@ViewBag.ForgotError';
+        if (hasMessage || hasError) {
             showForgot();
         }
     }
