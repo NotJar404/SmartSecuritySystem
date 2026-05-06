@@ -232,19 +232,20 @@ body {
     margin-top: 6px;
     display: flex;
     align-items: center;
+    width: 100%;
 }
 
 input[type="text"],
 input[type="password"],
 input[type="email"] {
     width: 100%;
-    padding: 12px 42px 12px 42px;
+    padding: 12px 44px 12px 44px;
     border-radius: 8px;
-    border: 1px solid var(--border);
+    border: 1.5px solid var(--border);
     background: var(--bg-main);
     color: var(--text-main);
     outline: none;
-    transition: 0.2s;
+    transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
     font-size: 14px;
     font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
 }
@@ -274,6 +275,7 @@ input::placeholder {
     color: var(--text-muted);
     font-size: 16px;
     pointer-events: none;
+    transition: color 0.2s ease;
 }
 
 .input-group i:first-child {
@@ -284,12 +286,21 @@ input::placeholder {
     right: 14px;
     cursor: pointer;
     pointer-events: all;
-    transition: color 0.2s;
+    transition: color 0.2s ease, transform 0.15s ease;
     color: var(--text-muted);
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .right-icon:hover {
     color: var(--accent);
+    transform: scale(1.1);
+}
+
+.right-icon:active {
+    transform: scale(0.95);
 }
 
 /* ================= OPTIONS ================= */
@@ -510,5 +521,176 @@ button i {
     .login-container {
         max-width: 100%;
         padding: 30px 20px;
+    }
+}
+
+/* ================= STEP INDICATOR ================= */
+.step-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    margin-bottom: 24px;
+}
+
+.step-dot {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--bg-panel);
+    border: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-muted);
+    transition: all 0.3s ease;
+}
+
+.step-dot.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+    box-shadow: 0 2px 10px rgba(212, 163, 115, 0.3);
+}
+
+.step-dot.completed {
+    background: #2D7A56;
+    border-color: #2D7A56;
+    color: white;
+}
+
+.step-line {
+    width: 40px;
+    height: 2px;
+    background: var(--border);
+    transition: background 0.3s ease;
+}
+
+.step-line.completed {
+    background: #2D7A56;
+}
+
+/* ================= OTP INPUTS ================= */
+.otp-container {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin: 20px 0;
+}
+
+.otp-input {
+    width: 48px !important;
+    height: 56px;
+    text-align: center;
+    font-size: 22px;
+    font-weight: 700;
+    font-family: 'Courier New', monospace;
+    padding: 0 !important;
+    border-radius: 10px;
+    border: 2px solid var(--border);
+    background: var(--bg-main);
+    color: var(--text-main);
+    outline: none;
+    transition: all 0.2s ease;
+    caret-color: var(--accent);
+}
+
+.otp-input:focus {
+    border-color: var(--accent);
+    background: var(--bg-panel);
+    box-shadow: var(--shadow-glow);
+    transform: scale(1.05);
+}
+
+.otp-input:not(:placeholder-shown) {
+    border-color: var(--accent-light);
+}
+
+/* ================= OTP TIMER ================= */
+.otp-timer {
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-muted);
+    margin: 12px 0 4px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.otp-timer i {
+    font-size: 14px;
+}
+
+/* ================= PASSWORD REQUIREMENTS ================= */
+.password-requirements {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-top: 16px;
+}
+
+.req-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.req-title i {
+    color: var(--accent);
+    font-size: 13px;
+}
+
+.req-item {
+    font-size: 12px;
+    padding: 3px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-muted);
+    transition: color 0.2s ease;
+}
+
+.req-item i {
+    font-size: 10px;
+    width: 14px;
+    text-align: center;
+    transition: color 0.2s ease;
+}
+
+.req-item.met {
+    color: #2D7A56;
+}
+
+.req-item.met i {
+    color: #2D7A56;
+}
+
+.req-item.unmet {
+    color: var(--text-muted);
+}
+
+/* ================= FORGOT STEP ANIMATION ================= */
+.forgot-step {
+    animation: fadeInStep 0.3s ease;
+}
+
+@keyframes fadeInStep {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
     }
 }

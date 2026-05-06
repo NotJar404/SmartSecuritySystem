@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Net;
 using System.Net.Mail;
 using WebApp.Data;
@@ -15,10 +16,12 @@ namespace SmartSecuritySystem.Controllers
     public class AuthController : Controller
     {
         private readonly AppDbContext _context;
+        private readonly IConfiguration _configuration;
 
-        public AuthController(AppDbContext context)
+        public AuthController(AppDbContext context, IConfiguration configuration)
         {
             _context = context;
+            _configuration = configuration;
         }
 
         // =========================
@@ -144,7 +147,7 @@ namespace SmartSecuritySystem.Controllers
         }
 
         // =========================
-        // FORGOT PASSWORD (UPDATED FOR SINGLE PAGE)
+        // FORGOT PASSWORD — STEP 1: SEND OTP
         // =========================
         [HttpPost]
         public async Task<IActionResult> ForgotPassword(string email)
@@ -154,7 +157,7 @@ namespace SmartSecuritySystem.Controllers
             // Validate email input
             if (string.IsNullOrWhiteSpace(email))
             {
-                ViewBag.ForgotError = "Email is required"; // Error message for missing email
+                ViewBag.ForgotError = "Email is required";
                 return View("Login");
             }
 
@@ -163,25 +166,165 @@ namespace SmartSecuritySystem.Controllers
 
             if (user == null)
             {
-                ViewBag.ForgotError = "Email not found"; // Error message for non-existing email
+                ViewBag.ForgotError = "Email not found";
                 return View("Login");
             }
 
-            // Generate a random password and update the user's password
-            var newPassword = GenerateRandomPassword(10);
-            user.PasswordHash = HashPassword(newPassword);
-            user.UpdatedAt = DateTime.UtcNow;
+            // Generate 6-digit OTP
+            var otp = GenerateOtp();
 
+            // Store OTP in session with expiry (5 minutes)
+            HttpContext.Session.SetString("OTP_Code", otp);
+            HttpContext.Session.SetString("OTP_Email", email);
+            HttpContext.Session.SetString("OTP_Expiry", DateTime.UtcNow.AddMinutes(5).ToString("o"));
+            HttpContext.Session.SetInt32("OTP_Attempts", 0);
+
+            // Send OTP via email
+            try
+            {
+                SendOtpEmail(user.Email ?? "", user.FullName ?? "User", otp);
+                ViewBag.ShowOtp = true;
+                ViewBag.OtpEmail = email;
+                ViewBag.ForgotMessage = "A 6-digit verification code has been sent to your email.";
+            }
+            catch (Exception)
+            {
+                ViewBag.ForgotError = "Failed to send verification email. Please try again.";
+            }
+
+            return View("Login");
+        }
+
+        // =========================
+        // FORGOT PASSWORD — STEP 2: VERIFY OTP
+        // =========================
+        [HttpPost]
+        public IActionResult VerifyOtp(string otpCode)
+        {
+            ViewBag.ShowForgot = true;
+
+            var sessionOtp = HttpContext.Session.GetString("OTP_Code");
+            var sessionEmail = HttpContext.Session.GetString("OTP_Email");
+            var sessionExpiry = HttpContext.Session.GetString("OTP_Expiry");
+            var attempts = HttpContext.Session.GetInt32("OTP_Attempts") ?? 0;
+
+            // Validate session data exists
+            if (string.IsNullOrEmpty(sessionOtp) || string.IsNullOrEmpty(sessionEmail) || string.IsNullOrEmpty(sessionExpiry))
+            {
+                ViewBag.ForgotError = "Session expired. Please request a new verification code.";
+                return View("Login");
+            }
+
+            // Check max attempts (3)
+            if (attempts >= 3)
+            {
+                HttpContext.Session.Remove("OTP_Code");
+                HttpContext.Session.Remove("OTP_Email");
+                HttpContext.Session.Remove("OTP_Expiry");
+                HttpContext.Session.Remove("OTP_Attempts");
+                ViewBag.ForgotError = "Too many failed attempts. Please request a new code.";
+                return View("Login");
+            }
+
+            // Check expiry
+            if (DateTime.TryParse(sessionExpiry, out var expiry) && DateTime.UtcNow > expiry)
+            {
+                HttpContext.Session.Remove("OTP_Code");
+                HttpContext.Session.Remove("OTP_Email");
+                HttpContext.Session.Remove("OTP_Expiry");
+                HttpContext.Session.Remove("OTP_Attempts");
+                ViewBag.ForgotError = "Verification code has expired. Please request a new one.";
+                return View("Login");
+            }
+
+            // Validate OTP
+            if (!string.Equals(otpCode?.Trim(), sessionOtp, StringComparison.Ordinal))
+            {
+                HttpContext.Session.SetInt32("OTP_Attempts", attempts + 1);
+                ViewBag.ShowOtp = true;
+                ViewBag.OtpEmail = sessionEmail;
+                ViewBag.OtpError = $"Invalid code. {2 - attempts} attempt(s) remaining.";
+                return View("Login");
+            }
+
+            // OTP verified — show password reset fields
+            ViewBag.ShowResetFields = true;
+            ViewBag.ResetEmail = sessionEmail;
+            ViewBag.OtpVerified = true;
+
+            return View("Login");
+        }
+
+        // =========================
+        // FORGOT PASSWORD — STEP 3: RESET PASSWORD
+        // =========================
+        [HttpPost]
+        public async Task<IActionResult> ResetPassword(string resetEmail, string newPassword, string confirmPassword)
+        {
+            ViewBag.ShowForgot = true;
+
+            var sessionEmail = HttpContext.Session.GetString("OTP_Email");
+
+            // Verify session integrity
+            if (string.IsNullOrEmpty(sessionEmail) || !string.Equals(resetEmail, sessionEmail, StringComparison.OrdinalIgnoreCase))
+            {
+                ViewBag.ForgotError = "Session expired. Please restart the password reset process.";
+                return View("Login");
+            }
+
+            // Validate passwords
+            if (string.IsNullOrWhiteSpace(newPassword) || string.IsNullOrWhiteSpace(confirmPassword))
+            {
+                ViewBag.ShowResetFields = true;
+                ViewBag.ResetEmail = sessionEmail;
+                ViewBag.ResetError = "Both password fields are required.";
+                return View("Login");
+            }
+
+            if (!string.Equals(newPassword, confirmPassword, StringComparison.Ordinal))
+            {
+                ViewBag.ShowResetFields = true;
+                ViewBag.ResetEmail = sessionEmail;
+                ViewBag.ResetError = "Passwords do not match.";
+                return View("Login");
+            }
+
+            // Enforce password complexity: min 8 chars, uppercase, lowercase, digit, special
+            if (!IsPasswordComplex(newPassword))
+            {
+                ViewBag.ShowResetFields = true;
+                ViewBag.ResetEmail = sessionEmail;
+                ViewBag.ResetError = "Password must be at least 8 characters and include uppercase, lowercase, number, and special character.";
+                return View("Login");
+            }
+
+            // Find user and update password
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == sessionEmail);
+            if (user == null)
+            {
+                ViewBag.ForgotError = "Account not found. Please try again.";
+                return View("Login");
+            }
+
+            user.PasswordHash = HashPassword(newPassword);
+            user.MustChangePassword = false;
+            user.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
-            // Send the new password to the user's email
-            SendEmail(
-                user.Email ?? "",
-                "Your New Password",
-                $"Hello {user.FullName},\n\nYour new password is: {newPassword}\n\nPlease change it after login."
-            );
+            // Clear all OTP session data
+            HttpContext.Session.Remove("OTP_Code");
+            HttpContext.Session.Remove("OTP_Email");
+            HttpContext.Session.Remove("OTP_Expiry");
+            HttpContext.Session.Remove("OTP_Attempts");
 
-            ViewBag.ForgotMessage = "A new password has been sent to your email."; // Success message
+            // Send confirmation email
+            try
+            {
+                SendPasswordChangedEmail(user.Email ?? "", user.FullName ?? "User");
+            }
+            catch { /* Non-critical */ }
+
+            ViewBag.LoginSuccess = "Password reset successfully! Please sign in with your new password.";
             return View("Login");
         }
 
@@ -293,6 +436,28 @@ namespace SmartSecuritySystem.Controllers
             return int.TryParse(id, out var userId) ? userId : null;
         }
 
+        private string GenerateOtp()
+        {
+            using var rng = RandomNumberGenerator.Create();
+            var bytes = new byte[4];
+            rng.GetBytes(bytes);
+            var number = BitConverter.ToUInt32(bytes, 0) % 900000 + 100000;
+            return number.ToString();
+        }
+
+        private bool IsPasswordComplex(string password)
+        {
+            if (string.IsNullOrWhiteSpace(password) || password.Length < 8)
+                return false;
+
+            bool hasUpper = Regex.IsMatch(password, @"[A-Z]");
+            bool hasLower = Regex.IsMatch(password, @"[a-z]");
+            bool hasDigit = Regex.IsMatch(password, @"[0-9]");
+            bool hasSpecial = Regex.IsMatch(password, @"[!@#$%^&*()_+\-=\[\]{};':""\\|,.<>\/?]");
+
+            return hasUpper && hasLower && hasDigit && hasSpecial;
+        }
+
         private string GenerateRandomPassword(int length)
         {
             // Guarantee at least: 1 uppercase, 1 lowercase, 1 digit, 1 special char
@@ -342,26 +507,174 @@ namespace SmartSecuritySystem.Controllers
             );
         }
 
+        // =========================
+        // EMAIL HELPERS
+        // =========================
 #pragma warning disable SYSLIB0014
-        private void SendEmail(string toEmail, string subject, string body)
+        private void SendOtpEmail(string toEmail, string fullName, string otp)
         {
-            var fromEmail = "yourgmail@gmail.com";
-            var appPassword = "your_app_password";
+            var subject = "SecureVision — Password Reset Verification Code";
+            var body = BuildHtmlEmail(
+                fullName,
+                "Password Reset Verification",
+                $@"<p style=""margin:0 0 16px 0;color:#4a4540;font-size:15px;line-height:1.6;"">
+                    You have requested to reset your password. Please use the following verification code to proceed:
+                </p>
+                <div style=""text-align:center;margin:24px 0;"">
+                    <div style=""display:inline-block;background:linear-gradient(135deg,#D4A373,#BC8F62);color:#ffffff;font-size:32px;font-weight:700;letter-spacing:12px;padding:16px 32px;border-radius:12px;font-family:'Courier New',monospace;"">
+                        {otp}
+                    </div>
+                </div>
+                <p style=""margin:0 0 8px 0;color:#4a4540;font-size:14px;line-height:1.6;"">
+                    This code will expire in <strong>5 minutes</strong>. Do not share this code with anyone.
+                </p>
+                <p style=""margin:0 0 16px 0;color:#6B635B;font-size:13px;line-height:1.6;"">
+                    If you did not request this password reset, please ignore this email or contact your system administrator immediately.
+                </p>"
+            );
 
-            var client = new SmtpClient("smtp.gmail.com", 587)
+            SendEmail(toEmail, subject, body);
+        }
+
+        private void SendPasswordChangedEmail(string toEmail, string fullName)
+        {
+            var subject = "SecureVision — Password Changed Successfully";
+            var body = BuildHtmlEmail(
+                fullName,
+                "Password Changed",
+                $@"<p style=""margin:0 0 16px 0;color:#4a4540;font-size:15px;line-height:1.6;"">
+                    Your SecureVision account password has been successfully changed.
+                </p>
+                <div style=""background:#f0f9f4;border:1px solid #c3e6cb;border-radius:8px;padding:16px;margin:16px 0;"">
+                    <p style=""margin:0;color:#2D7A56;font-size:14px;"">
+                        <strong>✓ Password updated</strong> on {DateTime.UtcNow:MMMM dd, yyyy} at {DateTime.UtcNow:hh:mm tt} UTC
+                    </p>
+                </div>
+                <p style=""margin:0 0 16px 0;color:#6B635B;font-size:13px;line-height:1.6;"">
+                    If you did not make this change, please contact your system administrator immediately to secure your account.
+                </p>"
+            );
+
+            SendEmail(toEmail, subject, body);
+        }
+
+        public void SendCredentialEmail(string toEmail, string fullName, string username, string tempPassword)
+        {
+            var subject = "SecureVision — Your Account Credentials";
+            var body = BuildHtmlEmail(
+                fullName,
+                "Welcome to SecureVision",
+                $@"<p style=""margin:0 0 16px 0;color:#4a4540;font-size:15px;line-height:1.6;"">
+                    Your SecureVision security system account has been created. Please use the credentials below to sign in:
+                </p>
+                <div style=""background:#FAF7F2;border:1px solid #E2DCD5;border-radius:8px;padding:20px;margin:16px 0;"">
+                    <table style=""width:100%;border-collapse:collapse;"">
+                        <tr>
+                            <td style=""padding:8px 0;color:#6B635B;font-size:13px;font-weight:600;width:120px;"">Username</td>
+                            <td style=""padding:8px 0;color:#2C2724;font-size:14px;font-weight:700;"">{username}</td>
+                        </tr>
+                        <tr>
+                            <td style=""padding:8px 0;color:#6B635B;font-size:13px;font-weight:600;"">Temporary Password</td>
+                            <td style=""padding:8px 0;color:#2C2724;font-size:14px;font-family:'Courier New',monospace;font-weight:700;"">{tempPassword}</td>
+                        </tr>
+                    </table>
+                </div>
+                <p style=""margin:0 0 8px 0;color:#E07A5F;font-size:13px;font-weight:600;line-height:1.6;"">
+                    ⚠ You will be required to change your password upon first login.
+                </p>
+                <p style=""margin:0 0 16px 0;color:#6B635B;font-size:13px;line-height:1.6;"">
+                    Keep your credentials secure and do not share them with anyone.
+                </p>"
+            );
+
+            SendEmail(toEmail, subject, body);
+        }
+
+        private string BuildHtmlEmail(string recipientName, string heading, string contentHtml)
+        {
+            return $@"<!DOCTYPE html>
+<html lang=""en"">
+<head>
+    <meta charset=""UTF-8"">
+    <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"">
+    <meta http-equiv=""X-UA-Compatible"" content=""IE=edge"">
+    <title>{heading} — SecureVision</title>
+</head>
+<body style=""margin:0;padding:0;background-color:#f5f0eb;font-family:'Segoe UI','Helvetica Neue',Arial,sans-serif;"">
+    <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background-color:#f5f0eb;"">
+        <tr>
+            <td align=""center"" style=""padding:40px 20px;"">
+                <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""560"" style=""max-width:560px;width:100%;"">
+                    <!-- Header -->
+                    <tr>
+                        <td style=""background:linear-gradient(135deg,#D4A373,#BC8F62);padding:28px 32px;border-radius:12px 12px 0 0;text-align:center;"">
+                            <div style=""width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,0.2);display:inline-block;line-height:48px;font-size:18px;font-weight:700;color:#ffffff;margin-bottom:12px;"">QCU</div>
+                            <h1 style=""margin:8px 0 0 0;color:#ffffff;font-size:22px;font-weight:700;"">{heading}</h1>
+                            <p style=""margin:4px 0 0 0;color:rgba(255,255,255,0.85);font-size:13px;"">SecureVision Security System</p>
+                        </td>
+                    </tr>
+                    <!-- Body -->
+                    <tr>
+                        <td style=""background:#ffffff;padding:32px;border-left:1px solid #E2DCD5;border-right:1px solid #E2DCD5;"">
+                            <p style=""margin:0 0 20px 0;color:#2C2724;font-size:16px;font-weight:600;"">
+                                Hello {recipientName},
+                            </p>
+                            {contentHtml}
+                        </td>
+                    </tr>
+                    <!-- Footer -->
+                    <tr>
+                        <td style=""background:#FAF7F2;padding:20px 32px;border-radius:0 0 12px 12px;border:1px solid #E2DCD5;border-top:none;text-align:center;"">
+                            <p style=""margin:0 0 4px 0;color:#8E847B;font-size:12px;"">
+                                This is an automated message from SecureVision — Quezon City University
+                            </p>
+                            <p style=""margin:0;color:#8E847B;font-size:11px;"">
+                                AI-Assisted Smart Security & Intruder Detection System &bull; Do not reply to this email
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>";
+        }
+
+        private void SendEmail(string toEmail, string subject, string htmlBody)
+        {
+            var smtpSettings = _configuration.GetSection("SmtpSettings");
+            var fromEmail = smtpSettings["SenderEmail"] ?? "yourgmail@gmail.com";
+            var senderName = smtpSettings["SenderName"] ?? "SecureVision Security System";
+            var appPassword = smtpSettings["AppPassword"] ?? "your_app_password";
+            var host = smtpSettings["Host"] ?? "smtp.gmail.com";
+            var port = int.TryParse(smtpSettings["Port"], out var p) ? p : 587;
+            var enableSsl = bool.TryParse(smtpSettings["EnableSsl"], out var ssl) ? ssl : true;
+
+            var client = new SmtpClient(host, port)
             {
-                EnableSsl = true,
-                Credentials = new NetworkCredential(fromEmail, appPassword)
+                EnableSsl = enableSsl,
+                Credentials = new NetworkCredential(fromEmail, appPassword),
+                DeliveryMethod = SmtpDeliveryMethod.Network,
+                Timeout = 15000
             };
 
             var mail = new MailMessage
             {
-                From = new MailAddress(fromEmail),
+                From = new MailAddress(fromEmail, senderName),
                 Subject = subject ?? "",
-                Body = body ?? ""
+                Body = htmlBody ?? "",
+                IsBodyHtml = true,
+                SubjectEncoding = Encoding.UTF8,
+                BodyEncoding = Encoding.UTF8
             };
 
-            mail.To.Add(toEmail ?? "");
+            // Add headers for better deliverability
+            mail.Headers.Add("X-Mailer", "SecureVision-Mailer");
+            mail.Headers.Add("X-Priority", "3");
+            mail.Headers.Add("Precedence", "bulk");
+
+            mail.To.Add(new MailAddress(toEmail));
             client.Send(mail);
         }
 #pragma warning restore SYSLIB0014

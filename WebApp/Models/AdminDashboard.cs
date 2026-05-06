@@ -33,6 +33,11 @@ namespace WebApp.Models
         // AUDIT LOGS (NEW)
         // =====================
         public List<AuditLogViewModel> AuditLogs { get; set; } = new();
+
+        // =====================
+        // ACTIVE INTERVENTIONS
+        // =====================
+        public List<Alert> ActiveInterventions { get; set; } = new();
     }
 
     // =====================

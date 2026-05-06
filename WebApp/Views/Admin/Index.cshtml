@@ -1,4 +1,4 @@
-@model WebApp.Models.AdminDashboardViewModel
+﻿@model WebApp.Models.AdminDashboardViewModel
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
     ViewData["Title"] = "AI Assisted Smart Security and Intrusion Detection System";
@@ -123,16 +123,26 @@
                 <div class="panel-header">
                     <h5>Critical Audit Stream</h5>
                     <small>Recent system and admin activity</small>
+                    <a href="/Logs/Index?filter=@(ViewBag.IsAdmin == true ? "all" : "alert")" class="view-more-link">View More <i class="fas fa-arrow-right"></i></a>
                 </div>
 
                 <div class="audit-feed">
 
                     @if (Model.AuditLogs?.Any() == true)
                     {
-                        foreach (var log in Model.AuditLogs.Take(6))
+                        foreach (var log in Model.AuditLogs)
                         {
+                            var actionName = log.Action?.ToLower() ?? "";
+                            var iconColor = "blue";
+                            var iconClass = "fa-history";
+
+                            if (actionName.Contains("alert")) { iconColor = "red"; iconClass = "fa-exclamation-triangle"; }
+                            else if (actionName.Contains("detection")) { iconColor = "yellow"; iconClass = "fa-eye"; }
+                            else if (actionName.Contains("access")) { iconColor = "green"; iconClass = "fa-id-badge"; }
+                            else if (actionName.Contains("login")) { iconColor = "blue"; iconClass = "fa-sign-in-alt"; }
+
                             <div class="audit-item">
-                                <i class="fa fa-history audit-icon blue"></i>
+                                <i class="fa @iconClass audit-icon @iconColor"></i>
                                 <div class="audit-details">
                                     <strong>@log.Action</strong>
                                     <p>@log.Description</p>

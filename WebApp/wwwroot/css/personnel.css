@@ -144,11 +144,11 @@ small { color: var(--text-muted); font-size: var(--font-small); }
     margin-bottom: 28px !important;
 }
 
-/* Table Row — 2 columns with proper gap */
+/* Table Row — stacked vertically with proper spacing */
 .row:not(.mb-4) {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 24px;
+    grid-template-columns: 1fr;
+    gap: 28px;
 }
 
 .row.mb-4 .card {
@@ -518,8 +518,16 @@ code {
     position: relative;
     display: flex;
     flex-direction: column;
-    max-height: 85vh;
+    max-height: 90vh;
     min-height: auto;
+}
+
+/* Form inside modal must also flex so header/body/footer layout works */
+.modal-content > form {
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh;
+    overflow: hidden;
 }
 
 /* Modal Header - Close Button at Right */
@@ -572,12 +580,12 @@ code {
     outline: none;
 }
 
-/* Modal Body - No Scrollbar */
+/* Modal Body - Scrollable when content overflows */
 .modal-body {
     padding: 24px;
     background: var(--bg-card);
     color: var(--text-main);
-    overflow: hidden;
+    overflow-y: auto;
     flex: 1;
     display: flex;
     flex-direction: column;

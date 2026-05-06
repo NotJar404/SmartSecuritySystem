@@ -1,8 +1,12 @@
-﻿@model List<WebApp.Models.AccessLog>
+@model List<WebApp.Models.AccessLog>
 
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
     ViewData["Title"] = "AI Assisted Smart Security and Intrusion Detection System";
+
+    var activePersonIds = ViewBag.ActivePersonIds as HashSet<int> ?? new HashSet<int>();
+    var activeSessions = ViewBag.ActiveSessions as List<WebApp.Models.OccupancySession>
+                         ?? new List<WebApp.Models.OccupancySession>();
 }
 
 <link rel="stylesheet" href="~/css/access.css" />
@@ -17,6 +21,12 @@
         </div>
         <div class="header-right">
             <span id="statusText" class="active-selection-text">System Monitoring Active</span>
+            @if (activeSessions.Any())
+            {
+                <span class="ms-3" style="color: #2ecc71; font-size: 0.8rem;">
+                    <i class="fa fa-users me-1"></i>@activeSessions.Count active session(s)
+                </span>
+            }
         </div>
     </div>
 
@@ -40,6 +50,7 @@
                                 <h2 id="detName" class="display-name">Name</h2>
                                 <p class="id-tag">Personnel ID: <span id="detId">0000</span></p>
                                 <div id="detStatus" class="status-badge">PENDING</div>
+                                <div id="detSessionBadge" class="session-indicator" style="display:none;"></div>
                             </div>
                         </div>
                     </div>
@@ -101,9 +112,16 @@
                     ? new string(log.FullName.Split(' ').Select(n => n[0]).ToArray()) 
                     : "??";
 
-                // We pass the VideoPath to the JS function here
-                <div class="log-card" 
-                     onclick="dockData('@log.FullName', '@log.PersonnelId', '@log.Location', '@log.ImageUrl', '@log.Department', '@log.Email', '@log.Phone', '@log.Room', '@log.Timestamp.ToString("hh:mm tt")', '@log.VideoPath')">
+                // SESSION-AWARE: Determine true status from FSM data
+                var isCurrentlyInside = log.PersonId.HasValue && activePersonIds.Contains(log.PersonId.Value);
+                var sessionStatus = isCurrentlyInside ? "INSIDE" : "";
+
+                // Compute risk level from actual RFID + Face data
+                var computedRisk = log.ComputedRiskLevel;
+
+                // We pass the VideoPath and session info to the JS function here
+                <div class="log-card @(isCurrentlyInside ? "session-active" : "")" 
+                     onclick="dockData('@log.FullName', '@log.PersonnelId', '@log.Location', '@log.ImageUrl', '@log.Department', '@log.Email', '@log.Phone', '@log.Room', '@log.Timestamp.ToString("hh:mm tt")', '@log.VideoPath', '@computedRisk', @(isCurrentlyInside ? "true" : "false"), '@log.RfidValid', '@log.FaceVerified')">
                     
                     <div class="log-avatar-box">
                         <span class="avatar-initial">@initials</span>
@@ -114,7 +132,13 @@
                             <span class="log-name">@log.FullName</span>
                             <span class="log-time">@log.Timestamp.ToString("hh:mm tt")</span>
                         </div>
-                        <p class="log-sub">@log.Location • @log.Room</p>
+                        <p class="log-sub">
+                            @log.Location • @log.Room
+                            @if (isCurrentlyInside)
+                            {
+                                <span style="color: #2ecc71; font-weight: 600; margin-left: 6px;">● INSIDE</span>
+                            }
+                        </p>
                     </div>
                 </div>
             }
@@ -125,16 +149,20 @@
 
 <script>
 let currentVideoPath = "";
+let currentLogContext = null;
 
-function dockData(name, id, loc, img, dept, email, phone, room, time, videoPath) {
-    const emptyState = document.getElementById("emptyState");
-    const detailContent = document.getElementById("detailContent");
-    
-    emptyState.style.display = "none";
-    detailContent.style.display = "block";
+// =========================
+// MAIN LOG VIEW (SESSION-AWARE)
+// =========================
+function dockData(name, id, loc, img, dept, email, phone, room, time, videoPath, riskLevel, isInside, rfidValid, faceVerified) {
+    document.getElementById("emptyState").style.display = "none";
+    document.getElementById("detailContent").style.display = "block";
 
-    // Set Global Video Path for the action panel
     currentVideoPath = videoPath;
+
+    currentLogContext = {
+        name, id, loc, img, dept, email, phone, room, time, riskLevel, isInside, rfidValid, faceVerified
+    };
 
     document.getElementById("detName").innerText = name;
     document.getElementById("detId").innerText = id || "N/A";
@@ -150,71 +178,250 @@ function dockData(name, id, loc, img, dept, email, phone, room, time, videoPath)
 
     document.getElementById("statusText").innerText = "Viewing Detail: " + name;
 
-    // Security Logic: If Name contains "Unknown" or ID is missing, mark as Suspicious
-    let severity = "AUTHORIZED";
-    if (name.toLowerCase().includes("unknown") || !id || id === "0") {
-        severity = "SUSPICIOUS";
+    // =========================
+    // SESSION-AWARE STATUS
+    // =========================
+    const sessionBadge = document.getElementById("detSessionBadge");
+
+    if (isInside === true || isInside === "true" || isInside === "True") {
+        sessionBadge.style.display = "inline-block";
+        sessionBadge.innerHTML = '<i class="fa fa-circle me-1" style="color:#2ecc71;font-size:8px;"></i> Currently Inside (Active Session)';
+        sessionBadge.style.color = "#2ecc71";
+        sessionBadge.style.fontSize = "0.8rem";
+        sessionBadge.style.marginTop = "6px";
+    } else {
+        sessionBadge.style.display = "none";
     }
 
-    setStatus(severity, name);
+    // =========================
+    // SEVERITY FROM REAL DATA (NOT NAIVE NAME CHECK)
+    // =========================
+    setStatus(riskLevel, isInside, rfidValid, faceVerified);
 }
 
-function setStatus(status, personName) {
+// =========================
+// STATUS UI ENGINE (SESSION-AWARE)
+// =========================
+function setStatus(riskLevel, isInside, rfidValid, faceVerified) {
     const badge = document.getElementById("detStatus");
     const panel = document.getElementById("actionPanel");
     const container = document.getElementById("actionContainer");
 
-    panel.innerHTML = ""; 
+    panel.innerHTML = "";
     badge.className = "status-badge";
     container.className = "action-container-full";
 
-    if (status === "AUTHORIZED") {
-        badge.innerText = "ACCESS GRANTED";
+    // Normalize boolean strings
+    const inside = (isInside === true || isInside === "true" || isInside === "True");
+    const rfid = (rfidValid === "True" || rfidValid === true);
+    const face = (faceVerified === "True" || faceVerified === true);
+
+    // =========================
+    // AUTHORIZED (RFID + Face verified, or active session)
+    // =========================
+    if (riskLevel === "AUTHORIZED" || (inside && rfid)) {
+        badge.innerText = inside ? "ACCESS GRANTED — INSIDE" : "ACCESS GRANTED";
         badge.classList.add("authorized");
         container.classList.add("severity-low");
-        panel.innerHTML = `<button class="btn-sec btn-neutral"><i class="fa fa-print me-2"></i>Print Access Slip</button>`;
-    } 
-    else if (status === "SUSPICIOUS") {
+
+        panel.innerHTML = `
+            <button class="btn-sec btn-neutral" onclick="printSlip()">
+                <i class="fa fa-print me-2"></i>Print Access Slip
+            </button>
+            ${inside ? `
+            <button class="btn-sec btn-neutral" onclick="viewActiveSession()">
+                <i class="fa fa-eye me-2"></i>View Session
+            </button>` : ""}
+        `;
+    }
+
+    // =========================
+    // SUSPICIOUS (RFID valid but face NOT verified, or face mismatch)
+    // =========================
+    else if (riskLevel === "SUSPICIOUS") {
         badge.innerText = "SUSPICIOUS ACTIVITY";
         badge.classList.add("suspicious");
         container.classList.add("severity-med");
 
-        let videoBtn = currentVideoPath ? `<button class="btn-sec btn-warning" onclick="playLogVideo()"><i class="fa fa-video me-2"></i>Review Footage</button>` : "";
-
         panel.innerHTML = `
-            ${videoBtn}
-            <button class="btn-sec btn-neutral"><i class="fa fa-flag me-2"></i>Flag for Admin</button>
-            <button class="btn-sec btn-danger"><i class="fa fa-lock me-2"></i>Lockdown Room</button>
+            ${currentVideoPath ? `
+            <button class="btn-sec btn-warning" onclick="playLogVideo()">
+                <i class="fa fa-video me-2"></i>Review Footage
+            </button>` : ""}
+
+            <button class="btn-sec btn-neutral" onclick="flagForAdmin()">
+                <i class="fa fa-flag me-2"></i>Flag for Admin
+            </button>
+
+            <button class="btn-sec btn-warning" onclick="manualVerify()">
+                <i class="fa fa-user-check me-2"></i>Manual Verify
+            </button>
+
+            <button class="btn-sec btn-danger" onclick="lockdownRoom()">
+                <i class="fa fa-lock me-2"></i>Lockdown Room
+            </button>
         `;
     }
-    // NEW: Added the Unauthorized/Intrusion state
-    else if (status === "UNAUTHORIZED") {
+
+    // =========================
+    // UNAUTHORIZED (No RFID, no face — full intrusion)
+    // =========================
+    else if (riskLevel === "UNAUTHORIZED") {
         badge.innerText = "UNAUTHORIZED INTRUSION";
-        badge.classList.add("unauthorized"); // Ensure this class is in your CSS for Red color
+        badge.classList.add("unauthorized");
         container.classList.add("severity-high");
 
         panel.innerHTML = `
-            <button class="btn-sec btn-danger" onclick="triggerAlarm()"><i class="fa fa-shield-exclamation me-2"></i>TRIGGER ALARM</button>
-            <button class="btn-sec btn-dark"><i class="fa fa-user-slash me-2"></i>Blacklist Biometrics</button>
-            <button class="btn-sec btn-warning" onclick="playLogVideo()"><i class="fa fa-eye me-2"></i>Live Tracking</button>
+            <button class="btn-sec btn-danger" onclick="triggerAlarm()">
+                <i class="fa fa-bell me-2"></i>TRIGGER ALARM
+            </button>
+
+            <button class="btn-sec btn-dark" onclick="flagForAdmin()">
+                <i class="fa fa-user-slash me-2"></i>Escalate to Admin
+            </button>
+
+            <button class="btn-sec btn-warning" onclick="lockdownRoom()">
+                <i class="fa fa-lock me-2"></i>Lockdown Room
+            </button>
+
+            ${currentVideoPath ? `
+            <button class="btn-sec btn-neutral" onclick="playLogVideo()">
+                <i class="fa fa-eye me-2"></i>Review Footage
+            </button>` : ""}
+        `;
+    }
+
+    // =========================
+    // DEFAULT FALLBACK
+    // =========================
+    else {
+        badge.innerText = "PENDING REVIEW";
+        badge.classList.add("authorized");
+        container.classList.add("severity-low");
+
+        panel.innerHTML = `
+            <button class="btn-sec btn-neutral" onclick="printSlip()">
+                <i class="fa fa-print me-2"></i>Print Access Slip
+            </button>
         `;
     }
 }
 
+// =========================
+// BACKEND ACTION: FLAG ADMIN (ANTI-SPAM)
+// =========================
+function flagForAdmin() {
+    if (!currentLogContext) return;
+
+    fetch('/api/flag', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            name: currentLogContext.name,
+            room: currentLogContext.room,
+            time: currentLogContext.time
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.duplicate) {
+            alert("⚠️ Flag already raised for this person recently.");
+        } else {
+            alert("✅ Flag sent to admin.");
+        }
+    })
+    .catch(err => console.error(err));
+}
+
+// =========================
+// BACKEND ACTION: LOCKDOWN (ANTI-SPAM)
+// =========================
+function lockdownRoom() {
+    if (!currentLogContext) return;
+
+    if (!confirm(`🔒 Confirm room lockdown for ${currentLogContext.room}?`)) return;
+
+    fetch('/api/security/lockdown', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            room: currentLogContext.room
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.duplicate) {
+            alert("⚠️ Room lockdown already active.");
+        } else {
+            alert("🔒 Room lockdown triggered.");
+        }
+    })
+    .catch(err => console.error(err));
+}
+
+// =========================
+// BACKEND ACTION: ALARM (ANTI-SPAM)
+// =========================
+function triggerAlarm() {
+    if (!confirm("🚨 CONFIRM: Trigger emergency alarm?")) return;
+
+    fetch('/api/security/alarm', {
+        method: 'POST'
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.duplicate) {
+            alert("⚠️ Alarm already active.");
+        } else {
+            alert("🚨 Emergency alarm triggered!");
+        }
+    })
+    .catch(err => console.error(err));
+}
+
+// =========================
+// MANUAL VERIFY (NEW — Security decision)
+// =========================
+function manualVerify() {
+    if (!currentLogContext) return;
+
+    if (confirm(`✅ Manually verify ${currentLogContext.name} as authorized?`)) {
+        alert(`${currentLogContext.name} manually approved by security.`);
+        setStatus("AUTHORIZED", false, "True", "True");
+    }
+}
+
+// =========================
+// VIEW ACTIVE SESSION
+// =========================
+function viewActiveSession() {
+    if (!currentLogContext) return;
+    alert(`📋 Active session for ${currentLogContext.name}\nRoom: ${currentLogContext.room}\nTime: ${currentLogContext.time}`);
+}
+
+// =========================
+// UI ACTIONS
+// =========================
+function printSlip() {
+    alert("Printing access slip...");
+}
+
+// =========================
+// VIDEO
+// =========================
 function playLogVideo() {
     if (typeof openAlertModal === "function" && currentVideoPath) {
-        const videoData = {
+        openAlertModal({
             id: "LOG-" + Date.now(),
-            type: "Access Event: " + document.getElementById("detName").innerText,
+            type: "Access Event: " + currentLogContext.name,
             video: currentVideoPath,
-            room: document.getElementById("detRoom").innerText,
-            time: document.getElementById("detTime").innerText,
+            room: currentLogContext.room,
+            time: currentLogContext.time,
             status: "LOG REVIEW",
-            desc: "Visual verification of biometric access log."
-        };
-        openAlertModal(videoData, true);
+            desc: "Biometric access verification."
+        }, true);
     } else {
-        alert("Video evidence is currently unavailable for this log.");
+        alert("No video available.");
     }
 }
 </script>

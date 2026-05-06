@@ -23,12 +23,14 @@ namespace WebApp.Controllers
             filter = (filter ?? "all").ToLower();
             search = (search ?? "").Trim();
 
+            bool isAdmin = User.IsInRole("Admin");
+
             var logs = new List<LogEntry>();
 
             // =========================
             // USER LOGIN LOGS
             // =========================
-            if (filter == "all" || filter == "login")
+            if (isAdmin && (filter == "all" || filter == "login"))
             {
                 logs.AddRange(_context.Users
                     .Where(u => u.LastLogin != null)
@@ -121,6 +123,7 @@ namespace WebApp.Controllers
 
             ViewBag.Filter = filter;
             ViewBag.Search = search;
+            ViewBag.IsAdmin = isAdmin;
 
             return View(orderedLogs);
         }

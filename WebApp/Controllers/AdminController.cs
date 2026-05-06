@@ -12,7 +12,7 @@ using System.Collections.Generic;
 
 namespace WebApp.Controllers
 {
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,Security")]
     public class AdminController : Controller
     {
         private readonly AppDbContext _context;
@@ -27,24 +27,33 @@ namespace WebApp.Controllers
         // =========================
         public async Task<IActionResult> Index()
         {
-            var model = await BuildDashboardModel();
+            var model = await BuildDashboardModel(isAdmin: User.IsInRole("Admin"));
             ViewBag.Rooms = await _context.Rooms.ToListAsync();
+            ViewBag.IsAdmin = User.IsInRole("Admin");
             return View(model);
         }
 
         // =========================
         // ANALYTICS
         // =========================
-        public async Task<IActionResult> Analytics()
+        public async Task<IActionResult> Analytics(DateTime? startDate, DateTime? endDate, string? locationFilter, string? eventFilter)
         {
-            var model = await BuildDashboardModel();
+            bool isAdmin = User.IsInRole("Admin");
+            var model = await BuildDashboardModel(startDate, endDate, locationFilter, eventFilter, isAdmin);
+            
+            ViewBag.StartDate = startDate?.ToString("yyyy-MM-dd");
+            ViewBag.EndDate = endDate?.ToString("yyyy-MM-dd");
+            ViewBag.LocationFilter = locationFilter;
+            ViewBag.EventFilter = eventFilter;
+            ViewBag.IsAdmin = isAdmin;
+
             return View(model);
         }
 
         // =========================
         // CORE DASHBOARD BUILDER (SAFE - NO PARALLEL EF)
         // =========================
-        private async Task<AdminDashboardViewModel> BuildDashboardModel()
+        private async Task<AdminDashboardViewModel> BuildDashboardModel(DateTime? startDate = null, DateTime? endDate = null, string? locationFilter = null, string? eventFilter = null, bool isAdmin = true)
         {
             var now = DateTime.UtcNow;
 
@@ -72,19 +81,87 @@ namespace WebApp.Controllers
             // =========================
             // TIME SERIES DATA
             // =========================
-            var alertDates = await _context.Alerts
-                .Select(a => a.Timestamp)
-                .ToListAsync();
+            var alertQ = _context.Alerts.AsQueryable();
+            var accessQ = _context.AccessLogs.AsQueryable();
+            var motionQ = _context.DetectionLogs.AsQueryable();
 
-            var accessDates = await _context.AccessLogs
-                .Select(a => a.Timestamp)
-                .ToListAsync();
+            if (startDate.HasValue)
+            {
+                alertQ = alertQ.Where(x => x.Timestamp >= startDate.Value);
+                accessQ = accessQ.Where(x => x.Timestamp >= startDate.Value);
+                motionQ = motionQ.Where(x => x.Timestamp >= startDate.Value);
+            }
+            if (endDate.HasValue)
+            {
+                var end = endDate.Value.AddDays(1).AddTicks(-1);
+                alertQ = alertQ.Where(x => x.Timestamp <= end);
+                accessQ = accessQ.Where(x => x.Timestamp <= end);
+                motionQ = motionQ.Where(x => x.Timestamp <= end);
+            }
 
-            var motionDates = await _context.DetectionLogs
-                .Select(d => d.Timestamp)
-                .ToListAsync();
+            // Optional: location filter could apply if room matches (simplistic string match for demonstration)
+            if (!string.IsNullOrEmpty(locationFilter))
+            {
+                // In a real app, map location to RoomId. For now, we leave as is or apply if property exists.
+            }
+
+            var alertDates = await alertQ.Select(a => a.Timestamp).ToListAsync();
+            var accessDates = await accessQ.Select(a => a.Timestamp).ToListAsync();
+            var motionDates = await motionQ.Select(d => d.Timestamp).ToListAsync();
 
             var occupancy = await SafeLoadRoomOccupancy();
+
+            // =========================
+            // ACTIVE INTERVENTIONS (Unresolved Alerts)
+            // =========================
+            var activeInterventions = await _context.Alerts
+                .Where(a => a.Status != AlertStatus.Resolved)
+                .OrderByDescending(a => a.Timestamp)
+                .Take(15)
+                .ToListAsync();
+
+            // =========================
+            // ROLE-BASED AUDIT LOGS
+            // =========================
+            var auditLogs = new List<AuditLogViewModel>();
+            
+            // Add Alerts and Detections for both roles
+            var recentAlerts = await _context.Alerts
+                .OrderByDescending(a => a.Timestamp)
+                .Take(10)
+                .ToListAsync();
+                
+            var recentDetections = await _context.DetectionLogs
+                .OrderByDescending(a => a.Timestamp)
+                .Take(10)
+                .ToListAsync();
+                
+            var recentAccess = await _context.AccessLogs
+                .OrderByDescending(a => a.Timestamp)
+                .Take(10)
+                .ToListAsync();
+
+            auditLogs.AddRange(recentAlerts.Select(a => new AuditLogViewModel { Action = a.Type.ToString(), Description = $"Severity: {a.Severity} | {a.Status}", Timestamp = a.Timestamp }));
+            auditLogs.AddRange(recentDetections.Select(d => new AuditLogViewModel { Action = "Detection", Description = $"Detected: {d.DetectedCount} at {d.Confidence}%", Timestamp = d.Timestamp }));
+            auditLogs.AddRange(recentAccess.Select(a => new AuditLogViewModel { Action = a.AccessResult == "granted" ? "Access Granted" : "Access Denied", Description = $"RFID/Face check via Local Device", Timestamp = a.Timestamp }));
+
+            // Add Admin-only logs
+            if (isAdmin)
+            {
+                var recentLogins = await _context.Users
+                    .Where(u => u.LastLogin != null)
+                    .OrderByDescending(u => u.LastLogin)
+                    .Take(10)
+                    .ToListAsync();
+                    
+                auditLogs.AddRange(recentLogins.Select(u => new AuditLogViewModel { Action = "User Login", Description = $"{u.Username} signed in securely", Timestamp = u.LastLogin ?? DateTime.UtcNow }));
+            }
+
+            // Final sort and take top 15
+            var criticalAuditStream = auditLogs
+                .OrderByDescending(a => a.Timestamp)
+                .Take(15)
+                .ToList();
 
             // =========================
             // RETURN VIEW MODEL
@@ -100,6 +177,9 @@ namespace WebApp.Controllers
                 AccessWeekly = GroupByWeek(accessDates),
                 MotionWeekly = GroupByWeek(motionDates),
                 OccupancyWeekly = GroupByWeek(occupancy.Select(o => o.Timestamp)),
+
+                ActiveInterventions = activeInterventions,
+                AuditLogs = criticalAuditStream,
 
                 // Optional safety fallback (if your view uses labels)
                 Labels = new List<string>
@@ -150,6 +230,7 @@ namespace WebApp.Controllers
         // =========================
         // PERSONNEL
         // =========================
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Personnel(string? search)
         {
             var users = _context.Users.AsQueryable();
@@ -200,6 +281,7 @@ namespace WebApp.Controllers
         // =========================
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Add(User user)
         {
             if (!ModelState.IsValid)
@@ -222,6 +304,7 @@ namespace WebApp.Controllers
         // =========================
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(int id)
         {
             var user = await _context.Users.FindAsync(id);
@@ -240,12 +323,14 @@ namespace WebApp.Controllers
         // =========================
         private static SystemStatus systemStatus = new SystemStatus();
 
+        [Authorize(Roles = "Admin")]
         public IActionResult System()
         {
             return View(systemStatus);
         }
 
         [HttpPost]
+        [Authorize(Roles = "Admin")]
         public IActionResult UpdateSetting(string setting, bool value)
         {
             if (string.IsNullOrWhiteSpace(setting))

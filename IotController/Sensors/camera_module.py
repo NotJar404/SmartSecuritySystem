@@ -6,14 +6,19 @@ from flask import Flask, Response
 
 
 # =========================
-# CAMERA MODULE (UNIVERSAL)
+# CAMERA MODULE (AI-READY)
 # =========================
 class CameraModule:
     """
+    Universal Camera Module
     Supports:
-    - Laptop webcam (Windows/Linux)
-    - Raspberry Pi Camera Module
-    - USB external cameras
+    - Laptop webcam
+    - Raspberry Pi camera
+    - USB cameras
+
+    Now supports:
+    - AI overlay frames
+    - Safe multithreading
     """
 
     def __init__(self, camera_id=0, width=640, height=480, fps=30):
@@ -24,25 +29,25 @@ class CameraModule:
 
         self.cap = None
         self.frame = None
+        self.processed_frame = None  # NEW: for AI overlays
+
         self.lock = threading.Lock()
         self.running = False
 
     def initialize(self):
         """Initialize camera with fallback support"""
-
         try:
-            # =========================
-            # AUTO DETECTION MODE
-            # =========================
             system = platform.system().lower()
 
-            # Raspberry Pi usually uses /dev/video0 or libcamera
             if system == "linux":
-                print("Detected Linux system (likely Raspberry Pi)")
+                print("Detected Linux system (Raspberry Pi compatible)")
+            else:
+                print("Detected Desktop system (Laptop/Webcam mode)")
 
-            # Open camera (works for both Pi + laptop)
+            # Try primary camera
             self.cap = cv2.VideoCapture(self.camera_id)
 
+            # Fallback
             if not self.cap.isOpened():
                 print("Primary camera failed, trying fallback index 1...")
                 self.cap = cv2.VideoCapture(1)
@@ -50,10 +55,18 @@ class CameraModule:
             if not self.cap.isOpened():
                 raise Exception("Cannot open any camera device")
 
-            # Optimize camera settings
+            # Optimize settings
             self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
             self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
             self.cap.set(cv2.CAP_PROP_FPS, self.fps)
+
+            # =========================
+            # DISABLE AUTOFOCUS (CRITICAL FOR STABILITY)
+            # Autofocus causes 0.5-2s blur cycles that produce
+            # false face detections and occupancy flicker
+            # =========================
+            self.cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)
+            self.cap.set(cv2.CAP_PROP_FOCUS, 40)  # Fixed focus (adjust per camera)
 
             print("Camera initialized successfully")
             return True
@@ -68,11 +81,10 @@ class CameraModule:
             return
 
         self.running = True
-        thread = threading.Thread(target=self._loop, daemon=True)
-        thread.start()
+        threading.Thread(target=self._loop, daemon=True).start()
 
     def _loop(self):
-        """Continuous frame capture loop"""
+        """Continuous capture loop"""
         while self.running:
             try:
                 ret, frame = self.cap.read()
@@ -81,14 +93,30 @@ class CameraModule:
                     with self.lock:
                         self.frame = frame
 
+                        # Default processed frame = raw frame
+                        if self.processed_frame is None:
+                            self.processed_frame = frame
+
             except Exception as e:
                 print("Camera loop error:", e)
 
             time.sleep(0.01)
 
     def get_frame(self):
-        """Get latest frame safely"""
+        """Raw frame (for AI processing)"""
         with self.lock:
+            return None if self.frame is None else self.frame.copy()
+
+    def set_processed_frame(self, frame):
+        """Set AI-processed frame (with overlays)"""
+        with self.lock:
+            self.processed_frame = frame
+
+    def get_stream_frame(self):
+        """Frame used for streaming (processed if available)"""
+        with self.lock:
+            if self.processed_frame is not None:
+                return self.processed_frame.copy()
             return None if self.frame is None else self.frame.copy()
 
     def stop(self):
@@ -107,35 +135,27 @@ camera = CameraModule(camera_id=0)
 
 def generate_frames():
     """
-    MJPEG stream for ASP.NET <video> tag
-    Works for:
-    - Raspberry Pi stream
-    - Laptop webcam stream
-    - USB camera stream
+    MJPEG stream for ASP.NET
+    Shows AI overlays if available
     """
-
     while True:
-        frame = camera.get_frame()
+        frame = camera.get_stream_frame()
 
         if frame is None:
             continue
 
-        # Encode frame to JPEG
         success, buffer = cv2.imencode('.jpg', frame)
         if not success:
             continue
 
-        frame_bytes = buffer.tobytes()
-
         yield (
             b'--frame\r\n'
-            b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n'
+            b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n'
         )
 
 
 @app.route('/video')
 def video_feed():
-    """Streaming endpoint for ASP.NET"""
     return Response(
         generate_frames(),
         mimetype='multipart/x-mixed-replace; boundary=frame'
@@ -148,8 +168,8 @@ def video_feed():
 if __name__ == "__main__":
     print("===================================")
     print(" Smart Camera Stream Starting...")
-    print(" Supports: Laptop + Raspberry Pi")
-    print(" Stream URL: http://<IP>:5000/video")
+    print(" Hybrid Mode: Laptop + Raspberry Pi")
+    print(" Stream URL: http://localhost:5000/video")
     print("===================================")
 
     if not camera.initialize():
@@ -158,5 +178,5 @@ if __name__ == "__main__":
 
     camera.start()
 
-    # IMPORTANT: 0.0.0.0 allows network access (Raspberry Pi / LAN)
+    # Allow LAN access (important for ASP.NET)
     app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)

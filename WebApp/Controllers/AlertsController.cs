@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using WebApp.Data;
@@ -27,72 +27,56 @@ namespace WebApp.Controllers
             filter = (filter ?? "all").Trim().ToLower();
             search = (search ?? "").Trim();
 
-            IQueryable<Alert> query = _context.Alerts.AsNoTracking();
+            // BASE QUERY (DO NOT MATERIALIZE YET)
+            var query = _context.Alerts.AsNoTracking().AsQueryable();
+
+            // =========================
+            // TOTAL COUNTS (FAST DB COUNT)
+            // =========================
+            ViewBag.TotalAll = await query.CountAsync();
+            ViewBag.TotalNew = await query.CountAsync(a => a.Status == AlertStatus.New);
+            ViewBag.TotalAcknowledged = await query.CountAsync(a => a.Status == AlertStatus.Acknowledged);
+            ViewBag.TotalEscalated = await query.CountAsync(a => a.Status == AlertStatus.Escalated);
+            ViewBag.TotalResolved = await query.CountAsync(a => a.Status == AlertStatus.Resolved);
 
             // =========================
             // FILTER BY STATUS
             // =========================
-            switch (filter)
+            query = filter switch
             {
-                case "new":
-                    query = query.Where(a => a.Status == AlertStatus.New);
-                    break;
-
-                case "acknowledged":
-                    query = query.Where(a => a.Status == AlertStatus.Acknowledged);
-                    break;
-
-                case "escalated":
-                    query = query.Where(a => a.Status == AlertStatus.Escalated);
-                    break;
-
-                case "resolved":
-                    query = query.Where(a => a.Status == AlertStatus.Resolved);
-                    break;
-
-                default:
-                    break;
-            }
+                "new" => query.Where(a => a.Status == AlertStatus.New),
+                "acknowledged" => query.Where(a => a.Status == AlertStatus.Acknowledged),
+                "escalated" => query.Where(a => a.Status == AlertStatus.Escalated),
+                "resolved" => query.Where(a => a.Status == AlertStatus.Resolved),
+                _ => query
+            };
 
             // =========================
-            // SEARCH (SAFE + CASE INSENSITIVE)
+            // SEARCH (Postgres-safe ILIKE)
             // =========================
-            // =========================
-            // TOTAL COUNTS (BEFORE FILTERING — for filter button labels)
-            // =========================
-            var allAlerts = _context.Alerts.AsNoTracking();
-            ViewBag.TotalAll = await allAlerts.CountAsync();
-            ViewBag.TotalNew = await allAlerts.CountAsync(a => a.Status == AlertStatus.New);
-            ViewBag.TotalAcknowledged = await allAlerts.CountAsync(a => a.Status == AlertStatus.Acknowledged);
-            ViewBag.TotalEscalated = await allAlerts.CountAsync(a => a.Status == AlertStatus.Escalated);
-            ViewBag.TotalResolved = await allAlerts.CountAsync(a => a.Status == AlertStatus.Resolved);
-
             if (!string.IsNullOrWhiteSpace(search))
             {
-                var s = search.ToLower();
-
                 query = query.Where(a =>
-                    a.Type.ToString().ToLower().Contains(s) ||
-                    a.Status.ToString().ToLower().Contains(s) ||
-                    a.Severity.ToString().ToLower().Contains(s) ||
-                    (a.Description != null && a.Description.ToLower().Contains(s)) ||
-                    (a.RoomId.HasValue && a.RoomId.Value.ToString().Contains(s))
+                    EF.Functions.ILike(a.Type.ToString(), $"%{search}%") ||
+                    EF.Functions.ILike(a.Status.ToString(), $"%{search}%") ||
+                    EF.Functions.ILike(a.Severity.ToString(), $"%{search}%") ||
+                    (a.Description != null && EF.Functions.ILike(a.Description, $"%{search}%")) ||
+                    (a.RoomId.HasValue && a.RoomId.Value.ToString().Contains(search))
                 );
             }
 
             // =========================
             // SORTING
             // =========================
-            var data = await query
+            var finalData = await query
                 .OrderByDescending(a => a.Severity)
                 .ThenByDescending(a => a.Timestamp)
                 .ToListAsync();
 
-            // Pass back to view
             ViewBag.Filter = filter;
             ViewBag.Search = search;
 
-            return View(data);
+            return View(finalData);
         }
 
         // =========================
@@ -124,22 +108,74 @@ namespace WebApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Escalate(int id)
         {
-            var alert = await _context.Alerts.FindAsync(id);
-            if (alert == null) return NotFound();
+            // =========================
+            // LOAD ALERT WITH ROOM
+            // =========================
+            var alert = await _context.Alerts
+                .Include(a => a.Room)
+                .FirstOrDefaultAsync(a => a.AlertId == id);
 
+            if (alert == null)
+                return NotFound();
+
+            // =========================
+            // VALIDATION RULES
+            // =========================
             if (alert.Status == AlertStatus.Resolved)
                 return BadRequest("Resolved alerts cannot be escalated.");
 
             if (alert.Status == AlertStatus.Escalated)
                 return RedirectToAction(nameof(Index));
 
+            // =========================
+            // UPDATE ALERT STATE
+            // =========================
             alert.Status = AlertStatus.Escalated;
             alert.EscalatedAt = DateTime.UtcNow;
             alert.EscalatedBy = User.Identity?.Name ?? "Unknown";
 
-            // Force critical severity when escalated
+            // Force CRITICAL severity when escalated
             alert.Severity = SeverityLevel.CRITICAL;
 
+            // =========================
+            // SAFE ROOM NAME RESOLUTION
+            // =========================
+            var roomName = alert.Room?.RoomName ?? $"Room {alert.RoomId}";
+
+            // =========================
+            // SYSTEM-WIDE NOTIFICATION
+            // (VISIBLE TO ALL USERS)
+            // =========================
+            _context.Notifications.Add(new Notification
+            {
+                UserId = null, // system broadcast
+                AlertId = alert.AlertId,
+                Message = $"🚨 ALERT ESCALATED: Immediate attention required in {roomName}",
+                IsRead = false,
+                Timestamp = DateTime.UtcNow
+            });
+
+            // =========================
+            // ADMIN NOTIFICATION ONLY
+            // =========================
+            var admin = await _context.Users
+                .FirstOrDefaultAsync(u => u.Role == "Admin");
+
+            if (admin != null)
+            {
+                _context.Notifications.Add(new Notification
+                {
+                    UserId = admin.Id,
+                    AlertId = alert.AlertId,
+                    Message = $"⚠️ Escalated alert requires administrative attention in {roomName}.",
+                    IsRead = false,
+                    Timestamp = DateTime.UtcNow
+                });
+            }
+
+            // =========================
+            // SAVE CHANGES
+            // =========================
             await _context.SaveChangesAsync();
 
             return RedirectToAction(nameof(Index));

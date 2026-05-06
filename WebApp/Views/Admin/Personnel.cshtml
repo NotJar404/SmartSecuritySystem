@@ -61,9 +61,13 @@
         </div>
     </div>
 
-    <div class="row">
+    <!-- ============================================ -->
+    <!-- TABLES — STACKED VERTICALLY (FULL WIDTH)     -->
+    <!-- ============================================ -->
+    <div class="row personnel-tables">
 
-        <div class="col-xl-6 mb-3">
+        <!-- DASHBOARD OPERATORS TABLE -->
+        <div class="col-xl-12 mb-4">
             <div class="card">
 
                 <div class="card-header d-flex justify-content-between align-items-center">
@@ -74,7 +78,7 @@
                     </div>
                 </div>
 
-                <div style="max-height:380px; overflow-y:auto;">
+                <div style="max-height:420px; overflow-y:auto;">
                     <table class="table table-hover mb-0" id="staffTable">
 
                         <thead>
@@ -109,14 +113,11 @@
 
                                     <td class="text-right">
                                         <button class="btn btn-link btn-sm"
-                                                data-toggle="modal"
-                                                data-target="#userModal"
-                                                onclick='openEditModal(
+                                                onclick='openEditStaff(
                                                     @user.Id,
                                                     @Html.Raw(Json.Serialize(user.FullName)),
                                                     @Html.Raw(Json.Serialize(user.Username)),
-                                                    @Html.Raw(Json.Serialize(user.Email)),
-                                                    "staff","","")'>
+                                                    @Html.Raw(Json.Serialize(user.Email)))'>
                                             <i class="fas fa-edit"></i>
                                         </button>
 
@@ -143,7 +144,8 @@
             </div>
         </div>
 
-        <div class="col-xl-6 mb-3">
+        <!-- AUTHORIZED PERSONNEL TABLE -->
+        <div class="col-xl-12 mb-4">
             <div class="card">
 
                 <div class="card-header d-flex justify-content-between align-items-center">
@@ -154,7 +156,7 @@
                     </div>
                 </div>
 
-                <div style="max-height:380px; overflow-y:auto;">
+                <div style="max-height:420px; overflow-y:auto;">
                     <table class="table table-hover mb-0" id="memberTable">
 
                         <thead>
@@ -181,24 +183,22 @@
 
                                     <td class="text-right">
                                         <button class="btn btn-link btn-sm"
-                                                data-toggle="modal"
-                                                data-target="#userModal"
-                                                onclick='openEditModal(
+                                                onclick='openEditMember(
                                                     @m.Id,
                                                     @Html.Raw(Json.Serialize(m.FullName)),
-                                                    "",
                                                     @Html.Raw(Json.Serialize(m.Email)),
-                                                    "campus",
                                                     @Html.Raw(Json.Serialize(m.Department)),
-                                                    @Html.Raw(Json.Serialize(m.RfidTag)))'>
+                                                    @Html.Raw(Json.Serialize(m.RfidTag)),
+                                                    @Html.Raw(Json.Serialize(m.Phone)))'>
                                             <i class="fas fa-edit"></i>
                                         </button>
 
-                                        <form method="post" asp-action="DeleteMember" asp-controller="Personnel" style="display:inline;">
+                                        <form method="post" asp-action="DeleteMember" asp-controller="Personnel" style="display:inline;" id="deleteMember-@m.Id">
                                             @Html.AntiForgeryToken()
                                             <input type="hidden" name="id" value="@m.Id" />
-                                            <button type="submit"
-                                                    class="btn btn-link text-danger btn-sm">
+                                            <button type="button"
+                                                    class="btn btn-link text-danger btn-sm"
+                                                    onclick="SecureConfirm.confirmDelete('@m.FullName', function() { document.getElementById('deleteMember-@m.Id').submit(); })">
                                                 <i class="fas fa-trash"></i>
                                             </button>
                                         </form>
@@ -216,6 +216,9 @@
     </div>
 </div>
 
+<!-- ============================================ -->
+<!-- ADD MODAL (UNCHANGED STRUCTURE)              -->
+<!-- ============================================ -->
 <div class="modal fade" id="userModal" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" role="document">
 
@@ -224,6 +227,8 @@
             <form method="post" id="userForm">
                 @Html.AntiForgeryToken()
                 <input type="hidden" id="userId" name="Id" />
+                <input type="hidden" id="personIdField" name="personId" />
+                <input type="hidden" id="formMode" value="add" />
 
                 <div class="modal-header d-flex justify-content-between align-items-center">
 
@@ -287,7 +292,7 @@
                         </div>
                         <div class="form-group">
                             <label>Phone Number</label>
-                            <input id="phoneNumber" name="PhoneNumber" type="tel" class="form-control" />
+                            <input id="phoneNumber" name="Phone" type="tel" class="form-control" />
                         </div>
                     </div>
 
@@ -307,7 +312,9 @@
 
 @section Scripts {
 <script>
-// Search Functionality
+// =====================================================
+// SEARCH FUNCTIONALITY
+// =====================================================
 function liveSearch(tableId, inputId) {
     const input = document.getElementById(inputId);
     const filter = input.value.toUpperCase();
@@ -324,7 +331,9 @@ function liveSearch(tableId, inputId) {
     }
 }
 
-// Shortcut Filter Function
+// =====================================================
+// SHORTCUT FILTER
+// =====================================================
 function applyQuickFilter(tableId, term) {
     const searchInputId = tableId === 'staffTable' ? 'staffSearch' : 'memberSearch';
     const input = document.getElementById(searchInputId);
@@ -332,12 +341,18 @@ function applyQuickFilter(tableId, term) {
     liveSearch(tableId, searchInputId);
 }
 
+// =====================================================
+// ADD MODAL (NEW RECORD)
+// =====================================================
 function openAddModal() {
     document.getElementById("userForm").reset();
     document.getElementById("modalTitle").innerText = "Register Account";
     document.getElementById("userForm").action = "/Personnel/Add";
     document.getElementById("userId").value = "0";
+    document.getElementById("personIdField").value = "0";
+    document.getElementById("formMode").value = "add";
     document.getElementById("RegType").value = "staff";
+    document.getElementById("RegType").disabled = false;
     toggleFields();
     
     // Show modal
@@ -346,47 +361,89 @@ function openAddModal() {
     document.body.style.overflow = 'hidden';
 }
 
-function openEditModal(id, name, user, email, type, dept, rfid, phone, profileImage) {
+// =====================================================
+// EDIT STAFF (SYSTEM OPERATOR)
+// =====================================================
+function openEditStaff(id, name, user, email) {
     document.getElementById("userForm").reset();
-
+    document.getElementById("modalTitle").innerText = "Edit System Operator";
+    document.getElementById("userForm").action = "/Personnel/Edit";
     document.getElementById("userId").value = id;
+    document.getElementById("personIdField").value = "";
+    document.getElementById("formMode").value = "editStaff";
     document.getElementById("fullName").value = name;
     document.getElementById("email").value = email;
-    document.getElementById("RegType").value = type;
+    document.getElementById("RegType").value = "staff";
+    document.getElementById("RegType").disabled = true;
 
-    document.getElementById("userForm").action = "/Personnel/Edit";
-    document.getElementById("modalTitle").innerText = "Edit Personnel";
-
-    if (type === "staff") {
+    if (document.getElementById("username")) {
         document.getElementById("username").value = user || "";
-        document.getElementById("password").value = "";
-    } else {
+    }
+
+    toggleFields();
+
+    // Show modal
+    const modal = document.getElementById('userModal');
+    modal.classList.add('show');
+    document.body.style.overflow = 'hidden';
+}
+
+// =====================================================
+// EDIT MEMBER (AUTHORIZED PERSONNEL)
+// =====================================================
+function openEditMember(id, name, email, dept, rfid, phone) {
+    document.getElementById("userForm").reset();
+    document.getElementById("modalTitle").innerText = "Edit Authorized Personnel";
+    document.getElementById("userForm").action = "/Personnel/EditMember";
+    document.getElementById("userId").value = "";
+    document.getElementById("personIdField").value = id;
+    document.getElementById("formMode").value = "editMember";
+    document.getElementById("fullName").value = name;
+    document.getElementById("email").value = email || "";
+    document.getElementById("RegType").value = "campus";
+    document.getElementById("RegType").disabled = true;
+
+    if (document.getElementById("department")) {
         document.getElementById("department").value = dept || "";
+    }
+    if (document.getElementById("rfidTag")) {
         document.getElementById("rfidTag").value = rfid || "";
+    }
+    if (document.getElementById("phoneNumber")) {
         document.getElementById("phoneNumber").value = phone || "";
     }
 
     toggleFields();
-    
+
     // Show modal
     const modal = document.getElementById('userModal');
     modal.classList.add('show');
     document.body.style.overflow = 'hidden';
 }
 
+// =====================================================
+// TOGGLE FIELDS BASED ON TYPE
+// =====================================================
 function toggleFields() {
     const type = document.getElementById("RegType").value;
-    document.getElementById("staffFields").style.display = (type === "staff") ? "flex" : "none";
-    document.getElementById("campusFields").style.display = (type === "campus") ? "flex" : "none";
+    document.getElementById("staffFields").style.display = (type === "staff") ? "block" : "none";
+    document.getElementById("campusFields").style.display = (type === "campus") ? "block" : "none";
 }
 
+// =====================================================
+// CLOSE MODAL
+// =====================================================
 function closeModal() {
     const modal = document.getElementById('userModal');
     modal.classList.remove('show');
     document.body.style.overflow = 'auto';
+    // Re-enable RegType in case it was disabled
+    document.getElementById("RegType").disabled = false;
 }
 
-// Event Listeners for Closing
+// =====================================================
+// EVENT LISTENERS
+// =====================================================
 document.addEventListener('DOMContentLoaded', function() {
     const closeBtn = document.querySelector('#userModal .close');
     if (closeBtn) {

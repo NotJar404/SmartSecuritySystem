@@ -1,4 +1,4 @@
-﻿@using System.Linq
+@using System.Linq
 @model WebApp.Models.DashboardViewModel
 
 @{
@@ -150,12 +150,12 @@
 
             <div class="alerts-container-dashboard">
 
-                @if (Model.RecentEvents?.Any() == true)
+                @if (Model.RecentAlerts?.Any() == true)
                 {
-                    foreach (var item in Model.RecentEvents.Take(6))
+                    foreach (var item in Model.RecentAlerts.Take(6))
                     {
-                        var isCritical = item.TriggeredAlert && item.Confidence > 0.8f;
-                        var isWarning = item.TriggeredAlert && item.Confidence <= 0.8f;
+                        var isCritical = item.Severity == WebApp.Models.SeverityLevel.CRITICAL;
+                        var isWarning = item.Severity == WebApp.Models.SeverityLevel.WARNING;
                         var cardClass = "alert-card-dash";
                         cardClass += isCritical ? " critical" : isWarning ? " warning" : " info";
 
@@ -166,21 +166,42 @@
                             </div>
 
                             <div class="alert-content">
-                                <div class="alert-title">@item.DetectionType</div>
-                                <div class="alert-description">@item.Camera?.RoomName</div>
+                                <div class="alert-title">@item.Type</div>
+                                <div class="alert-description">Room @item.RoomId</div>
                                 <div class="alert-time">@item.Timestamp.ToString("HH:mm:ss")</div>
                             </div>
 
                             <div class="alert-actions-dash">
-                                @if (item.TriggeredAlert)
+                                @if (item.Status == WebApp.Models.AlertStatus.New)
                                 {
-                                    <form method="post" action="/Alerts/Acknowledge" style="display:inline;" id="ackDash-@item.DetectionId">
+                                    <form method="post" action="/Alerts/Acknowledge" style="display:inline;" id="ackDash-@item.AlertId">
                                         @Html.AntiForgeryToken()
-                                        <input type="hidden" name="id" value="@item.DetectionId" />
+                                        <input type="hidden" name="id" value="@item.AlertId" />
                                         <button type="button" class="btn-alert-secondary"
-                                                onclick="event.stopPropagation(); SecureConfirm.show({ title:'Acknowledge Alert', icon:'fas fa-check-circle', fields:[{label:'Type',value:'@item.DetectionType'},{label:'Action',value:'Mark as acknowledged'}], onConfirm:function(){document.getElementById('ackDash-@item.DetectionId').submit();} });">Acknowledge</button>
+                                                onclick="event.stopPropagation(); SecureConfirm.show({ title:'Acknowledge Alert', icon:'fas fa-check-circle', fields:[{label:'Type',value:'@item.Type'},{label:'Action',value:'Mark as acknowledged'}], onConfirm:function(){document.getElementById('ackDash-@item.AlertId').submit();} });">Acknowledge</button>
                                     </form>
                                 }
+                                
+                                @if (item.Status != WebApp.Models.AlertStatus.Resolved && item.Status != WebApp.Models.AlertStatus.New)
+                                {
+                                    <form method="post" action="/Alerts/Resolve" style="display:inline;" id="resDash-@item.AlertId">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@item.AlertId" />
+                                        <button type="button" class="btn-alert-secondary" style="background-color: #28a745; color: white;"
+                                                onclick="event.stopPropagation(); SecureConfirm.show({ title:'Resolve Alert', icon:'fas fa-check-double', fields:[{label:'Type',value:'@item.Type'}], onConfirm:function(){document.getElementById('resDash-@item.AlertId').submit();} });">Resolve</button>
+                                    </form>
+                                }
+
+                                @if (isCritical && item.Status != WebApp.Models.AlertStatus.Resolved && item.Status != WebApp.Models.AlertStatus.Escalated)
+                                {
+                                    <form method="post" action="/Alerts/Escalate" style="display:inline;" id="escDash-@item.AlertId">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@item.AlertId" />
+                                        <button type="button" class="btn-alert-secondary" style="background-color: #dc3545; color: white;"
+                                                onclick="event.stopPropagation(); SecureConfirm.show({ title:'Escalate Alert', icon:'fas fa-exclamation-triangle', isDelete:true, fields:[{label:'Type',value:'@item.Type'}], onConfirm:function(){document.getElementById('escDash-@item.AlertId').submit();} });">Escalate</button>
+                                    </form>
+                                }
+
                                 <a href="/Alerts/Index" class="btn-alert-primary">Details</a>
                             </div>
 

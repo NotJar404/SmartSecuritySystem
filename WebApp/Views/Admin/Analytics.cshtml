@@ -65,46 +65,48 @@
 
     <!-- FILTER PANEL -->
     <section class="panel filter-panel">
-        <div class="filter-header d-flex justify-content-between align-items-center">
-            <div class="filter-title d-flex">
-                <div class="filter-icon me-2"><i class="fa fa-filter"></i></div>
-                <div>
-                    <h5 class="mb-0">Report Filters</h5>
-                    <small>Customize your report criteria</small>
+        <form method="get" action="/Admin/Analytics">
+            <div class="filter-header d-flex justify-content-between align-items-center">
+                <div class="filter-title d-flex">
+                    <div class="filter-icon me-2"><i class="fa fa-filter"></i></div>
+                    <div>
+                        <h5 class="mb-0">Report Filters</h5>
+                        <small>Customize your report criteria</small>
+                    </div>
+                </div>
+                <button type="submit" class="btn">Apply Filter</button>
+            </div>
+
+            <div class="filter-grid">
+                <div class="filter-field">
+                    <label>Start Date</label>
+                    <input type="date" name="startDate" id="startDate" class="filter-input" value="@ViewBag.StartDate" />
+                </div>
+
+                <div class="filter-field">
+                    <label>End Date</label>
+                    <input type="date" name="endDate" id="endDate" class="filter-input" value="@ViewBag.EndDate" />
+                </div>
+
+                <div class="filter-field">
+                    <label>Room/Location</label>
+                    <select name="locationFilter" id="locationFilter" class="filter-input">
+                        <option value="">All Rooms</option>
+                        <option value="Lobby" selected="@(ViewBag.LocationFilter == "Lobby")">Lobby</option>
+                        <option value="Server Room A" selected="@(ViewBag.LocationFilter == "Server Room A")">Server Room A</option>
+                    </select>
+                </div>
+
+                <div class="filter-field">
+                    <label>Event Type</label>
+                    <select name="eventFilter" id="eventFilter" class="filter-input">
+                        <option value="">All Events</option>
+                        <option value="Alert" selected="@(ViewBag.EventFilter == "Alert")">Alert</option>
+                        <option value="Access" selected="@(ViewBag.EventFilter == "Access")">Access</option>
+                    </select>
                 </div>
             </div>
-            <button class="btn" onclick="applyFilters()">Apply Filter</button>
-        </div>
-
-        <div class="filter-grid">
-            <div class="filter-field">
-                <label>Start Date</label>
-                <input type="date" id="startDate" class="filter-input" />
-            </div>
-
-            <div class="filter-field">
-                <label>End Date</label>
-                <input type="date" id="endDate" class="filter-input" />
-            </div>
-
-            <div class="filter-field">
-                <label>Room/Location</label>
-                <select id="locationFilter" class="filter-input">
-                    <option value="">All Rooms</option>
-                    <option>Lobby</option>
-                    <option>Server Room A</option>
-                </select>
-            </div>
-
-            <div class="filter-field">
-                <label>Event Type</label>
-                <select id="eventFilter" class="filter-input">
-                    <option value="">All Events</option>
-                    <option>Alert</option>
-                    <option>Access</option>
-                </select>
-            </div>
-        </div>
+        </form>
     </section>
 
     <!-- CHARTS -->
@@ -155,30 +157,30 @@
     <div class="panel">
         <div class="panel-header">
             <h5>Active Intervention Queue</h5>
-            <small>Current alerts requiring attention</small>
+            <small>Current unresolved alerts requiring attention</small>
         </div>
         <div class="status-list-container">
-            <div class="status-item">
-                <span class="status-dot-indicator red"></span>
-                <div class="status-info">
-                    <p class="mb-0"><strong>Unauthorized Entry - Room 302</strong></p>
-                    <small class="text-muted">Security Team Dispatched (3 mins ago)</small>
-                </div>
-            </div>
-            <div class="status-item">
-                <span class="status-dot-indicator yellow"></span>
-                <div class="status-info">
-                    <p class="mb-0"><strong>Motion Detected - Server Room A</strong></p>
-                    <small class="text-muted">Verifying via Camera Feed...</small>
-                </div>
-            </div>
-            <div class="status-item">
-                <span class="status-dot-indicator green"></span>
-                <div class="status-info">
-                    <p class="mb-0"><strong>Door Forced - Lobby</strong></p>
-                    <small class="text-muted">Resolved - Maintenance issue identified</small>
-                </div>
-            </div>
+            @if (Model.ActiveInterventions != null && Model.ActiveInterventions.Any())
+            {
+                foreach (var alert in Model.ActiveInterventions)
+                {
+                    var isCritical = alert.Severity == WebApp.Models.SeverityLevel.CRITICAL;
+                    var isWarning = alert.Severity == WebApp.Models.SeverityLevel.WARNING;
+                    var dotClass = isCritical ? "red" : isWarning ? "yellow" : "green";
+
+                    <div class="status-item">
+                        <span class="status-dot-indicator @dotClass"></span>
+                        <div class="status-info">
+                            <p class="mb-0"><strong>@alert.Type - Room @alert.RoomId</strong></p>
+                            <small class="text-muted">Status: @alert.Status | @alert.Timestamp.ToString("g")</small>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <p class="text-muted small text-center mt-3">No active interventions queued.</p>
+            }
         </div>
     </div>
     
@@ -329,37 +331,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// FILTER
-function applyFilters() {
-    let start = startDate.value;
-    let end = endDate.value;
-    let loc = locationFilter.value;
-    let evt = eventFilter.value;
 
-    document.querySelectorAll("#logTable tbody tr").forEach(row => {
-        let date = row.cells[0].innerText;
-        let event = row.cells[1].innerText;
-        let location = row.cells[2].innerText;
-
-        let show = true;
-
-        if (start && date < start) show = false;
-        if (end && date > end) show = false;
-        if (loc && location !== loc) show = false;
-        if (evt && !event.includes(evt)) show = false;
-
-        row.style.display = show ? "" : "none";
-    });
-
-    updateStats();
-}
-
-function updateStats(){
-    let visible = document.querySelectorAll("#logTable tbody tr:not([style*='display: none'])").length;
-    statAlerts.innerText = visible;
-    statAccess.innerText = visible;
-    statDetections.innerText = visible;
-}
 
 // EXPORT PDF WITH FILTERS
 async function generateExportPDF(){

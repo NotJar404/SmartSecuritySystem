@@ -1,4 +1,4 @@
-﻿@{
+@{
     ViewData["Title"] = "Login";
     Layout = null;
 }
@@ -50,7 +50,9 @@
     <div class="right-panel">
         <div class="login-container">
 
-            <!-- LOGIN FORM -->
+            <!-- ========================= -->
+            <!-- LOGIN FORM                -->
+            <!-- ========================= -->
             <div id="loginForm">
                 <h2>Sign In</h2>
                 <p class="subtitle">Enter your credentials to access the system</p>
@@ -67,7 +69,7 @@
                     <div class="input-group">
                         <i class="fa fa-lock"></i>
                         <input type="password" id="password" name="password" placeholder="Enter your password" required />
-                        <i class="fa fa-eye right-icon" onclick="togglePassword()"></i>
+                        <i class="fa fa-eye right-icon" onclick="togglePassword(this)"></i>
                     </div>
 
                     <!-- Error message display (below password) -->
@@ -76,13 +78,18 @@
                         <p class="error">@ViewBag.LoginError</p>
                     }
 
+                    @if (ViewBag.LoginSuccess != null)
+                    {
+                        <p class="success">@ViewBag.LoginSuccess</p>
+                    }
+
                     <div class="options">
                         <label class="remember-me">
                             <input type="checkbox" name="rememberMe" />
                             <span>Remember me</span>
                         </label>
 
-                        <a href="#" onclick="showForgot()">Forgot password?</a>
+                        <a href="#" onclick="showForgotStep1()">Forgot password?</a>
                     </div>
 
                     <button type="submit">
@@ -92,39 +99,145 @@
 
             </div>
 
-            <!-- FORGOT PASSWORD FORM -->
+            <!-- ========================= -->
+            <!-- FORGOT PASSWORD FLOW      -->
+            <!-- ========================= -->
             <div id="forgotForm" style="display:none;">
-                <h2>Forgot Password</h2>
-                <p class="subtitle">
-                    Enter your email and we’ll send you a reset link
-                </p>
 
-                <form method="post" asp-action="ForgotPassword">
-
-                    <label>Email</label>
-                    <div class="input-group">
-                        <i class="fa fa-envelope"></i>
-                        <input type="email" name="email" placeholder="Enter your email" required />
-                    </div>
-
-                    <button type="submit">
-                        <i class="fa fa-paper-plane"></i> Send Reset Link
-                    </button>
-                </form>
-
-                <div class="options" style="margin-top:15px;">
-                    <a href="#" onclick="showLogin()">← Back to Login</a>
+                <!-- Step Indicator -->
+                <div class="step-indicator" id="stepIndicator">
+                    <div class="step-dot active" id="stepDot1">1</div>
+                    <div class="step-line" id="stepLine1"></div>
+                    <div class="step-dot" id="stepDot2">2</div>
+                    <div class="step-line" id="stepLine2"></div>
+                    <div class="step-dot" id="stepDot3">3</div>
                 </div>
 
-                @if (ViewBag.Message != null)
-                {
-                    <p style="color:lightgreen">@ViewBag.Message</p>
-                }
+                <!-- ====== STEP 1: Email Entry ====== -->
+                <div id="forgotStep1" class="forgot-step">
+                    <h2>Forgot Password</h2>
+                    <p class="subtitle">
+                        Enter your registered email and we'll send you a verification code
+                    </p>
 
-                @if (ViewBag.Error != null)
-                {
-                    <p class="error">@ViewBag.Error</p>
-                }
+                    <form method="post" asp-action="ForgotPassword">
+
+                        <label>Email Address</label>
+                        <div class="input-group">
+                            <i class="fa fa-envelope"></i>
+                            <input type="email" name="email" placeholder="Enter your email" required />
+                        </div>
+
+                        @if (ViewBag.ForgotError != null)
+                        {
+                            <p class="error">@ViewBag.ForgotError</p>
+                        }
+
+                        @if (ViewBag.ForgotMessage != null && ViewBag.ShowOtp == null)
+                        {
+                            <p class="success">@ViewBag.ForgotMessage</p>
+                        }
+
+                        <button type="submit">
+                            <i class="fa fa-paper-plane"></i> Send Verification Code
+                        </button>
+                    </form>
+
+                    <div class="options" style="margin-top:15px;">
+                        <a href="#" onclick="showLogin()">← Back to Login</a>
+                    </div>
+                </div>
+
+                <!-- ====== STEP 2: OTP Verification ====== -->
+                <div id="forgotStep2" class="forgot-step" style="display:none;">
+                    <h2>Verify Code</h2>
+                    <p class="subtitle">
+                        Enter the 6-digit code sent to your email
+                    </p>
+
+                    <form method="post" asp-action="VerifyOtp" id="otpForm">
+
+                        <input type="hidden" name="otpCode" id="otpHidden" />
+
+                        <div class="otp-container">
+                            <input type="text" class="otp-input" maxlength="1" data-index="0" inputmode="numeric" pattern="[0-9]" autocomplete="off" />
+                            <input type="text" class="otp-input" maxlength="1" data-index="1" inputmode="numeric" pattern="[0-9]" autocomplete="off" />
+                            <input type="text" class="otp-input" maxlength="1" data-index="2" inputmode="numeric" pattern="[0-9]" autocomplete="off" />
+                            <input type="text" class="otp-input" maxlength="1" data-index="3" inputmode="numeric" pattern="[0-9]" autocomplete="off" />
+                            <input type="text" class="otp-input" maxlength="1" data-index="4" inputmode="numeric" pattern="[0-9]" autocomplete="off" />
+                            <input type="text" class="otp-input" maxlength="1" data-index="5" inputmode="numeric" pattern="[0-9]" autocomplete="off" />
+                        </div>
+
+                        <div class="otp-timer" id="otpTimer">
+                            <i class="fa fa-clock"></i> Code expires in <span id="timerCountdown">5:00</span>
+                        </div>
+
+                        @if (ViewBag.OtpError != null)
+                        {
+                            <p class="error">@ViewBag.OtpError</p>
+                        }
+
+                        <button type="submit" id="verifyOtpBtn" disabled>
+                            <i class="fa fa-check-circle"></i> Verify Code
+                        </button>
+                    </form>
+
+                    <div class="options" style="margin-top:15px;">
+                        <a href="#" onclick="showForgotStep1()">← Request new code</a>
+                    </div>
+                </div>
+
+                <!-- ====== STEP 3: Reset Password ====== -->
+                <div id="forgotStep3" class="forgot-step" style="display:none;">
+                    <h2>Reset Password</h2>
+                    <p class="subtitle">
+                        Create a strong new password for your account
+                    </p>
+
+                    <form method="post" asp-action="ResetPassword" id="resetForm">
+
+                        <input type="hidden" name="resetEmail" value="@(ViewBag.ResetEmail ?? "")" />
+
+                        <label>New Password</label>
+                        <div class="input-group">
+                            <i class="fa fa-lock"></i>
+                            <input type="password" id="newPassword" name="newPassword" placeholder="Enter new password" required minlength="8" />
+                            <i class="fa fa-eye right-icon" onclick="toggleField('newPassword', this)"></i>
+                        </div>
+
+                        <label>Confirm Password</label>
+                        <div class="input-group">
+                            <i class="fa fa-lock"></i>
+                            <input type="password" id="confirmPassword" name="confirmPassword" placeholder="Confirm new password" required minlength="8" />
+                            <i class="fa fa-eye right-icon" onclick="toggleField('confirmPassword', this)"></i>
+                        </div>
+
+                        <!-- Password Requirements -->
+                        <div class="password-requirements" id="passwordReqs">
+                            <p class="req-title"><i class="fa fa-shield-halved"></i> Password Requirements</p>
+                            <div class="req-item" id="reqLength"><i class="fa fa-circle"></i> At least 8 characters</div>
+                            <div class="req-item" id="reqUpper"><i class="fa fa-circle"></i> One uppercase letter</div>
+                            <div class="req-item" id="reqLower"><i class="fa fa-circle"></i> One lowercase letter</div>
+                            <div class="req-item" id="reqDigit"><i class="fa fa-circle"></i> One number</div>
+                            <div class="req-item" id="reqSpecial"><i class="fa fa-circle"></i> One special character (!@@#$%&*)</div>
+                            <div class="req-item" id="reqMatch"><i class="fa fa-circle"></i> Passwords match</div>
+                        </div>
+
+                        @if (ViewBag.ResetError != null)
+                        {
+                            <p class="error">@ViewBag.ResetError</p>
+                        }
+
+                        <button type="submit" id="resetBtn" disabled>
+                            <i class="fa fa-key"></i> Reset Password
+                        </button>
+                    </form>
+
+                    <div class="options" style="margin-top:15px;">
+                        <a href="#" onclick="showLogin()">← Back to Login</a>
+                    </div>
+                </div>
+
             </div>
 
         </div>
@@ -133,26 +246,269 @@
 </div>
 
 <script>
-    function togglePassword() {
+    // =========================
+    // TOGGLE PASSWORD VISIBILITY
+    // =========================
+    function togglePassword(icon) {
         const input = document.getElementById("password");
-        input.type = input.type === "password" ? "text" : "password";
+        if (!input) return;
+        
+        try {
+            if (input.type === "password") {
+                input.type = "text";
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = "password";
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        } catch (error) {
+            console.error('Password toggle error:', error);
+        }
     }
 
-    function showForgot() {
-        document.getElementById("loginForm").style.display = "none";
-        document.getElementById("forgotForm").style.display = "block";
+    function toggleField(fieldId, icon) {
+        const input = document.getElementById(fieldId);
+        if (!input || !icon) return;
+        
+        try {
+            if (input.type === "password") {
+                input.type = "text";
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = "password";
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        } catch (error) {
+            console.error('Field toggle error:', error);
+        }
     }
+    
+    // Initialize password toggle on page load
+    window.addEventListener('DOMContentLoaded', function() {
+        // Ensure password field eye icons are properly initialized
+        const passwordIcon = document.querySelector('#password + .right-icon');
+        if (passwordIcon && !passwordIcon.classList.contains('fa-eye')) {
+            passwordIcon.classList.add('fa-eye');
+        }
+        
+        const newPasswordIcon = document.querySelector('#newPassword + .right-icon');
+        if (newPasswordIcon && !newPasswordIcon.classList.contains('fa-eye')) {
+            newPasswordIcon.classList.add('fa-eye');
+        }
+        
+        const confirmPasswordIcon = document.querySelector('#confirmPassword + .right-icon');
+        if (confirmPasswordIcon && !confirmPasswordIcon.classList.contains('fa-eye')) {
+            confirmPasswordIcon.classList.add('fa-eye');
+        }
+    });
 
+    // =========================
+    // VIEW SWITCHING
+    // =========================
     function showLogin() {
         document.getElementById("loginForm").style.display = "block";
         document.getElementById("forgotForm").style.display = "none";
     }
 
-    // Optional: auto-switch if coming from ForgotPassword with message/error
+    function showForgotStep1() {
+        document.getElementById("loginForm").style.display = "none";
+        document.getElementById("forgotForm").style.display = "block";
+        showStep(1);
+    }
+
+    function showStep(step) {
+        // Hide all steps
+        document.querySelectorAll('.forgot-step').forEach(el => el.style.display = 'none');
+
+        // Show target step
+        const stepEl = document.getElementById('forgotStep' + step);
+        if (stepEl) {
+            stepEl.style.display = 'block';
+            stepEl.style.animation = 'fadeInStep 0.3s ease';
+        }
+
+        // Update step dots
+        for (let i = 1; i <= 3; i++) {
+            const dot = document.getElementById('stepDot' + i);
+            const line = document.getElementById('stepLine' + (i - 1));
+            if (dot) {
+                dot.classList.remove('active', 'completed');
+                if (i < step) dot.classList.add('completed');
+                else if (i === step) dot.classList.add('active');
+            }
+            if (line) {
+                line.classList.toggle('completed', i < step);
+            }
+        }
+    }
+
+    // =========================
+    // OTP INPUT HANDLING
+    // =========================
+    function initOtpInputs() {
+        const inputs = document.querySelectorAll('.otp-input');
+        const verifyBtn = document.getElementById('verifyOtpBtn');
+        const hiddenInput = document.getElementById('otpHidden');
+
+        inputs.forEach((input, index) => {
+            input.addEventListener('input', function (e) {
+                // Only allow digits
+                this.value = this.value.replace(/[^0-9]/g, '');
+
+                if (this.value && index < inputs.length - 1) {
+                    inputs[index + 1].focus();
+                }
+
+                // Update hidden field and button state
+                updateOtpValue();
+            });
+
+            input.addEventListener('keydown', function (e) {
+                if (e.key === 'Backspace' && !this.value && index > 0) {
+                    inputs[index - 1].focus();
+                    inputs[index - 1].value = '';
+                    updateOtpValue();
+                }
+            });
+
+            input.addEventListener('paste', function (e) {
+                e.preventDefault();
+                const pastedData = (e.clipboardData || window.clipboardData).getData('text').replace(/[^0-9]/g, '');
+                if (pastedData.length >= 6) {
+                    for (let i = 0; i < 6; i++) {
+                        inputs[i].value = pastedData[i] || '';
+                    }
+                    inputs[5].focus();
+                    updateOtpValue();
+                }
+            });
+        });
+
+        function updateOtpValue() {
+            let code = '';
+            inputs.forEach(inp => code += inp.value);
+            hiddenInput.value = code;
+            verifyBtn.disabled = code.length !== 6;
+        }
+    }
+
+    // =========================
+    // OTP COUNTDOWN TIMER
+    // =========================
+    function startOtpTimer() {
+        let timeLeft = 300; // 5 minutes
+        const timerDisplay = document.getElementById('timerCountdown');
+        const timerContainer = document.getElementById('otpTimer');
+
+        if (!timerDisplay) return;
+
+        const interval = setInterval(function () {
+            timeLeft--;
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            timerDisplay.textContent = minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
+
+            if (timeLeft <= 60) {
+                timerContainer.style.color = 'var(--alert)';
+            }
+
+            if (timeLeft <= 0) {
+                clearInterval(interval);
+                timerDisplay.textContent = 'Expired';
+                timerContainer.style.color = 'var(--alert)';
+                document.getElementById('verifyOtpBtn').disabled = true;
+            }
+        }, 1000);
+    }
+
+    // =========================
+    // PASSWORD VALIDATION
+    // =========================
+    function initPasswordValidation() {
+        const newPwd = document.getElementById('newPassword');
+        const confirmPwd = document.getElementById('confirmPassword');
+        const resetBtn = document.getElementById('resetBtn');
+
+        if (!newPwd || !confirmPwd) return;
+
+        function validate() {
+            const pwd = newPwd.value;
+            const confirm = confirmPwd.value;
+
+            const checks = {
+                reqLength: pwd.length >= 8,
+                reqUpper: /[A-Z]/.test(pwd),
+                reqLower: /[a-z]/.test(pwd),
+                reqDigit: /[0-9]/.test(pwd),
+                reqSpecial: /[^A-Za-z0-9\s]/.test(pwd),
+                reqMatch: pwd.length > 0 && pwd === confirm
+            };
+
+            let allPassed = true;
+            for (const [id, passed] of Object.entries(checks)) {
+                const el = document.getElementById(id);
+                if (el) {
+                    const icon = el.querySelector('i');
+                    if (passed) {
+                        el.classList.add('met');
+                        el.classList.remove('unmet');
+                        if (icon) icon.className = 'fa fa-check-circle';
+                    } else {
+                        el.classList.remove('met');
+                        el.classList.add('unmet');
+                        if (icon) icon.className = 'fa fa-circle';
+                        allPassed = false;
+                    }
+                }
+            }
+
+            resetBtn.disabled = !allPassed;
+        }
+
+        newPwd.addEventListener('input', validate);
+        confirmPwd.addEventListener('input', validate);
+    }
+
+    // =========================
+    // AUTO-SWITCH ON LOAD
+    // =========================
     window.onload = function () {
-        const hasMessage = '@ViewBag.Message';
-        if (hasMessage) {
-            showForgot();
+        initOtpInputs();
+        initPasswordValidation();
+
+        // Server returned ShowOtp flag — show Step 2
+        var showOtp = '@(ViewBag.ShowOtp ?? "")';
+        if (showOtp === 'True') {
+            document.getElementById("loginForm").style.display = "none";
+            document.getElementById("forgotForm").style.display = "block";
+            showStep(2);
+            startOtpTimer();
+            // Focus first OTP input
+            var firstOtp = document.querySelector('.otp-input');
+            if (firstOtp) firstOtp.focus();
+            return;
+        }
+
+        // Server returned ShowResetFields flag — show Step 3
+        var showReset = '@(ViewBag.ShowResetFields ?? "")';
+        if (showReset === 'True') {
+            document.getElementById("loginForm").style.display = "none";
+            document.getElementById("forgotForm").style.display = "block";
+            showStep(3);
+            return;
+        }
+
+        // Server returned ShowForgot — show Step 1
+        var showForgot = '@(ViewBag.ShowForgot ?? "")';
+        if (showForgot === 'True') {
+            document.getElementById("loginForm").style.display = "none";
+            document.getElementById("forgotForm").style.display = "block";
+            showStep(1);
+            return;
         }
     }
 </script>

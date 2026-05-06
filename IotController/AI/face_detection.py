@@ -2,34 +2,76 @@ import cv2
 import numpy as np
 
 class FaceDetector:
-    """Lightweight face detector optimized for Raspberry Pi + live stream"""
+    """
+    Lightweight face detector optimized for:
+    - Laptop webcam testing
+    - Raspberry Pi camera module
+    - Real-time occupancy detection
+    """
 
     def __init__(self):
+
         cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
         self.face_cascade = cv2.CascadeClassifier(cascade_path)
 
-        # Tuned for better stability
+        # =========================
+        # TUNING PARAMETERS
+        # =========================
         self.min_face_size = (40, 40)
         self.scale_factor = 1.1
-        self.min_neighbors = 6
+        self.min_neighbors = 7  # slightly stricter → fewer false positives
+
+        # OPTIONAL PERFORMANCE MODE (Pi friendly)
+        self.use_resize = True
+        self.resize_width = 320
+        self.resize_height = 240
+
+        # =========================
+        # BLUR REJECTION (AUTOFOCUS STABILITY)
+        # Frames below this Laplacian variance are too blurry
+        # for reliable face detection — skip entirely
+        # =========================
+        self.blur_threshold = 50.0
+        self.last_blur_score = 0
 
     # =========================
     # FACE DETECTION CORE
     # =========================
     def detect_faces(self, frame):
         """
-        Detect faces and extract ROI
-
-        Returns:
-            faces: list of bounding boxes
-            face_images: cropped face regions
+        Detect faces and return bounding boxes + cropped faces.
+        Rejects blurry frames to prevent autofocus-induced false detections.
         """
 
         if frame is None:
             return [], []
 
         try:
+            original_frame = frame
+
+            # =========================
+            # BLUR CHECK (MUST COME FIRST)
+            # Reject frames during autofocus cycling
+            # =========================
+            gray_check = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            self.last_blur_score = cv2.Laplacian(gray_check, cv2.CV_64F).var()
+
+            if self.last_blur_score < self.blur_threshold:
+                # Frame is too blurry — do not attempt detection
+                return [], []
+
+            # =========================
+            # PERFORMANCE OPTIMIZATION
+            # =========================
+            if self.use_resize:
+                frame = cv2.resize(frame, (self.resize_width, self.resize_height))
+
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+            # =========================
+            # IMPROVE LIGHTING ROBUSTNESS
+            # =========================
+            gray = cv2.equalizeHist(gray)
 
             faces = self.face_cascade.detectMultiScale(
                 gray,
@@ -40,14 +82,26 @@ class FaceDetector:
 
             face_images = []
 
+            # =========================
+            # PROCESS DETECTED FACES
+            # =========================
             for (x, y, w, h) in faces:
-                # Safety crop check
+
                 if w <= 0 or h <= 0:
                     continue
 
-                face = frame[y:y+h, x:x+w]
+                # SCALE BACK IF RESIZED
+                if self.use_resize:
+                    scale_x = original_frame.shape[1] / self.resize_width
+                    scale_y = original_frame.shape[0] / self.resize_height
 
-                # skip too small or corrupted ROI
+                    x = int(x * scale_x)
+                    y = int(y * scale_y)
+                    w = int(w * scale_x)
+                    h = int(h * scale_y)
+
+                face = original_frame[y:y+h, x:x+w]
+
                 if face.size == 0:
                     continue
 
@@ -56,14 +110,13 @@ class FaceDetector:
             return list(faces), face_images
 
         except Exception as e:
-            print("Face detection error:", e)
+            print("[FACE DETECTION ERROR]", e)
             return [], []
 
     # =========================
-    # DRAW OVERLAY (UI DEBUG)
+    # DRAW OVERLAY (DEBUG / UI)
     # =========================
     def draw_detections(self, frame, faces):
-        """Draw bounding boxes for visualization"""
 
         if frame is None:
             return None

@@ -25,7 +25,7 @@
 
             <div class="control-card">
                 <div class="card-title-area">
-                    <h5><i class="fa fa-desktop me-2"></i>Global Settings</h5>
+                    <h5><i class="fa fa-desktop me-3"></i>Global Settings</h5>
                     <span class="status-indicator-dot online"></span>
                 </div>
                 
@@ -64,7 +64,10 @@
             </div>
 
             <div class="control-card">
-                <h5><i class="fa fa-brain me-2"></i>AI Intelligence</h5>
+                <div class="card-title-area">
+                    <h5><i class="fa fa-brain me-3"></i>AI Intelligence</h5>
+                    <span class="status-indicator-dot online"></span>
+                </div>
                 <div class="setting-row">
                     <label>Motion Sensitivity</label>
                     <select class="warm-select">
@@ -87,7 +90,10 @@
             </div>
 
             <div class="control-card">
-                <h5><i class="fa fa-bell me-2"></i>Alert Protocols</h5>
+                <div class="card-title-area">
+                    <h5><i class="fa fa-bell me-3"></i>Alert Protocols</h5>
+                    <span class="status-indicator-dot online"></span>
+                </div>
                 <div class="setting-row">
                     <div class="label-desc">
                         <label>Email Reports</label>
@@ -111,7 +117,10 @@
             </div>
 
             <div class="control-card">
-                <h5><i class="fa fa-shield-alt me-2"></i>Access Control</h5>
+                <div class="card-title-area">
+                    <h5><i class="fa fa-shield-alt me-3"></i>Access Control</h5>
+                    <span class="status-indicator-dot online"></span>
+                </div>
                 <div class="setting-row">
                     <label>Gate Hold-Open</label>
                     <div class="input-group-custom">
@@ -132,7 +141,10 @@
             </div>
 
             <div class="control-card">
-                <h5><i class="fa fa-microchip me-2"></i>Pi Maintenance</h5>
+                <div class="card-title-area">
+                    <h5><i class="fa fa-microchip me-3"></i>Pi Maintenance</h5>
+                    <span class="status-indicator-dot online"></span>
+                </div>
                 
                 <div class="storage-display mb-3">
                     <div class="d-flex justify-content-between mb-1">
@@ -155,7 +167,7 @@
 
             <div class="system-card control-card">
                 <div class="card-title-area">
-                    <h5><i class="fa fa-exclamation-triangle text-danger me-2"></i>Emergency Alarm</h5>
+                    <h5><i class="fa fa-exclamation-triangle text-danger me-3"></i>Emergency Alarm</h5>
                 </div>
 
                 <div class="alarm-list mt-3">
@@ -193,11 +205,14 @@
 
         </div>
 
-        <div class="mt-5 border-top pt-4 text-center">
-            <button class="btn btn-warm-dark px-5 py-3 shadow-lg rounded-pill" onclick="saveGlobalSettings()">
-                <i class="fa fa-cloud-upload-alt me-2"></i>Deploy Changes to Raspberry Pi
+        <div class="control-card d-flex flex-row justify-content-between align-items-center mt-5" style="margin-top: 30px !important; padding: 24px; border-left: 4px solid var(--accent-dark);">
+            <div>
+                <h5 class="mb-2" style="font-weight: 800;"><i class="fa fa-server me-3"></i>System Deployment</h5>
+                <p class="text-muted extra-small mb-0">Changes will be pushed via SQL bridge to the AI engine on the Raspberry Pi.</p>
+            </div>
+            <button class="btn btn-warm-dark px-4 py-2 shadow-sm" onclick="saveGlobalSettings()" style="min-width: 200px;">
+                <i class="fa fa-cloud-upload-alt me-2"></i>Deploy Changes
             </button>
-            <p class="text-muted extra-small mt-2">Changes will be pushed via SQL bridge to the AI engine.</p>
         </div>
 
     </div>

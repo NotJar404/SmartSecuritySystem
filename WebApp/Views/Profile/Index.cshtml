@@ -70,15 +70,24 @@
                     <div class="pass-inputs">
                         <div class="field-group">
                             <label>Current Password</label>
-                            <input type="password" name="CurrentPassword" class="system-input" required />
+                            <div class="input-group-pwd">
+                                <input type="password" id="currentPass" name="CurrentPassword" class="system-input" required />
+                                <i class="fa fa-eye toggle-pwd-icon" onclick="togglePasswordField('currentPass', this)"></i>
+                            </div>
                         </div>
                         <div class="field-group">
                             <label>New Password</label>
-                            <input type="password" id="newPass" name="NewPassword" class="system-input" required />
+                            <div class="input-group-pwd">
+                                <input type="password" id="newPass" name="NewPassword" class="system-input" required />
+                                <i class="fa fa-eye toggle-pwd-icon" onclick="togglePasswordField('newPass', this)"></i>
+                            </div>
                         </div>
                         <div class="field-group">
                             <label>Confirm Password</label>
-                            <input type="password" name="ConfirmPassword" class="system-input" required />
+                            <div class="input-group-pwd">
+                                <input type="password" id="confirmPass" name="ConfirmPassword" class="system-input" required />
+                                <i class="fa fa-eye toggle-pwd-icon" onclick="togglePasswordField('confirmPass', this)"></i>
+                            </div>
                         </div>
                     </div>
 
@@ -129,27 +138,67 @@
 </div>
 
 <script>
+    // =========================
+    // TOGGLE PASSWORD VISIBILITY
+    // =========================
+    function togglePasswordField(fieldId, icon) {
+        const input = document.getElementById(fieldId);
+        if (!input || !icon) return;
+        
+        try {
+            if (input.type === "password") {
+                input.type = "text";
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = "password";
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        } catch (error) {
+            console.error('Password toggle error:', error);
+        }
+    }
+
+    // Initialize password icons on page load
+    window.addEventListener('DOMContentLoaded', function() {
+        const passwordIcons = document.querySelectorAll('.toggle-pwd-icon');
+        passwordIcons.forEach(icon => {
+            if (!icon.classList.contains('fa-eye') && !icon.classList.contains('fa-eye-slash')) {
+                icon.classList.add('fa-eye');
+            }
+        });
+    });
+
+    // =========================
+    // PASSWORD VALIDATION
+    // =========================
     const newPass = document.getElementById('newPass');
     const updateBtn = document.getElementById('btnUpdate');
 
-    newPass.addEventListener('input', () => {
-        const val = newPass.value;
-        const requirements = {
-            'rule-len': val.length >= 8,
-            'rule-up': /[A-Z]/.test(val),
-            'rule-num': /[0-9]/.test(val),
-            'rule-spec': /[!@@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(val)
-        };
+    if (newPass) {
+        newPass.addEventListener('input', () => {
+            const val = newPass.value;
+            const requirements = {
+                'rule-len': val.length >= 8,
+                'rule-up': /[A-Z]/.test(val),
+                'rule-num': /[0-9]/.test(val),
+                'rule-spec': /[!@@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(val)
+            };
 
-        let passedCount = 0;
-        for (const [id, passed] of Object.entries(requirements)) {
-            const el = document.getElementById(id);
-            if (passed) { el.classList.add('valid'); passedCount++; }
-            else { el.classList.remove('valid'); }
-        }
-        updateBtn.disabled = passedCount < 4;
-    });
+            let passedCount = 0;
+            for (const [id, passed] of Object.entries(requirements)) {
+                const el = document.getElementById(id);
+                if (passed) { el.classList.add('valid'); passedCount++; }
+                else { el.classList.remove('valid'); }
+            }
+            updateBtn.disabled = passedCount < 4;
+        });
+    }
 
+    // =========================
+    // IMAGE PREVIEW
+    // =========================
     function previewImage(input) {
         if (input.files && input.files[0]) {
             const reader = new FileReader();

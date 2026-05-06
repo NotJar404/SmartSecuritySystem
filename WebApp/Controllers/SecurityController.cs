@@ -6,6 +6,7 @@ using WebApp.Models;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace WebApp.Controllers
 {
@@ -19,19 +20,21 @@ namespace WebApp.Controllers
             _context = context;
         }
 
+        // =========================
+        // DASHBOARD HOME
+        // =========================
         public async Task<IActionResult> Index()
         {
             var now = DateTime.UtcNow;
 
             // =========================
-            // FETCH RECENT ACCESS LOGS
+            // RECENT ACCESS LOGS
             // =========================
             var recentAccessLogs = await _context.AccessLogs
                 .OrderByDescending(a => a.Timestamp)
                 .Take(5)
                 .ToListAsync();
 
-            // ✅ Populate UI-safe values (same as AccessController)
             foreach (var log in recentAccessLogs)
             {
                 log.FullName = log.FullName ?? "Unknown User";
@@ -42,41 +45,58 @@ namespace WebApp.Controllers
                 log.ImageUrl = log.ImageUrl ?? "/images/default-user.png";
             }
 
+            // =========================
+            // HYBRID OCCUPANCY (PI + LOCAL AI)
+            // =========================
+            var latestOccupancy = await _context.RoomOccupancy
+                .OrderByDescending(o => o.Timestamp)
+                .GroupBy(o => o.CameraId)
+                .Select(g => new
+                {
+                    CameraId = g.Key,
+                    PeopleCount = g.First().PeopleCount,
+                    Timestamp = g.First().Timestamp
+                })
+                .ToListAsync();
+
+            var occupancyMap = latestOccupancy
+                .ToDictionary(x => x.CameraId, x => x.PeopleCount);
+
+            // =========================
+            // BUILD DASHBOARD MODEL
+            // =========================
             var model = new DashboardViewModel
             {
                 // =========================
-                // CAMERAS
+                // CAMERA METRICS
                 // =========================
                 ActiveCameraCount = await _context.CameraDevices
-                    .Where(c => c.Status == "active")
-                    .CountAsync(),
+                    .CountAsync(c => c.Status == "active"),
 
                 TotalCameraCount = await _context.CameraDevices.CountAsync(),
 
                 // =========================
-                // DETECTIONS
+                // DETECTIONS (AI / FACE / MOTION)
                 // =========================
                 TodayDetectionCount = await _context.DetectionLogs
-                    .Where(d => d.Timestamp.Date == now.Date)
-                    .CountAsync(),
+                    .CountAsync(d => d.Timestamp.Date == now.Date),
 
                 // =========================
-                // ALERTS
+                // ALERTS (HYBRID STATUS)
                 // =========================
                 ActiveAlertCount = await _context.Alerts
-                    .Where(a => a.Status == AlertStatus.New ||
-                                a.Status == AlertStatus.Acknowledged)
-                    .CountAsync(),
+                    .CountAsync(a =>
+                        a.Status == AlertStatus.New ||
+                        a.Status == AlertStatus.Acknowledged),
 
                 // =========================
-                // ACCESS REQUESTS
+                // ACCESS CONTROL
                 // =========================
                 PendingAccessCount = await _context.AccessLogs
-                    .Where(a => a.AccessResult == "denied")
-                    .CountAsync(),
+                    .CountAsync(a => a.AccessResult == "denied"),
 
                 // =========================
-                // RECENT EVENTS
+                // RECENT AI EVENTS
                 // =========================
                 RecentEvents = await _context.DetectionLogs
                     .Include(d => d.Camera!)
@@ -86,20 +106,35 @@ namespace WebApp.Controllers
                     .ToListAsync(),
 
                 // =========================
-                // CAMERAS LIST
+                // CAMERA LIST (LIVE FEED)
                 // =========================
                 Cameras = await _context.CameraDevices
                     .Include(c => c.Room)
-                    .Take(5)
+                    .Take(6)
                     .ToListAsync(),
 
-                // ✅ NEW: ACCESS LOGS FOR DASHBOARD
-                RecentAccessLogs = recentAccessLogs
+                // =========================
+                // DASHBOARD LOGS
+                // =========================
+                RecentAccessLogs = recentAccessLogs,
+
+                RecentAlerts = await _context.Alerts
+                    .OrderByDescending(a => a.Timestamp)
+                    .Take(6)
+                    .ToListAsync()
             };
+
+            // =========================
+            // PASS HYBRID DATA TO VIEW
+            // =========================
+            ViewBag.OccupancyMap = occupancyMap;
 
             return View(model);
         }
 
+        // =========================
+        // SYSTEM PAGE
+        // =========================
         public IActionResult System()
         {
             return View();

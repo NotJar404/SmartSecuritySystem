@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -22,8 +22,19 @@ namespace WebApp.Models
         [Column("severity")]
         public SeverityLevel Severity { get; set; } = SeverityLevel.WARNING;
 
+        // =========================
+        // ROOM RELATIONSHIP (FIXED)
+        // =========================
+
         [Column("room_id")]
         public int? RoomId { get; set; }
+
+        [ForeignKey("RoomId")]
+        public Room? Room { get; set; }
+
+        // =========================
+        // TIMESTAMP
+        // =========================
 
         [Column("timestamp")]
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
@@ -33,7 +44,7 @@ namespace WebApp.Models
         public AlertStatus Status { get; set; } = AlertStatus.New;
 
         // =========================
-        // NEW: RECORDING LINK
+        // RECORDING LINK
         // =========================
 
         [Column("video_path")]
@@ -55,7 +66,8 @@ namespace WebApp.Models
         [Column("resolved_at")]
         public DateTime? ResolvedAt { get; set; }
 
-        [Column("escalated_by")]        public string? EscalatedBy { get; set; }
+        [Column("escalated_by")]
+        public string? EscalatedBy { get; set; }
 
         [Column("escalated_at")]
         public DateTime? EscalatedAt { get; set; }
@@ -90,7 +102,7 @@ namespace WebApp.Models
         Intrusion,
         SuspiciousActivity,
         AccessDenied,
-        AccessGranted, // Add this back!
+        AccessGranted,
         ForcedEntry,
         DoorEvent,
         SystemError

@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Logging;
 using System.Security.Cryptography;
 using System.Text;
+using System.Net;
+using System.Net.Mail;
 using WebApp.Data;
 using WebApp.Models; // ✅ FIXED (important)
 using SmartSecuritySystem.Models;
@@ -19,11 +21,13 @@ namespace SmartSecuritySystem.Controllers
     {
         private readonly AppDbContext _context;
         private readonly ILogger<PersonnelController> _logger;
+        private readonly IConfiguration _configuration;
 
-        public PersonnelController(AppDbContext context, ILogger<PersonnelController> logger)
+        public PersonnelController(AppDbContext context, ILogger<PersonnelController> logger, IConfiguration configuration)
         {
             _context = context;
             _logger = logger;
+            _configuration = configuration;
         }
 
         // =====================================================
@@ -154,7 +158,7 @@ namespace SmartSecuritySystem.Controllers
         }
 
         // =====================================================
-        // EDIT USERS
+        // EDIT USERS (SYSTEM OPERATORS)
         // =====================================================
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -182,7 +186,37 @@ namespace SmartSecuritySystem.Controllers
         }
 
         // =====================================================
-        // DELETE USERS
+        // EDIT MEMBER (AUTHORIZED PERSONNEL / CAMPUS MEMBERS)
+        // =====================================================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult EditMember(int personId, string fullName, string? email, string? department, string? rfidTag, string? phone)
+        {
+            var existing = _context.AuthorizedPersonnel.FirstOrDefault(p => p.PersonId == personId);
+            if (existing == null)
+                return RedirectToAction(nameof(Index));
+
+            existing.FullName = fullName ?? existing.FullName;
+            existing.Email = email;
+            existing.Department = department;
+            existing.Phone = phone;
+            existing.UpdatedAt = DateTime.UtcNow;
+
+            // Only update RFID if provided and not already taken by another member
+            if (!string.IsNullOrWhiteSpace(rfidTag) && rfidTag != existing.RfidTag)
+            {
+                if (!_context.AuthorizedPersonnel.Any(p => p.RfidTag == rfidTag && p.PersonId != personId))
+                {
+                    existing.RfidTag = rfidTag;
+                }
+            }
+
+            _context.SaveChanges();
+            return RedirectToAction(nameof(Index));
+        }
+
+        // =====================================================
+        // DELETE USERS (SYSTEM OPERATORS)
         // =====================================================
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -197,6 +231,24 @@ namespace SmartSecuritySystem.Controllers
                 return RedirectToAction(nameof(Index));
 
             _context.Users.Remove(user);
+            _context.SaveChanges();
+
+            return RedirectToAction(nameof(Index));
+        }
+
+        // =====================================================
+        // DELETE MEMBER (AUTHORIZED PERSONNEL / CAMPUS MEMBERS)
+        // =====================================================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult DeleteMember(int id)
+        {
+            var member = _context.AuthorizedPersonnel.FirstOrDefault(p => p.PersonId == id);
+
+            if (member == null)
+                return RedirectToAction(nameof(Index));
+
+            _context.AuthorizedPersonnel.Remove(member);
             _context.SaveChanges();
 
             return RedirectToAction(nameof(Index));
@@ -285,31 +337,129 @@ namespace SmartSecuritySystem.Controllers
             return email.Trim().EndsWith("@gmail.com", StringComparison.OrdinalIgnoreCase);
         }
 
+        // =====================================================
+        // EMAIL HELPERS (SHARED HTML TEMPLATE)
+        // =====================================================
+#pragma warning disable SYSLIB0014
         private void SendCredentialEmail(string toEmail, string fullName, string username, string tempPassword)
         {
-            var fromEmail = "yourgmail@gmail.com";
-            var appPassword = "your_app_password";
+            var subject = "SecureVision — Your Account Credentials";
+            var body = BuildHtmlEmail(
+                fullName,
+                "Welcome to SecureVision",
+                $@"<p style=""margin:0 0 16px 0;color:#4a4540;font-size:15px;line-height:1.6;"">
+                    Your SecureVision security system account has been created. Please use the credentials below to sign in:
+                </p>
+                <div style=""background:#FAF7F2;border:1px solid #E2DCD5;border-radius:8px;padding:20px;margin:16px 0;"">
+                    <table style=""width:100%;border-collapse:collapse;"">
+                        <tr>
+                            <td style=""padding:8px 0;color:#6B635B;font-size:13px;font-weight:600;width:140px;"">Username</td>
+                            <td style=""padding:8px 0;color:#2C2724;font-size:14px;font-weight:700;"">{username}</td>
+                        </tr>
+                        <tr>
+                            <td style=""padding:8px 0;color:#6B635B;font-size:13px;font-weight:600;"">Temporary Password</td>
+                            <td style=""padding:8px 0;color:#2C2724;font-size:14px;font-family:'Courier New',monospace;font-weight:700;"">{tempPassword}</td>
+                        </tr>
+                    </table>
+                </div>
+                <p style=""margin:0 0 8px 0;color:#E07A5F;font-size:13px;font-weight:600;line-height:1.6;"">
+                    ⚠ You will be required to change your password upon first login.
+                </p>
+                <p style=""margin:0 0 16px 0;color:#6B635B;font-size:13px;line-height:1.6;"">
+                    Keep your credentials secure and do not share them with anyone.
+                </p>"
+            );
 
-            var client = new System.Net.Mail.SmtpClient("smtp.gmail.com", 587)
+            SendEmail(toEmail, subject, body);
+        }
+
+        private string BuildHtmlEmail(string recipientName, string heading, string contentHtml)
+        {
+            return $@"<!DOCTYPE html>
+<html lang=""en"">
+<head>
+    <meta charset=""UTF-8"">
+    <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"">
+    <meta http-equiv=""X-UA-Compatible"" content=""IE=edge"">
+    <title>{heading} — SecureVision</title>
+</head>
+<body style=""margin:0;padding:0;background-color:#f5f0eb;font-family:'Segoe UI','Helvetica Neue',Arial,sans-serif;"">
+    <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""background-color:#f5f0eb;"">
+        <tr>
+            <td align=""center"" style=""padding:40px 20px;"">
+                <table role=""presentation"" cellpadding=""0"" cellspacing=""0"" width=""560"" style=""max-width:560px;width:100%;"">
+                    <!-- Header -->
+                    <tr>
+                        <td style=""background:linear-gradient(135deg,#D4A373,#BC8F62);padding:28px 32px;border-radius:12px 12px 0 0;text-align:center;"">
+                            <div style=""width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,0.2);display:inline-block;line-height:48px;font-size:18px;font-weight:700;color:#ffffff;margin-bottom:12px;"">QCU</div>
+                            <h1 style=""margin:8px 0 0 0;color:#ffffff;font-size:22px;font-weight:700;"">{heading}</h1>
+                            <p style=""margin:4px 0 0 0;color:rgba(255,255,255,0.85);font-size:13px;"">SecureVision Security System</p>
+                        </td>
+                    </tr>
+                    <!-- Body -->
+                    <tr>
+                        <td style=""background:#ffffff;padding:32px;border-left:1px solid #E2DCD5;border-right:1px solid #E2DCD5;"">
+                            <p style=""margin:0 0 20px 0;color:#2C2724;font-size:16px;font-weight:600;"">
+                                Hello {recipientName},
+                            </p>
+                            {contentHtml}
+                        </td>
+                    </tr>
+                    <!-- Footer -->
+                    <tr>
+                        <td style=""background:#FAF7F2;padding:20px 32px;border-radius:0 0 12px 12px;border:1px solid #E2DCD5;border-top:none;text-align:center;"">
+                            <p style=""margin:0 0 4px 0;color:#8E847B;font-size:12px;"">
+                                This is an automated message from SecureVision — Quezon City University
+                            </p>
+                            <p style=""margin:0;color:#8E847B;font-size:11px;"">
+                                AI-Assisted Smart Security & Intruder Detection System &bull; Do not reply to this email
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>";
+        }
+
+        private void SendEmail(string toEmail, string subject, string htmlBody)
+        {
+            var smtpSettings = _configuration.GetSection("SmtpSettings");
+            var fromEmail = smtpSettings["SenderEmail"] ?? "yourgmail@gmail.com";
+            var senderName = smtpSettings["SenderName"] ?? "SecureVision Security System";
+            var appPassword = smtpSettings["AppPassword"] ?? "your_app_password";
+            var host = smtpSettings["Host"] ?? "smtp.gmail.com";
+            var port = int.TryParse(smtpSettings["Port"], out var p) ? p : 587;
+            var enableSsl = bool.TryParse(smtpSettings["EnableSsl"], out var ssl) ? ssl : true;
+
+            var client = new SmtpClient(host, port)
             {
-                EnableSsl = true,
-                Credentials = new System.Net.NetworkCredential(fromEmail, appPassword)
+                EnableSsl = enableSsl,
+                Credentials = new NetworkCredential(fromEmail, appPassword),
+                DeliveryMethod = SmtpDeliveryMethod.Network,
+                Timeout = 15000
             };
 
-            var mail = new System.Net.Mail.MailMessage
+            var mail = new MailMessage
             {
-                From = new System.Net.Mail.MailAddress(fromEmail),
-                Subject = "SecureVision — Your Account Credentials",
-                Body = $"Hello {fullName},\n\n" +
-                       $"Your SecureVision account has been created.\n\n" +
-                       $"Username: {username}\n" +
-                       $"Temporary Password: {tempPassword}\n\n" +
-                       $"Please change your password upon first login.\n\n" +
-                       $"— SecureVision Security System"
+                From = new MailAddress(fromEmail, senderName),
+                Subject = subject ?? "",
+                Body = htmlBody ?? "",
+                IsBodyHtml = true,
+                SubjectEncoding = Encoding.UTF8,
+                BodyEncoding = Encoding.UTF8
             };
 
-            mail.To.Add(toEmail);
+            // Add headers for better deliverability
+            mail.Headers.Add("X-Mailer", "SecureVision-Mailer");
+            mail.Headers.Add("X-Priority", "3");
+            mail.Headers.Add("Precedence", "bulk");
+
+            mail.To.Add(new MailAddress(toEmail));
             client.Send(mail);
         }
+#pragma warning restore SYSLIB0014
     }
 }

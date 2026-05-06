@@ -1,59 +1,76 @@
 import cv2
 import numpy as np
+import face_recognition
+import base64
 import pickle
 import os
 from datetime import datetime
 from pathlib import Path
 
+
 class FaceVerifier:
-    """Improved ORB-based face verifier (stable version for project use)"""
+    """AI-based Face Recognition using embeddings (Raspberry Pi compatible)"""
 
     def __init__(self, storage_dir="face_data"):
         self.storage_dir = storage_dir
-
-        # Improved ORB settings
-        self.orb = cv2.ORB_create(
-            nfeatures=1000,
-            scaleFactor=1.2,
-            nlevels=8
-        )
-
-        self.bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-
-        self.current_des = None
-        self.current_time = None
-
         Path(self.storage_dir).mkdir(parents=True, exist_ok=True)
 
+        self.current_encoding = None
+        self.current_time = None
+
+        # tolerance (lower = stricter)
+        self.tolerance = 0.5
+
     # =========================
-    # FEATURE EXTRACTION
+    # ENCODING
     # =========================
-    def extract(self, image):
+    def extract_encoding(self, image):
         if image is None:
             return None
 
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
+        rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-        kp, des = self.orb.detectAndCompute(gray, None)
-        return des
+        encodings = face_recognition.face_encodings(rgb)
+
+        if len(encodings) == 0:
+            return None
+
+        return encodings[0]
 
     # =========================
     # STORE LIVE FACE
     # =========================
     def store_detected_face(self, face_image):
-        des = self.extract(face_image)
+        encoding = self.extract_encoding(face_image)
 
-        if des is None:
+        if encoding is None:
             return False
 
-        self.current_des = des
+        self.current_encoding = encoding
         self.current_time = datetime.now()
 
-        print("Face stored at", self.current_time)
         return True
 
     # =========================
-    # LOAD FACE
+    # REGISTER USER
+    # =========================
+    def register_user_face(self, user_id, face_image):
+        encoding = self.extract_encoding(face_image)
+
+        if encoding is None:
+            print("No face detected for registration")
+            return False
+
+        path = os.path.join(self.storage_dir, f"{user_id}.pkl")
+
+        with open(path, "wb") as f:
+            pickle.dump(encoding, f)
+
+        print(f"[REGISTERED] {user_id}")
+        return True
+
+    # =========================
+    # LOAD USER FACE
     # =========================
     def load_user_face(self, user_id):
         path = os.path.join(self.storage_dir, f"{user_id}.pkl")
@@ -63,24 +80,6 @@ class FaceVerifier:
 
         with open(path, "rb") as f:
             return pickle.load(f)
-
-    # =========================
-    # REGISTER FACE
-    # =========================
-    def register_user_face(self, user_id, face_image):
-        des = self.extract(face_image)
-
-        if des is None:
-            print("No features found")
-            return False
-
-        path = os.path.join(self.storage_dir, f"{user_id}.pkl")
-
-        with open(path, "wb") as f:
-            pickle.dump(des, f)
-
-        print(f"Registered face: {user_id}")
-        return True
 
     # =========================
     # VERIFY RFID + FACE
@@ -93,45 +92,40 @@ class FaceVerifier:
             "user_id": user_id
         }
 
-        if self.current_des is None:
+        if self.current_encoding is None:
             result["message"] = "No face detected"
             return result
 
-        # timeout check
-        if (datetime.now() - self.current_time).seconds > 30:
-            self.current_des = None
+        # timeout check (FIXED: was .seconds which only returns partial seconds)
+        if (datetime.now() - self.current_time).total_seconds() > 30:
+            self.current_encoding = None
             result["message"] = "Face expired"
             return result
 
-        stored = self.load_user_face(user_id)
+        stored_encoding = self.load_user_face(user_id)
 
-        if stored is None:
+        if stored_encoding is None:
             result["message"] = "No registered face"
             return result
 
-        matches = self.bf.match(self.current_des, stored)
+        # AI comparison
+        distance = face_recognition.face_distance(
+            [stored_encoding],
+            self.current_encoding
+        )[0]
 
-        if not matches:
-            result["message"] = "No match found"
-            return result
+        confidence = (1 - distance) * 100
 
-        # sort best matches
-        matches = sorted(matches, key=lambda x: x.distance)
-
-        # FILTER GOOD MATCHES
-        good = [m for m in matches if m.distance < 60]
-
-        confidence = len(good) / max(len(matches), 1) * 100
-
-        if len(good) >= 30:   # threshold
+        if distance < self.tolerance:
             result["verified"] = True
             result["message"] = "ACCESS GRANTED"
+            self.current_encoding = None  # Clear after SUCCESSFUL use
         else:
             result["message"] = "FACE MISMATCH"
+            self.current_encoding = None  # Clear on confirmed mismatch
 
         result["confidence"] = round(confidence, 2)
 
-        self.current_des = None
         return result
 
     # =========================
@@ -139,6 +133,6 @@ class FaceVerifier:
     # =========================
     def get_detection_status(self):
         return {
-            "detected": self.current_des is not None,
+            "detected": self.current_encoding is not None,
             "time": str(self.current_time)
         }

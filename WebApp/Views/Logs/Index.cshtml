@@ -44,10 +44,13 @@
                class="filter-chip @(currentFilter == "all" ? "active" : "")">
                 <i class="fas fa-list"></i> All
             </a>
-            <a href="?filter=login&search=@currentSearch"
-               class="filter-chip @(currentFilter == "login" ? "active" : "")">
-                <i class="fas fa-sign-in-alt"></i> Login
-            </a>
+            @if (ViewBag.IsAdmin == true)
+            {
+                <a href="?filter=login&search=@currentSearch"
+                   class="filter-chip @(currentFilter == "login" ? "active" : "")">
+                    <i class="fas fa-sign-in-alt"></i> Login
+                </a>
+            }
             <a href="?filter=access&search=@currentSearch"
                class="filter-chip @(currentFilter == "access" ? "active" : "")">
                 <i class="fas fa-door-open"></i> Access
@@ -91,9 +94,12 @@
 
             var iconColor = (log.Action?.ToLower() ?? "") switch
             {
-                var a when a.Contains("login") || a.Contains("access") => "color: var(--status-active);",
-                var a when a.Contains("alert") || a.Contains("delete") => "color: var(--alert);",
-                var a when a.Contains("detection") || a.Contains("camera") => "color: var(--accent);",
+                var a when a.Contains("alert") => "color: #dc3545;", // red
+                var a when a.Contains("detection") => "color: #ffc107;", // yellow
+                var a when a.Contains("access") => "color: #28a745;", // green
+                var a when a.Contains("login") => "color: #17a2b8;", // cyan/blue
+                var a when a.Contains("delete") => "color: #dc3545;", // red
+                var a when a.Contains("camera") => "color: #F4A261;", // warm accent
                 _ => "color: var(--text-muted);"
             };
 

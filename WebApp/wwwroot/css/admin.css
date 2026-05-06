@@ -1,4 +1,4 @@
-/* =========================================================
+﻿/* =========================================================
    ADMIN DASHBOARD - FINAL BALANCED LAYOUT
    Fixes: panel height, grid spacing, audit vs occupancy sync
    ========================================================= */
@@ -212,12 +212,34 @@
 /* ===================== */
 /* AUDIT */
 /* ===================== */
+
 .audit-feed {
     display: flex;
     flex-direction: column;
     gap: 8px;
 
+    /* Controls visible height (~4 items visible) */
+    max-height: 260px;
+
+    /* Enables scrolling when content exceeds height */
     overflow-y: auto;
+
+    /* Optional: smoother layout stability */
+    padding-right: 4px;
+}
+
+/* Optional scrollbar styling (recommended for dashboards) */
+.audit-feed::-webkit-scrollbar {
+    width: 6px;
+}
+
+.audit-feed::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+}
+
+.audit-feed::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.35);
 }
 
 .audit-item {
@@ -230,6 +252,7 @@
     border-left: 3px solid var(--primary-blue);
 }
 
+/* Text styles */
 .audit-details strong {
     font-size: 0.8rem;
 }

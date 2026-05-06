@@ -141,6 +141,42 @@
                             </button>
                         }
 
+                        @if (alert.Status == WebApp.Models.AlertStatus.New)
+                        {
+                            <form method="post" action="/Alerts/Acknowledge" style="display:inline;" id="ack-@alert.AlertId">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@alert.AlertId" />
+                                <button type="button" class="btn-alert-secondary"
+                                        onclick="event.stopPropagation(); SecureConfirm.show({ title:'Acknowledge Alert', icon:'fas fa-check-circle', fields:[{label:'Type',value:'@alert.Type'},{label:'Action',value:'Mark as acknowledged'}], onConfirm:function(){document.getElementById('ack-@alert.AlertId').submit();} });">
+                                    Acknowledge
+                                </button>
+                            </form>
+                        }
+
+                        @if (alert.Status != WebApp.Models.AlertStatus.Resolved && alert.Status != WebApp.Models.AlertStatus.New)
+                        {
+                            <form method="post" action="/Alerts/Resolve" style="display:inline;" id="res-@alert.AlertId">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@alert.AlertId" />
+                                <button type="button" class="btn-alert-secondary" style="background-color: #28a745; color: white;"
+                                        onclick="event.stopPropagation(); SecureConfirm.show({ title:'Resolve Alert', icon:'fas fa-check-double', fields:[{label:'Type',value:'@alert.Type'}], onConfirm:function(){document.getElementById('res-@alert.AlertId').submit();} });">
+                                    Resolve
+                                </button>
+                            </form>
+                        }
+
+                        @if (isCritical && alert.Status != WebApp.Models.AlertStatus.Resolved && alert.Status != WebApp.Models.AlertStatus.Escalated)
+                        {
+                            <form method="post" action="/Alerts/Escalate" style="display:inline;" id="esc-@alert.AlertId">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@alert.AlertId" />
+                                <button type="button" class="btn-alert-secondary" style="background-color: #dc3545; color: white;"
+                                        onclick="event.stopPropagation(); SecureConfirm.show({ title:'Escalate Alert', icon:'fas fa-exclamation-triangle', isDelete:true, fields:[{label:'Type',value:'@alert.Type'}], onConfirm:function(){document.getElementById('esc-@alert.AlertId').submit();} });">
+                                    Escalate
+                                </button>
+                            </form>
+                        }
+
                         <button type="button" class="details-btn">Details</button>
                     </div>
                 </div>
@@ -198,21 +234,7 @@
                 </div>
 
                 <div class="modal-footer">
-                    <form method="post" asp-action="Acknowledge" class="modal-form">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="id" class="modalAlertId" />
-                        <button type="submit" class="btn btn-primary btn-sm">Acknowledge</button>
-                    </form>
-                    <form method="post" asp-action="Resolve" class="modal-form">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="id" class="modalAlertId" />
-                        <button type="submit" class="btn btn-primary btn-sm">Resolve</button>
-                    </form>
-                    <form method="post" asp-action="Escalate" class="modal-form">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="id" class="modalAlertId" />
-                        <button type="submit" class="btn btn-primary btn-sm">Escalate</button>
-                    </form>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="closeAlertModal()">Close</button>
                 </div>
             </div>
         </div>

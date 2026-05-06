@@ -568,28 +568,57 @@ section.panel.mt-4 {
 /* ============================= */
 /* INTERVENTION QUEUE ITEMS      */
 /* ============================= */
+
 .status-list-container {
     display: flex;
     flex-direction: column;
     gap: 12px;
-    padding: 10px 0;
+
+    /* Controls visible height (~4 items visible) */
+    max-height: 270px;
+
+    /* Enables scrolling when content exceeds height */
+    overflow-y: auto;
+
+    /* Prevents layout shift when scrollbar appears */
+    padding: 10px 6px 10px 0;
 }
 
+/* Scrollbar styling (optional but recommended for dashboard UI) */
+.status-list-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.status-list-container::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+}
+
+.status-list-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.35);
+}
+
+/* ITEM CARD */
 .status-item {
     display: flex;
     align-items: center;
     gap: 12px;
+
     padding: 12px;
+
     background: var(--bg-hover);
     border-radius: 8px;
     border: 1px solid var(--border-soft);
+
     transition: var(--transition-standard);
 }
 
+/* Hover effect */
 .status-item:hover {
     background: var(--bg-panel-hover);
 }
 
+/* TEXT */
 .status-item p {
     font-size: 13px;
     margin: 0;
@@ -597,8 +626,10 @@ section.panel.mt-4 {
 
 .status-item small {
     font-size: 11px;
+    color: var(--text-muted);
 }
 
+/* STATUS DOT */
 .status-dot-indicator {
     width: 10px;
     height: 10px;
@@ -606,9 +637,18 @@ section.panel.mt-4 {
     flex-shrink: 0;
 }
 
-.status-dot-indicator.red { background: var(--status-locked); }
-.status-dot-indicator.yellow { background: var(--accent); }
-.status-dot-indicator.green { background: var(--status-active); }
+/* STATUS COLORS */
+.status-dot-indicator.red {
+    background: var(--status-locked);
+}
+
+.status-dot-indicator.yellow {
+    background: var(--accent);
+}
+
+.status-dot-indicator.green {
+    background: var(--status-active);
+}
 
 /* ============================= */
 /* RESPONSIVE                    */

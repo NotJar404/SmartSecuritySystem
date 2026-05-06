@@ -1,13 +1,21 @@
-﻿@model List<WebApp.Models.Camera>
+@model List<WebApp.Models.Camera>
 
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
     ViewData["Title"] = "AI Assisted Smart Security and Intrusion Detection System";
 
     var rooms = ViewBag.Rooms as List<WebApp.Models.Room>;
+    var occupancyCounts = ViewBag.OccupancyCounts as Dictionary<int,int> ?? new Dictionary<int,int>();
+    var cameraAlerts = ViewBag.CameraAlerts as HashSet<int> ?? new HashSet<int>();
+    var roomCapacities = ViewBag.RoomCapacities as Dictionary<int,int> ?? new Dictionary<int,int>();
+    var alertSeverities = ViewBag.AlertSeverities as Dictionary<int,WebApp.Models.SeverityLevel> ?? new Dictionary<int,WebApp.Models.SeverityLevel>();
+    var latestDetections = ViewBag.LatestDetections as Dictionary<int,WebApp.Models.DetectionLog> ?? new Dictionary<int,WebApp.Models.DetectionLog>();
 }
 
 <link rel="stylesheet" href="~/css/camera.css" />
+<link rel="stylesheet" href="~/css/camera-ai.css" />
+<script defer src="https://cdn.jsdelivr.net/npm/@@vladmandic/face-api@@1.7.12/dist/face-api.min.js"></script>
+<script defer src="~/js/camera-detect.js"></script>
 
 <div class="monitoring-page">
 
@@ -56,11 +64,39 @@
                 var safeName = (cam.Name ?? "").Replace("'", "\\'");
                 var safeUrl = (cam.StreamUrl ?? "").Replace("'", "\\'");
                 var safeLoc = (cam.Location ?? "").Replace("'", "\\'");
-                var occupancy = ViewBag.OccupancyCounts != null && ((Dictionary<int,int>)ViewBag.OccupancyCounts).ContainsKey(cam.Id)
-                    ? ((Dictionary<int,int>)ViewBag.OccupancyCounts)[cam.Id] : 0;
-                var hasAlert = ViewBag.CameraAlerts != null && ((HashSet<int>)ViewBag.CameraAlerts).Contains(cam.RoomId);
+                var occupancy = occupancyCounts.ContainsKey(cam.Id) ? occupancyCounts[cam.Id] : 0;
+                var hasAlert = cameraAlerts.Contains(cam.RoomId);
+                var maxCap = roomCapacities.ContainsKey(cam.RoomId) ? roomCapacities[cam.RoomId] : 0;
+                var capPercent = maxCap > 0 ? Math.Min((occupancy * 100) / maxCap, 100) : 0;
 
-                <div class="grid-card @(hasAlert ? "alert-active" : "")"
+                // Tri-state status
+                var secStatus = "SAFE";
+                if (alertSeverities.ContainsKey(cam.RoomId))
+                {
+                    secStatus = alertSeverities[cam.RoomId] == WebApp.Models.SeverityLevel.CRITICAL ? "ALERT" : "WARNING";
+                }
+
+                // Face status
+                var faceStatus = "none";
+                if (latestDetections.ContainsKey(cam.Id))
+                {
+                    var det = latestDetections[cam.Id];
+                    var age = (DateTime.UtcNow - det.Timestamp).TotalSeconds;
+                    if (age < 30)
+                    {
+                        faceStatus = (det.DetectionType?.ToLower()) switch
+                        {
+                            "face_verified" => "verified",
+                            "unknown_face" => "unknown",
+                            "face_obstruction" => "obstructed",
+                            _ => "detected"
+                        };
+                    }
+                }
+
+                <div class="grid-card @(secStatus == "ALERT" ? "status-alert" : secStatus == "WARNING" ? "status-warning" : "")"
+                     data-camera-id="@cam.Id"
+                     data-room-id="@cam.RoomId"
                      onclick="openFromGrid(@cam.Id, '@safeName', '@safeUrl', '@safeLoc', @cam.RoomId)">
 
                     @if (User.IsInRole("Admin"))
@@ -73,7 +109,11 @@
 
                     <div class="grid-header">
                         <span class="grid-title">@cam.Name</span>
-                        <span class="live-badge">@(hasAlert ? "⚠ ALERT" : "● LIVE")</span>
+                        <span class="security-badge badge-@(secStatus.ToLower())" data-field="securityBadge">
+                            @if (secStatus == "ALERT") { <text><i class="fas fa-exclamation-triangle"></i> ALERT</text> }
+                            else if (secStatus == "WARNING") { <text><i class="fas fa-exclamation-circle"></i> WARNING</text> }
+                            else { <text><i class="fas fa-shield-alt"></i> SAFE</text> }
+                        </span>
                     </div>
 
                     <div class="grid-body">
@@ -81,14 +121,28 @@
                         <video class="grid-preview" muted autoplay playsinline data-src="@cam.StreamUrl"></video>
                     </div>
 
+                    <!-- Capacity Bar -->
+                    @if (maxCap > 0)
+                    {
+                        <div class="capacity-bar-wrap">
+                            <div class="capacity-bar" data-field="capacityBar" style="width: @(capPercent)%; background: @(capPercent > 80 ? "var(--alert)" : capPercent > 50 ? "var(--warning-amber)" : "var(--status-active)")"></div>
+                        </div>
+                    }
+
                     <div class="grid-meta">
-                        <div class="meta-item" title="Occupancy">
+                        <div class="meta-item people-counter" title="People Detected">
                             <i class="fas fa-users"></i>
-                            <span>@occupancy</span>
+                            <span data-field="peopleCount">@occupancy</span>
+                            @if (maxCap > 0) { <small class="cap-label">/ @maxCap</small> }
                         </div>
                         <div class="meta-item" title="Face Recognition">
-                            <i class="fas fa-user-check"></i>
-                            <span class="face-status active">Active</span>
+                            <span class="face-indicator face-@faceStatus" data-field="faceStatus">
+                                @if (faceStatus == "verified") { <text><i class="fas fa-user-check"></i> Verified</text> }
+                                else if (faceStatus == "unknown") { <text><i class="fas fa-user-times"></i> Unknown</text> }
+                                else if (faceStatus == "obstructed") { <text><i class="fas fa-user-slash"></i> Obstructed</text> }
+                                else if (faceStatus == "detected") { <text><i class="fas fa-user"></i> Detected</text> }
+                                else { <text><i class="far fa-user"></i> No Face</text> }
+                            </span>
                         </div>
                         <div class="meta-item" title="Status">
                             <span class="cam-status-dot @(cam.Status == "active" ? "online" : "offline")"></span>
@@ -155,9 +209,6 @@
                 <div class="rec-badge">● REC</div>
                 <div class="timestamp" id="camTime"></div>
 
-                @* =========================================================
-                   VIDEO PLAYER (Raspberry Pi + StreamUrl + Future Webcam Support)
-                   ========================================================= *@
                 <video id="videoPlayer"
                        autoplay
                        controls
@@ -169,6 +220,43 @@
                     <strong id="overlayName"></strong><br />
                     <span id="overlayLocation"></span><br />
                     <span id="overlaySource"></span>
+                </div>
+            </div>
+
+            <!-- AI STATUS PANEL (Focus View) -->
+            <div class="ai-status-panel" id="aiStatusPanel">
+                <div class="ai-panel-row">
+                    <div class="ai-stat">
+                        <div class="ai-stat-icon people"><i class="fas fa-users"></i></div>
+                        <div class="ai-stat-info">
+                            <span class="ai-stat-label">People Detected</span>
+                            <span class="ai-stat-value" id="focusPeopleCount">0</span>
+                        </div>
+                    </div>
+                    <div class="ai-stat">
+                        <div class="ai-stat-icon face"><i class="fas fa-user-shield"></i></div>
+                        <div class="ai-stat-info">
+                            <span class="ai-stat-label">Face Recognition</span>
+                            <span class="ai-stat-value" id="focusFaceStatus">No Face</span>
+                        </div>
+                    </div>
+                    <div class="ai-stat">
+                        <div class="ai-stat-icon threat"><i class="fas fa-shield-alt"></i></div>
+                        <div class="ai-stat-info">
+                            <span class="ai-stat-label">Threat Level</span>
+                            <span class="ai-stat-value" id="focusThreatLevel">SAFE</span>
+                        </div>
+                    </div>
+                    <div class="ai-stat">
+                        <div class="ai-stat-icon alert"><i class="fas fa-bell"></i></div>
+                        <div class="ai-stat-info">
+                            <span class="ai-stat-label">Active Alerts</span>
+                            <span class="ai-stat-value" id="focusAlertCount">0</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="ai-detection-feed" id="detectionFeed">
+                    <span class="feed-placeholder"><i class="fas fa-satellite-dish"></i> Awaiting AI detection data...</span>
                 </div>
             </div>
 
@@ -262,6 +350,7 @@
 
 let selectedCamera = null;
 let clockInterval = null;
+let pollingInterval = null;
 
 function el(id) {
     return document.getElementById(id);
@@ -269,17 +358,17 @@ function el(id) {
 
 const gridView = el("gridView");
 const focusView = el("focusView");
-
 const camTitle = el("camTitle");
 const camSubtitle = el("camSubtitle");
 const camTime = el("camTime");
-
 const overlayName = el("overlayName");
 const overlayLocation = el("overlayLocation");
 const overlaySource = el("overlaySource");
-
 const video = el("videoPlayer");
 
+// =====================================================
+// VIEW SWITCHING
+// =====================================================
 function showGrid() {
     gridView.style.display = "grid";
     focusView.style.display = "none";
@@ -295,68 +384,166 @@ function openFromGrid(id, name, streamUrl, location, roomId) {
     selectCamera({ Id: id, Name: name, StreamUrl: streamUrl, Location: location, RoomId: roomId });
 }
 
+// =====================================================
+// CAMERA SELECTION
+// =====================================================
 function selectCamera(cam) {
     selectedCamera = cam;
 
     camTitle.innerText = cam.Name || "";
     camSubtitle.innerText = cam.Location || "";
-
     overlayName.innerText = cam.Name || "";
     overlayLocation.innerText = cam.Location || "";
 
     startClock();
 
-    // =====================================================
-    // PRIORITY SYSTEM:
-    // 1. Raspberry Pi / StreamUrl (PRIMARY)
-    // 2. Future local webcam (ONLY if StreamUrl is empty)
-    // =====================================================
-
     if (cam.StreamUrl && cam.StreamUrl.trim() !== "") {
-
-        overlaySource.innerText = "Raspberry Pi / Stream Stream";
-
+        overlaySource.innerText = "Raspberry Pi / Stream";
+        stopDetection();
         video.srcObject = null;
         video.src = cam.StreamUrl;
         video.load();
-
-        video.play().catch(err => {
-            console.log("Stream failed:", err);
-        });
-
+        video.play().catch(err => { console.log("Stream failed:", err); });
     } else {
-
-        overlaySource.innerText = "Local Webcam (TEST MODE)";
-
+        overlaySource.innerText = "Local Webcam (TEST MODE — AI Detection Active)";
         navigator.mediaDevices.getUserMedia({ video: true })
             .then(stream => {
                 video.srcObject = stream;
                 video.play();
+                // Start browser-based face detection for testing
+                initWebcamDetection(video, cam.Id, cam.RoomId);
             })
-            .catch(err => {
-                console.log("Webcam blocked:", err);
-            });
+            .catch(err => { console.log("Webcam blocked:", err); });
     }
 }
 
 function startClock() {
     if (clockInterval) clearInterval(clockInterval);
-
     clockInterval = setInterval(() => {
         camTime.innerText = new Date().toLocaleString();
     }, 1000);
 }
 
 function toggleFullscreen() {
-    const view = focusView;
-
     if (!document.fullscreenElement) {
-        view.requestFullscreen();
+        focusView.requestFullscreen();
     } else {
         document.exitFullscreen();
     }
 }
 
+// =====================================================
+// REAL-TIME POLLING ENGINE (5 SECOND INTERVAL)
+// =====================================================
+function startPolling() {
+    if (pollingInterval) clearInterval(pollingInterval);
+    pollingInterval = setInterval(fetchCameraStatus, 5000);
+    fetchCameraStatus(); // initial fetch
+}
+
+function fetchCameraStatus() {
+    fetch('/Cameras/Status')
+        .then(r => r.json())
+        .then(data => {
+            if (!Array.isArray(data)) return;
+            data.forEach(cam => updateCameraCard(cam));
+            if (selectedCamera) {
+                const focused = data.find(c => c.cameraId === selectedCamera.Id);
+                if (focused) updateFocusPanel(focused);
+            }
+        })
+        .catch(err => console.log("[POLL ERROR]", err));
+}
+
+// =====================================================
+// UPDATE GRID CARD (REAL-TIME)
+// =====================================================
+function updateCameraCard(cam) {
+    const card = document.querySelector(`.grid-card[data-camera-id="${cam.cameraId}"]`);
+    if (!card) return;
+
+    // People count
+    const countEl = card.querySelector('[data-field="peopleCount"]');
+    if (countEl && countEl.textContent !== String(cam.peopleCount)) {
+        countEl.textContent = cam.peopleCount;
+        countEl.classList.add('count-flip');
+        setTimeout(() => countEl.classList.remove('count-flip'), 400);
+    }
+
+    // Security badge
+    const badge = card.querySelector('[data-field="securityBadge"]');
+    if (badge) {
+        badge.className = 'security-badge badge-' + cam.securityStatus.toLowerCase();
+        const icons = { SAFE: 'fa-shield-alt', WARNING: 'fa-exclamation-circle', ALERT: 'fa-exclamation-triangle' };
+        badge.innerHTML = `<i class="fas ${icons[cam.securityStatus] || 'fa-shield-alt'}"></i> ${cam.securityStatus}`;
+    }
+
+    // Card status class
+    card.classList.remove('status-alert', 'status-warning');
+    if (cam.securityStatus === 'ALERT') card.classList.add('status-alert');
+    else if (cam.securityStatus === 'WARNING') card.classList.add('status-warning');
+
+    // Face status
+    const faceEl = card.querySelector('[data-field="faceStatus"]');
+    if (faceEl) {
+        faceEl.className = 'face-indicator face-' + cam.faceStatus;
+        const faceMap = {
+            verified: '<i class="fas fa-user-check"></i> Verified',
+            unknown: '<i class="fas fa-user-times"></i> Unknown',
+            obstructed: '<i class="fas fa-user-slash"></i> Obstructed',
+            detected: '<i class="fas fa-user"></i> Detected',
+            none: '<i class="far fa-user"></i> No Face'
+        };
+        faceEl.innerHTML = faceMap[cam.faceStatus] || faceMap.none;
+    }
+
+    // Capacity bar
+    if (cam.maxCapacity > 0) {
+        const capBar = card.querySelector('[data-field="capacityBar"]');
+        if (capBar) {
+            const pct = Math.min((cam.peopleCount * 100) / cam.maxCapacity, 100);
+            capBar.style.width = pct + '%';
+            capBar.style.background = pct > 80 ? 'var(--alert)' : pct > 50 ? 'var(--warning-amber)' : 'var(--status-active)';
+        }
+    }
+}
+
+// =====================================================
+// UPDATE FOCUS PANEL (AI STATUS)
+// =====================================================
+function updateFocusPanel(cam) {
+    const pc = el('focusPeopleCount');
+    if (pc) pc.textContent = cam.peopleCount;
+
+    const fs = el('focusFaceStatus');
+    if (fs) {
+        const labels = { verified: 'Verified ✅', unknown: 'Unknown ⚠', obstructed: 'Obstructed 🚫', detected: 'Detected', none: 'No Face' };
+        fs.textContent = labels[cam.faceStatus] || 'No Face';
+        fs.className = 'ai-stat-value face-text-' + cam.faceStatus;
+    }
+
+    const tl = el('focusThreatLevel');
+    if (tl) {
+        tl.textContent = cam.securityStatus;
+        tl.className = 'ai-stat-value threat-text-' + cam.securityStatus.toLowerCase();
+    }
+
+    const ac = el('focusAlertCount');
+    if (ac) ac.textContent = cam.alertCount;
+
+    const feed = el('detectionFeed');
+    if (feed && cam.latestAlert) {
+        feed.innerHTML = `<div class="feed-item feed-${cam.latestAlert.severity.toLowerCase()}">
+            <i class="fas fa-exclamation-circle"></i>
+            <span>${cam.latestAlert.description || cam.latestAlert.type}</span>
+            <small>${cam.latestAlert.minutesAgo}m ago</small>
+        </div>`;
+    }
+}
+
+// =====================================================
+// MODAL FUNCTIONS
+// =====================================================
 function openModal() {
     document.getElementById("cameraForm").reset();
     document.getElementById("modalTitle").innerText = "Add Camera";
@@ -395,7 +582,6 @@ function editSelectedCamera() {
 // Delete camera with confirmation
 function deleteCamera(id, name) {
     SecureConfirm.confirmDelete(name || 'Camera', function() {
-        // Create and submit hidden form
         const form = document.createElement('form');
         form.method = 'POST';
         form.action = '/Cameras/Delete';
@@ -408,31 +594,25 @@ function deleteCamera(id, name) {
     });
 }
 
-// Modal event listeners
+// =====================================================
+// INIT
+// =====================================================
 document.addEventListener('DOMContentLoaded', function() {
     const modal = document.getElementById('cameraModal');
     const closeBtn = document.querySelector('#cameraModal .close');
     const cancelBtn = document.querySelector('#cameraModal .btn-light');
     
     if (closeBtn) {
-        closeBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            closeModal();
-        });
+        closeBtn.addEventListener('click', function(e) { e.preventDefault(); closeModal(); });
     }
     
     if (cancelBtn) {
-        cancelBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            closeModal();
-        });
+        cancelBtn.addEventListener('click', function(e) { e.preventDefault(); closeModal(); });
     }
     
     // Close on backdrop click
     modal.addEventListener('click', function(e) {
-        if (e.target === modal) {
-            closeModal();
-        }
+        if (e.target === modal) { closeModal(); }
     });
 
     // Intercept camera form with two-step confirmation
@@ -452,6 +632,9 @@ document.addEventListener('DOMContentLoaded', function() {
             } catch(e) {}
         }
     });
+
+    // START REAL-TIME POLLING
+    startPolling();
 });
 
 </script>

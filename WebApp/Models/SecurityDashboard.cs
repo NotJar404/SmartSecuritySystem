@@ -12,17 +12,17 @@ namespace WebApp.Models
         public int PendingAccessCount { get; set; }
 
         // =====================
-        // EXISTING DATA
+        // CORE DATA
         // =====================
-
         public List<DetectionLog> RecentEvents { get; set; } = new();
         public List<Camera> Cameras { get; set; } = new();
-
-        // =====================
-        // 🔥 ADD THIS (FIX ERROR)
-        // =====================
-
         public List<AccessLog> RecentAccessLogs { get; set; } = new();
         public List<Alert> RecentAlerts { get; set; } = new();
+
+        // =====================
+        // 🔥 HYBRID IOT ADDITION
+        // =====================
+
+        public Dictionary<int, int> OccupancyByCamera { get; set; } = new();
     }
 }

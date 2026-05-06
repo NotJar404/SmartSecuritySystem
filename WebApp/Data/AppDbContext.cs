@@ -15,7 +15,6 @@ namespace WebApp.Data
         // DBSets
         // =========================
         public DbSet<User> Users { get; set; }
-
         public DbSet<AuthorizedPersonnel> AuthorizedPersonnel { get; set; }
         public DbSet<LoginLog> LoginLogs { get; set; }
         public DbSet<Room> Rooms { get; set; }
@@ -25,11 +24,8 @@ namespace WebApp.Data
         public DbSet<AccessLog> AccessLogs { get; set; }
         public DbSet<DetectionLog> DetectionLogs { get; set; }
         public DbSet<RoomOccupancy> RoomOccupancy { get; set; }
-
-        // =========================
-        // NEW: NOTIFICATIONS TABLE
-        // =========================
         public DbSet<Notification> Notifications { get; set; }
+        public DbSet<OccupancySession> OccupancySessions { get; set; }
 
         // =========================
         // CONFIGURATION
@@ -68,7 +64,7 @@ namespace WebApp.Data
                 .HasDefaultValue("active");
 
             // =========================
-            // ALERTS
+            // ALERTS (FIXED + ROOM RELATIONSHIP)
             // =========================
             modelBuilder.Entity<Alert>()
                 .ToTable("alerts");
@@ -83,7 +79,16 @@ namespace WebApp.Data
 
             modelBuilder.Entity<Alert>()
                 .Property(a => a.Status)
-                .HasConversion<string>();
+                .HasConversion<string>()
+                .HasDefaultValue(AlertStatus.New)
+                .IsRequired();
+
+            // 🔥 IMPORTANT: Alert → Room relationship
+            modelBuilder.Entity<Alert>()
+                .HasOne(a => a.Room)
+                .WithMany()
+                .HasForeignKey(a => a.RoomId)
+                .OnDelete(DeleteBehavior.SetNull);
 
             // =========================
             // ALARM SETTINGS
@@ -110,6 +115,28 @@ namespace WebApp.Data
                 .ToTable("room_occupancy");
 
             // =========================
+            // OCCUPANCY SESSIONS (FSM STATE TRACKING)
+            // =========================
+            modelBuilder.Entity<OccupancySession>()
+                .ToTable("occupancy_sessions");
+
+            modelBuilder.Entity<OccupancySession>()
+                .HasIndex(s => s.SessionId)
+                .IsUnique();
+
+            modelBuilder.Entity<OccupancySession>()
+                .HasOne(s => s.Person)
+                .WithMany()
+                .HasForeignKey(s => s.PersonId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<OccupancySession>()
+                .HasOne(s => s.Room)
+                .WithMany()
+                .HasForeignKey(s => s.RoomId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // =========================
             // LOGIN LOGS
             // =========================
             modelBuilder.Entity<LoginLog>()
@@ -128,6 +155,10 @@ namespace WebApp.Data
             modelBuilder.Entity<Notification>()
                 .Property(n => n.Timestamp)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            modelBuilder.Entity<Notification>()
+                .Property(n => n.TargetRole)
+                .HasMaxLength(50);
         }
     }
 }
