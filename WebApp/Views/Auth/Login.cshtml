@@ -73,7 +73,15 @@
             <!-- FORGOT PASSWORD FORM -->
             <div id="forgotForm" style="display:none;">
                 <h2>Forgot Password</h2>
+<<<<<<< Updated upstream
                 <p class="subtitle">Enter your email and we’ll send you a temporary password</p>
+=======
+                <p class="subtitle">
+                    Enter your email and we'll send you a reset link
+                </p>
+
+                <form method="post" asp-action="ForgotPassword">
+>>>>>>> Stashed changes
 
                 <form method="post" asp-action="ForgotPassword" asp-controller="Auth">
                     <label>Email</label>
@@ -91,6 +99,7 @@
                     <a href="#" onclick="showLogin()">← Back to Login</a>
                 </div>
 
+<<<<<<< Updated upstream
                 <!-- DITO LALABAS ANG MGA MESSAGES -->
                 @if (ViewBag.ForgotMessage != null)
                 {
@@ -99,6 +108,18 @@
                 @if (ViewBag.ForgotError != null)
                 {
                     <p class="error" style="margin-top:10px;">@ViewBag.ForgotError</p>
+=======
+                @if (ViewBag.ForgotMessage != null)
+                {
+                    <p style="color:green; margin-top:12px;">
+                        <i class="fa fa-check-circle"></i> @ViewBag.ForgotMessage
+                    </p>
+                }
+
+                @if (ViewBag.ForgotError != null)
+                {
+                    <p class="error">@ViewBag.ForgotError</p>
+>>>>>>> Stashed changes
                 }
             </div>
         </div>
@@ -121,11 +142,17 @@
         document.getElementById("forgotForm").style.display = "none";
     }
 
+<<<<<<< Updated upstream
     // Ito ang taga-check kung dapat bang ipakita ang Forgot Form pagka-refresh
     window.onload = function () {
         const hasMessage = '@ViewBag.ForgotMessage';
         const hasError = '@ViewBag.ForgotError';
         if (hasMessage || hasError) {
+=======
+    window.onload = function () {
+        const hasMessage = '@ViewBag.ForgotMessage' || '@ViewBag.ForgotError';
+        if (hasMessage) {
+>>>>>>> Stashed changes
             showForgot();
         }
     }
