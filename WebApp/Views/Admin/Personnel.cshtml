@@ -8,22 +8,29 @@
 <div class="dashboard-container">
 
     <header class="cmd-header d-flex justify-content-between align-items-center mb-3">
-
         <div>
             <h2 class="mb-0">Personnel Management</h2>
             <small class="text-muted">Manage system access and employee profiles</small>
         </div>
-
         <div>
-            <button class="btn-export"
-                    data-toggle="modal"
-                    data-target="#userModal"
-                    onclick="openAddModal()">
+            <button class="btn-export" onclick="openAddModal()">
                 <i class="fa fa-user-plus"></i> Register Account
             </button>
         </div>
-
     </header>
+
+    @if (TempData["Success"] != null)
+    {
+        <div id="successAlert" style="background:#d4edda;color:#155724;border:1px solid #c3e6cb;padding:14px 20px;border-radius:10px;margin-bottom:16px;display:flex;align-items:center;gap:10px;">
+            <i class="fas fa-check-circle"></i> @TempData["Success"]
+        </div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div id="errorAlert" style="background:#f8d7da;color:#721c24;border:1px solid #f5c6cb;padding:14px 20px;border-radius:10px;margin-bottom:16px;display:flex;align-items:center;gap:10px;">
+            <i class="fas fa-exclamation-circle"></i> @TempData["Error"]
+        </div>
+    }
 
     <div class="row mb-4">
         <div class="col-md-4">
@@ -62,10 +69,8 @@
     </div>
 
     <div class="row">
-
         <div class="col-xl-6 mb-3">
             <div class="card">
-
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Dashboard Operators</h5>
                     <div class="input-group">
@@ -73,10 +78,8 @@
                         <input type="text" id="staffSearch" class="form-control form-control-sm" placeholder="Search operators..." onkeyup="liveSearch('staffTable', 'staffSearch')">
                     </div>
                 </div>
-
                 <div style="max-height:380px; overflow-y:auto;">
                     <table class="table table-hover mb-0" id="staffTable">
-
                         <thead>
                             <tr>
                                 <th>User</th>
@@ -84,7 +87,6 @@
                                 <th class="text-right">Actions</th>
                             </tr>
                         </thead>
-
                         <tbody>
                             @foreach (var user in Model.SystemUsers)
                             {
@@ -100,33 +102,20 @@
                                             </div>
                                         </div>
                                     </td>
-
                                     <td class="text-center">
-                                        <span class="status-pill @user.Status.ToLower()">
-                                            @user.Status
-                                        </span>
+                                        <span class="status-pill @user.Status.ToLower()">@user.Status</span>
                                     </td>
-
                                     <td class="text-right">
                                         <button class="btn btn-link btn-sm"
-                                                data-toggle="modal"
-                                                data-target="#userModal"
-                                                onclick='openEditModal(
-                                                    @user.Id,
-                                                    @Html.Raw(Json.Serialize(user.FullName)),
-                                                    @Html.Raw(Json.Serialize(user.Username)),
-                                                    @Html.Raw(Json.Serialize(user.Email)),
-                                                    "staff","","")'>
+                                                onclick='openEditModal(@user.Id, @Html.Raw(Json.Serialize(user.FullName)), @Html.Raw(Json.Serialize(user.Username)), @Html.Raw(Json.Serialize(user.Email)), "staff", "", "", "")'>
                                             <i class="fas fa-edit"></i>
                                         </button>
-
                                         @if (user.Role != "Admin")
                                         {
-                                            <form method="post" asp-action="Delete" asp-controller="Personnel" style="display:inline;" id="deleteStaff-@user.Id">
+                                            <form method="post" asp-action="Delete" asp-controller="Admin" style="display:inline;" id="deleteStaff-@user.Id">
                                                 @Html.AntiForgeryToken()
                                                 <input type="hidden" name="id" value="@user.Id" />
-                                                <button type="button"
-                                                        class="btn btn-link text-danger btn-sm"
+                                                <button type="button" class="btn btn-link text-danger btn-sm"
                                                         onclick="SecureConfirm.confirmDelete('@user.FullName', function() { document.getElementById('deleteStaff-@user.Id').submit(); })">
                                                     <i class="fas fa-trash"></i>
                                                 </button>
@@ -136,16 +125,13 @@
                                 </tr>
                             }
                         </tbody>
-
                     </table>
                 </div>
-
             </div>
         </div>
 
         <div class="col-xl-6 mb-3">
             <div class="card">
-
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Authorized Personnel</h5>
                     <div class="input-group">
@@ -153,10 +139,8 @@
                         <input type="text" id="memberSearch" class="form-control form-control-sm" placeholder="Search members..." onkeyup="liveSearch('memberTable', 'memberSearch')">
                     </div>
                 </div>
-
                 <div style="max-height:380px; overflow-y:auto;">
                     <table class="table table-hover mb-0" id="memberTable">
-
                         <thead>
                             <tr>
                                 <th>Member</th>
@@ -164,7 +148,6 @@
                                 <th class="text-right">Actions</th>
                             </tr>
                         </thead>
-
                         <tbody>
                             @foreach (var m in Model.CampusMembers)
                             {
@@ -173,32 +156,19 @@
                                         <div class="font-weight-bold">@m.FullName</div>
                                         <small class="text-muted search-meta">@m.Email</small>
                                     </td>
-
                                     <td>
                                         <small class="d-block search-meta">@m.Department</small>
                                         <code>@m.RfidTag</code>
                                     </td>
-
                                     <td class="text-right">
                                         <button class="btn btn-link btn-sm"
-                                                data-toggle="modal"
-                                                data-target="#userModal"
-                                                onclick='openEditModal(
-                                                    @m.Id,
-                                                    @Html.Raw(Json.Serialize(m.FullName)),
-                                                    "",
-                                                    @Html.Raw(Json.Serialize(m.Email)),
-                                                    "campus",
-                                                    @Html.Raw(Json.Serialize(m.Department)),
-                                                    @Html.Raw(Json.Serialize(m.RfidTag)))'>
+                                                onclick='openEditModal(@m.Id, @Html.Raw(Json.Serialize(m.FullName)), "", @Html.Raw(Json.Serialize(m.Email)), "campus", @Html.Raw(Json.Serialize(m.Department)), @Html.Raw(Json.Serialize(m.RfidTag)), @Html.Raw(Json.Serialize(m.Phone)))'>
                                             <i class="fas fa-edit"></i>
                                         </button>
-
-                                        <form method="post" asp-action="DeleteMember" asp-controller="Personnel" style="display:inline;">
+                                        <form method="post" asp-action="DeleteMember" asp-controller="Admin" style="display:inline;">
                                             @Html.AntiForgeryToken()
                                             <input type="hidden" name="id" value="@m.Id" />
-                                            <button type="submit"
-                                                    class="btn btn-link text-danger btn-sm">
+                                            <button type="submit" class="btn btn-link text-danger btn-sm">
                                                 <i class="fas fa-trash"></i>
                                             </button>
                                         </form>
@@ -206,40 +176,29 @@
                                 </tr>
                             }
                         </tbody>
-
                     </table>
                 </div>
-
             </div>
         </div>
-
     </div>
 </div>
 
-<div class="modal fade" id="userModal" tabindex="-1" role="dialog" aria-hidden="true">
+<!-- Registration Modal -->
+<div class="modal" id="userModal" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" role="document">
-
         <div class="modal-content">
-
-            <form method="post" id="userForm">
+            <form asp-controller="Admin" asp-action="Add" method="post" id="userForm">
                 @Html.AntiForgeryToken()
-                <input type="hidden" id="userId" name="Id" />
+                <input type="hidden" id="userId" name="user.Id" value="0" />
 
                 <div class="modal-header d-flex justify-content-between align-items-center">
-
                     <h5 id="modalTitle" class="mb-0">Register Account</h5>
-
-                    <button type="button"
-                            class="close"
-                            data-dismiss="modal"
-                            aria-label="Close">
+                    <button type="button" class="close" onclick="closeModal()" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
-
                 </div>
 
                 <div class="modal-body">
-
                     <div class="form-group">
                         <label>Account Type</label>
                         <select id="RegType" name="RegType" class="form-control" onchange="toggleFields()">
@@ -250,18 +209,21 @@
 
                     <div class="form-group">
                         <label>Full Name</label>
-                        <input id="fullName" name="FullName" class="form-control" required />
+                        <input id="fullName" name="user.FullName" class="form-control" required />
                     </div>
 
                     <div class="form-group">
                         <label>Email <small style="color:var(--accent);">(Gmail only)</small></label>
-                        <input id="email" name="Email" type="email" class="form-control" placeholder="name@gmail.com" required pattern=".*@@gmail\.com$" title="Only Gmail addresses are accepted" />
+                        <input id="email" name="user.Email" type="email" class="form-control"
+                               placeholder="name@gmail.com" required
+                               pattern=".*@@gmail\.com$"
+                               title="Only Gmail addresses are accepted" />
                     </div>
 
                     <div id="staffFields" style="display:none;">
                         <div class="form-group">
                             <label>Username</label>
-                            <input id="username" name="Username" class="form-control" />
+                            <input id="username" name="user.Username" class="form-control" />
                         </div>
                         <div class="form-group" style="background:var(--bg-input);padding:12px;border-radius:var(--radius-sm);">
                             <small style="color:var(--text-dim);">
@@ -274,10 +236,6 @@
 
                     <div id="campusFields" style="display:none;">
                         <div class="form-group">
-                            <label>Profile Image</label>
-                            <input id="profileImage" name="ProfileImage" type="file" accept="image/*" class="form-control" />
-                        </div>
-                        <div class="form-group">
                             <label>RFID Tag</label>
                             <input id="rfidTag" name="RfidTag" class="form-control" placeholder="Enter RFID tag ID" />
                         </div>
@@ -287,126 +245,95 @@
                         </div>
                         <div class="form-group">
                             <label>Phone Number</label>
-                            <input id="phoneNumber" name="PhoneNumber" type="tel" class="form-control" />
+                            <input id="phoneNumber" name="Phone" type="tel" class="form-control" />
                         </div>
                     </div>
-
                 </div>
 
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-light btn-sm" data-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-light btn-sm" onclick="closeModal()">Cancel</button>
                     <button type="submit" class="btn btn-primary btn-sm">Save</button>
                 </div>
-
             </form>
-
         </div>
-
     </div>
 </div>
 
 @section Scripts {
 <script>
-// Search Functionality
 function liveSearch(tableId, inputId) {
     const input = document.getElementById(inputId);
     const filter = input.value.toUpperCase();
     const table = document.getElementById(tableId);
     const tr = table.getElementsByTagName("tr");
-
     for (let i = 1; i < tr.length; i++) {
         const rowText = tr[i].textContent || tr[i].innerText;
-        if (rowText.toUpperCase().indexOf(filter) > -1) {
-            tr[i].style.display = "";
-        } else {
-            tr[i].style.display = "none";
-        }
+        tr[i].style.display = rowText.toUpperCase().indexOf(filter) > -1 ? "" : "none";
     }
-}
-
-// Shortcut Filter Function
-function applyQuickFilter(tableId, term) {
-    const searchInputId = tableId === 'staffTable' ? 'staffSearch' : 'memberSearch';
-    const input = document.getElementById(searchInputId);
-    input.value = term;
-    liveSearch(tableId, searchInputId);
 }
 
 function openAddModal() {
     document.getElementById("userForm").reset();
     document.getElementById("modalTitle").innerText = "Register Account";
-    document.getElementById("userForm").action = "/Personnel/Add";
+    document.getElementById("userForm").action = "/Admin/Add";
     document.getElementById("userId").value = "0";
     document.getElementById("RegType").value = "staff";
     toggleFields();
-    
-    // Show modal
-    const modal = document.getElementById('userModal');
-    modal.classList.add('show');
-    document.body.style.overflow = 'hidden';
+    showModal();
 }
 
-function openEditModal(id, name, user, email, type, dept, rfid, phone, profileImage) {
+function openEditModal(id, name, user, email, type, dept, rfid, phone) {
     document.getElementById("userForm").reset();
-
     document.getElementById("userId").value = id;
     document.getElementById("fullName").value = name;
     document.getElementById("email").value = email;
     document.getElementById("RegType").value = type;
-
-    document.getElementById("userForm").action = "/Personnel/Edit";
+    document.getElementById("userForm").action = "/Admin/Edit";
     document.getElementById("modalTitle").innerText = "Edit Personnel";
 
     if (type === "staff") {
         document.getElementById("username").value = user || "";
-        document.getElementById("password").value = "";
     } else {
         document.getElementById("department").value = dept || "";
         document.getElementById("rfidTag").value = rfid || "";
         document.getElementById("phoneNumber").value = phone || "";
     }
-
     toggleFields();
-    
-    // Show modal
-    const modal = document.getElementById('userModal');
-    modal.classList.add('show');
-    document.body.style.overflow = 'hidden';
+    showModal();
 }
 
 function toggleFields() {
     const type = document.getElementById("RegType").value;
-    document.getElementById("staffFields").style.display = (type === "staff") ? "flex" : "none";
-    document.getElementById("campusFields").style.display = (type === "campus") ? "flex" : "none";
+    document.getElementById("staffFields").style.display = (type === "staff") ? "block" : "none";
+    document.getElementById("campusFields").style.display = (type === "campus") ? "block" : "none";
+}
+
+function showModal() {
+    const modal = document.getElementById("userModal");
+    modal.classList.add("show");
+    document.body.style.overflow = "hidden";
 }
 
 function closeModal() {
-    const modal = document.getElementById('userModal');
-    modal.classList.remove('show');
-    document.body.style.overflow = 'auto';
+    const modal = document.getElementById("userModal");
+    modal.classList.remove("show");
+    document.body.style.overflow = "";
 }
 
-// Event Listeners for Closing
-document.addEventListener('DOMContentLoaded', function() {
-    const closeBtn = document.querySelector('#userModal .close');
-    if (closeBtn) {
-        closeBtn.addEventListener('click', closeModal);
-    }
-    
-    const cancelBtn = document.querySelector('#userModal .modal-footer .btn-light');
-    if (cancelBtn) {
-        cancelBtn.addEventListener('click', closeModal);
-    }
-    
-    const modal = document.getElementById('userModal');
-    modal.addEventListener('click', function(event) {
-        if (event.target === modal) {
-            closeModal();
-        }
+document.addEventListener('DOMContentLoaded', function () {
+    toggleFields();
+
+    document.getElementById("userModal").addEventListener("click", function (e) {
+        if (e.target === this) closeModal();
     });
 
-    // Intercept personnel form with two-step confirmation
-    SecureConfirm.interceptForm('userForm', 'Confirm Personnel Action', 'userModal');
+    
+    setTimeout(function() {
+        const s = document.getElementById("successAlert");
+        const e = document.getElementById("errorAlert");
+        if (s) s.style.display = "none";
+        if (e) e.style.display = "none";
+    }, 5000);
 });
 </script>
 }
