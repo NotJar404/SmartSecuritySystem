@@ -37,7 +37,13 @@ namespace SmartSecuritySystem.Controllers
                 return View("Login");
             }
 
+<<<<<<< Updated upstream
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == username);
+=======
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Username == username);
+
+>>>>>>> Stashed changes
             if (user == null)
             {
                 await LogLogin(username, ipAddress, false);
@@ -45,6 +51,7 @@ namespace SmartSecuritySystem.Controllers
                 return View("Login");
             }
 
+<<<<<<< Updated upstream
             if (!string.Equals(user.Status?.Trim(), "Active", StringComparison.OrdinalIgnoreCase))
             {
                 await LogLogin(username, ipAddress, false);
@@ -52,6 +59,27 @@ namespace SmartSecuritySystem.Controllers
                 return View("Login");
             }
 
+=======
+            var tenMinutesAgo = now.AddMinutes(-10);
+            var failedAttempts = await _context.LoginLogs
+                .Where(l => l.Username == username && !l.Success && l.Timestamp >= tenMinutesAgo)
+                .CountAsync();
+
+            if (failedAttempts >= 3)
+            {
+                await LogLogin(username, ipAddress, false);
+                ViewBag.LoginError = "Account temporarily locked. Try again after 10 minutes.";
+                return View("Login");
+            }
+
+            if (!string.Equals(user.Status?.Trim(), "active", StringComparison.OrdinalIgnoreCase))
+            {
+                await LogLogin(username, ipAddress, false);
+                ViewBag.LoginError = "Account is inactive or locked";
+                return View("Login");
+            }
+
+>>>>>>> Stashed changes
             var storedPassword = user.PasswordHash?.Trim() ?? "";
             var hashedInput = HashPassword(password?.Trim() ?? "");
 
@@ -66,6 +94,7 @@ namespace SmartSecuritySystem.Controllers
                 return View("Login");
             }
 
+<<<<<<< Updated upstream
             // --- REDIRECT IF MUST CHANGE PASSWORD ---
             if (user.MustChangePassword)
             {
@@ -77,6 +106,11 @@ namespace SmartSecuritySystem.Controllers
 
            
             if (string.Equals(storedPassword, password, StringComparison.Ordinal))
+=======
+            await LogLogin(username, ipAddress, true);
+
+            if (string.Equals(storedPassword, inputPassword, StringComparison.Ordinal))
+>>>>>>> Stashed changes
             {
                 user.PasswordHash = hashedInput;
                 user.UpdatedAt = now;
@@ -93,9 +127,18 @@ namespace SmartSecuritySystem.Controllers
                 new Claim(ClaimTypes.Role, role)
             };
 
+<<<<<<< Updated upstream
+=======
+            if (user.MustChangePassword)
+            {
+                claims.Add(new Claim("MustChangePassword", "true"));
+            }
+
+>>>>>>> Stashed changes
             var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
             await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), new AuthenticationProperties { IsPersistent = rememberMe });
 
+<<<<<<< Updated upstream
             return role.Equals("Admin", StringComparison.OrdinalIgnoreCase) ? RedirectToAction("Index", "Admin") : RedirectToAction("Index", "Dashboard");
         }
 
@@ -103,6 +146,106 @@ namespace SmartSecuritySystem.Controllers
         public async Task<IActionResult> ForgotPassword(string email)
         {
             
+=======
+            await HttpContext.SignInAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                principal,
+                new AuthenticationProperties
+                {
+                    IsPersistent = rememberMe
+                });
+
+            // ✅ ROLE-BASED REDIRECT KUNG MUSTCHANGEPASSWORD
+            if (user.MustChangePassword)
+            {
+                if (role.Equals("Admin", StringComparison.OrdinalIgnoreCase))
+                    return RedirectToAction("ForcedChangePassword", "Auth"); // walang sidebar
+                else
+                    return RedirectToAction("Index", "Profile"); // may sidebar
+            }
+
+            if (role.Equals("Admin", StringComparison.OrdinalIgnoreCase))
+                return RedirectToAction("Index", "Admin");
+
+            return RedirectToAction("Index", "Dashboard");
+        }
+
+        // =========================
+        // FORCED CHANGE PASSWORD (GET)
+        // =========================
+        [HttpGet]
+        public IActionResult ForcedChangePassword()
+        {
+            var userId = GetUserId();
+            if (userId == null) return RedirectToAction("Login");
+
+            ViewBag.UserId = userId;
+            return View("~/Views/Auth/ForcedChangePassword.cshtml");
+        }
+
+        // =========================
+        // FORCED CHANGE PASSWORD (POST)
+        // =========================
+        [HttpPost]
+        public async Task<IActionResult> ForcedChangePassword(int userId, string newPassword, string confirmPassword)
+        {
+            if (newPassword != confirmPassword)
+            {
+                ViewBag.Error = "Passwords do not match.";
+                ViewBag.UserId = userId;
+                return View("~/Views/Auth/ForcedChangePassword.cshtml");
+            }
+
+            if (newPassword.Length < 8)
+            {
+                ViewBag.Error = "Password must be at least 8 characters.";
+                ViewBag.UserId = userId;
+                return View("~/Views/Auth/ForcedChangePassword.cshtml");
+            }
+
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null) return RedirectToAction("Login");
+
+            user.PasswordHash = HashPassword(newPassword);
+            user.MustChangePassword = false;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            var role = user.Role?.Trim() ?? "Security";
+
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Name, user.Username ?? ""),
+                new Claim(ClaimTypes.Role, role),
+                new Claim("FullName", user.FullName ?? ""),
+                new Claim("Email", user.Email ?? "")
+            };
+
+            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+            var principal = new ClaimsPrincipal(identity);
+
+            await HttpContext.SignInAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                principal,
+                new AuthenticationProperties { IsPersistent = false });
+
+            if (role.Equals("Admin", StringComparison.OrdinalIgnoreCase))
+                return RedirectToAction("Index", "Admin");
+
+            return RedirectToAction("Index", "Dashboard");
+        }
+
+        // =========================
+        // FORGOT PASSWORD
+        // =========================
+        [HttpPost]
+        public async Task<IActionResult> ForgotPassword(string email)
+        {
+            ViewBag.ShowForgot = true;
+
+>>>>>>> Stashed changes
             if (string.IsNullOrWhiteSpace(email))
             {
                 ViewBag.ForgotError = "Email is required";
@@ -112,6 +255,7 @@ namespace SmartSecuritySystem.Controllers
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
             if (user == null)
             {
+<<<<<<< Updated upstream
                 ViewBag.ForgotError = "Email not found in our system.";
                 return View("Login");
             }
@@ -120,10 +264,20 @@ namespace SmartSecuritySystem.Controllers
             var newPass = GenerateRandomPassword(10);
             user.PasswordHash = HashPassword(newPass);
             user.MustChangePassword = true;
+=======
+                ViewBag.ForgotError = "Email not found";
+                return View("Login");
+            }
+
+            var newPassword = GenerateRandomPassword(10);
+            user.PasswordHash = HashPassword(newPassword);
+            user.MustChangePassword = true; // ← flag para ma-redirect sa tamang page
+>>>>>>> Stashed changes
             user.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
 
+<<<<<<< Updated upstream
             // Email details
             string subject = "SecureVision - Temporary Password";
             string body = $@"
@@ -138,6 +292,15 @@ namespace SmartSecuritySystem.Controllers
             SendEmail(user.Email, subject, body);
 
             ViewBag.ForgotMessage = "Check your email for the temporary password.";
+=======
+            SendEmail(
+                user.Email ?? "",
+                "Your New Password — SecureVision",
+                $"Hello {user.FullName},\n\nYour new temporary password is: {newPassword}\n\nPlease log in and change it immediately."
+            );
+
+            ViewBag.ForgotMessage = "A new password has been sent to your email.";
+>>>>>>> Stashed changes
             return View("Login");
         }
 
@@ -152,6 +315,7 @@ namespace SmartSecuritySystem.Controllers
         [HttpPost]
         public async Task<IActionResult> ForcedChangePassword(int userId, string newPassword, string confirmPassword)
         {
+<<<<<<< Updated upstream
             if (newPassword != confirmPassword)
             {
                 ViewBag.Error = "Passwords do not match.";
@@ -169,6 +333,57 @@ namespace SmartSecuritySystem.Controllers
                 return RedirectToAction("Login");
             }
             return RedirectToAction("Login");
+=======
+            var userId = GetUserId();
+            if (userId == null) return RedirectToAction("Login");
+
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null) return RedirectToAction("Login");
+
+            user.FullName = fullName;
+            user.Email = email;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = "Profile updated successfully!";
+            return RedirectToAction("Profile");
+        }
+
+        // =========================
+        // CHANGE PASSWORD
+        // =========================
+        [HttpPost]
+        public async Task<IActionResult> ChangePassword(string currentPassword, string newPassword)
+        {
+            var userId = GetUserId();
+            if (userId == null) return RedirectToAction("Login");
+
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null) return RedirectToAction("Login");
+
+            var stored = user.PasswordHash?.Trim() ?? "";
+            var input = currentPassword?.Trim() ?? "";
+            var hashedInput = HashPassword(input);
+
+            bool matches =
+                string.Equals(stored, input, StringComparison.Ordinal) ||
+                string.Equals(stored, hashedInput, StringComparison.Ordinal);
+
+            if (!matches)
+            {
+                TempData["PasswordError"] = "Current password is incorrect";
+                return RedirectToAction("Profile");
+            }
+
+            user.PasswordHash = HashPassword(newPassword ?? "");
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            TempData["PasswordSuccess"] = "Password updated successfully!";
+            return RedirectToAction("Profile");
+>>>>>>> Stashed changes
         }
 
         // =========================
@@ -176,7 +391,35 @@ namespace SmartSecuritySystem.Controllers
         // =========================
         private async Task LogLogin(string username, string ip, bool success)
         {
+<<<<<<< Updated upstream
             try
+=======
+            var id = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            return int.TryParse(id, out var userId) ? userId : null;
+        }
+
+        private string GenerateRandomPassword(int length)
+        {
+            const string upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+            const string lower = "abcdefghijkmnopqrstuvwxyz";
+            const string digits = "123456789";
+            const string special = "!@#$%&*";
+            const string all = upper + lower + digits + special;
+
+            length = Math.Max(length, 8);
+            var random = new Random();
+            var password = new char[length];
+
+            password[0] = upper[random.Next(upper.Length)];
+            password[1] = lower[random.Next(lower.Length)];
+            password[2] = digits[random.Next(digits.Length)];
+            password[3] = special[random.Next(special.Length)];
+
+            for (int i = 4; i < length; i++)
+                password[i] = all[random.Next(all.Length)];
+
+            for (int i = password.Length - 1; i > 0; i--)
+>>>>>>> Stashed changes
             {
                 _context.LoginLogs.Add(new LoginLog { Username = username, IpAddress = ip, Success = success, Timestamp = DateTime.UtcNow });
                 await _context.SaveChangesAsync();
@@ -186,6 +429,10 @@ namespace SmartSecuritySystem.Controllers
 
         private string HashPassword(string password)
         {
+<<<<<<< Updated upstream
+=======
+            password ??= "";
+>>>>>>> Stashed changes
             using var sha = SHA256.Create();
             return Convert.ToBase64String(sha.ComputeHash(Encoding.UTF8.GetBytes(password ?? "")));
         }
@@ -199,7 +446,14 @@ namespace SmartSecuritySystem.Controllers
 
         private void SendEmail(string toEmail, string subject, string body)
         {
+<<<<<<< Updated upstream
             try
+=======
+            var fromEmail = "abuanmarden4@gmail.com";
+            var appPassword = "womlpksgninuqgty";
+
+            var client = new SmtpClient("smtp.gmail.com", 587)
+>>>>>>> Stashed changes
             {
                 var fromEmail = "abuanmarden4@gmail.com";
                 var appPassword = "womlpksgninuqgty";
