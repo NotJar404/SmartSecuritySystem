@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -53,11 +53,11 @@
                         <li class="nav-item">
                             <a asp-controller="Admin" asp-action="Analytics"><i class="fa fa-chart-bar"></i> Analytics Report</a>
                         </li>
-                        <li class="nav-item">
-                            <a asp-controller="Admin" asp-action="System"><i class="fa fa-gear"></i> System Settings</a>
-                        </li>
                         <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Logs" ? "active" : "")">
                             <a asp-controller="Logs" asp-action="Index"><i class="fa fa-history"></i> Activity Logs</a>
+                        </li>
+                        <li class="nav-item">
+                            <a asp-controller="Admin" asp-action="System"><i class="fa fa-gear"></i> System Settings</a>
                         </li>
                     }
                     else

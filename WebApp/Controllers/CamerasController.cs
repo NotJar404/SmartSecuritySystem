@@ -623,6 +623,228 @@ namespace WebApp.Controllers
                     return Ok(new { message = "Alert recorded" });
                 }
 
+                // =========================
+                // EXTENDED STAY — Warning before loitering limit
+                // =========================
+                case "EXTENDED_STAY":
+                {
+                    var session = _context.OccupancySessions
+                        .FirstOrDefault(s => s.SessionId == data.SessionId && s.ExitTime == null);
+
+                    if (session == null)
+                        return NotFound(new { error = "No active session found" });
+
+                    // DEDUP: Only one extended stay alert per session per 10 minutes
+                    var recentExtended = _context.Alerts.Any(a =>
+                        a.RoomId == session.RoomId &&
+                        a.Type == AlertType.ExtendedStay &&
+                        a.Timestamp > DateTime.UtcNow.AddMinutes(-10));
+
+                    if (recentExtended)
+                        return Ok(new { message = "Extended stay already flagged", duplicate = true });
+
+                    _context.Alerts.Add(new Alert
+                    {
+                        Type = AlertType.ExtendedStay,
+                        Description = data.Description ?? $"Personnel approaching stay limit — Session {data.SessionId[..8]}",
+                        Severity = SeverityLevel.WARNING,
+                        RoomId = session.RoomId,
+                        Status = AlertStatus.New,
+                        Timestamp = DateTime.UtcNow
+                    });
+
+                    _context.Notifications.Add(new Notification
+                    {
+                        UserId = null,
+                        TargetRole = "Security",
+                        Message = $"⏰ Extended stay warning in {(session.Room?.RoomName ?? "Room")}",
+                        IsRead = false,
+                        Timestamp = DateTime.UtcNow
+                    });
+
+                    _context.SaveChanges();
+                    return Ok(new { message = "Extended stay warning recorded" });
+                }
+
+                // =========================
+                // OCCUPANCY EXCEEDED — Room over max capacity
+                // =========================
+                case "OCCUPANCY_EXCEEDED":
+                {
+                    int? roomId = data.RoomId;
+                    if (roomId == null && data.CameraId > 0)
+                    {
+                        var camera = _context.CameraDevices
+                            .FirstOrDefault(c => c.Id == data.CameraId);
+                        roomId = camera?.RoomId;
+                    }
+
+                    // DEDUP: Only one capacity alert per room per 5 minutes
+                    var recentCapacity = _context.Alerts.Any(a =>
+                        a.RoomId == roomId &&
+                        a.Type == AlertType.OccupancyExceeded &&
+                        a.Timestamp > DateTime.UtcNow.AddMinutes(-5));
+
+                    if (recentCapacity)
+                        return Ok(new { message = "Capacity alert already active", duplicate = true });
+
+                    _context.Alerts.Add(new Alert
+                    {
+                        Type = AlertType.OccupancyExceeded,
+                        Description = data.Description ?? "Room capacity exceeded",
+                        Severity = SeverityLevel.CRITICAL,
+                        RoomId = roomId,
+                        Status = AlertStatus.New,
+                        Timestamp = DateTime.UtcNow
+                    });
+
+                    _context.Notifications.Add(new Notification
+                    {
+                        UserId = null,
+                        TargetRole = "Security",
+                        Message = $"🚫 Room capacity exceeded — {data.Description}",
+                        IsRead = false,
+                        Timestamp = DateTime.UtcNow
+                    });
+
+                    _context.SaveChanges();
+                    return Ok(new { message = "Occupancy exceeded alert recorded" });
+                }
+
+                // =========================
+                // SUSPICIOUS IDLE — Person present but no PIR motion
+                // =========================
+                case "SUSPICIOUS_IDLE":
+                {
+                    var session = _context.OccupancySessions
+                        .FirstOrDefault(s => s.SessionId == data.SessionId && s.ExitTime == null);
+
+                    int? roomId = session?.RoomId ?? data.RoomId;
+
+                    // DEDUP: Only one idle alert per room per 15 minutes
+                    var recentIdle = _context.Alerts.Any(a =>
+                        a.RoomId == roomId &&
+                        a.Type == AlertType.SuspiciousIdle &&
+                        a.Timestamp > DateTime.UtcNow.AddMinutes(-15));
+
+                    if (recentIdle)
+                        return Ok(new { message = "Suspicious idle already flagged", duplicate = true });
+
+                    _context.Alerts.Add(new Alert
+                    {
+                        Type = AlertType.SuspiciousIdle,
+                        Description = data.Description ?? "Person detected but no movement for extended period",
+                        Severity = SeverityLevel.WARNING,
+                        RoomId = roomId,
+                        Status = AlertStatus.New,
+                        Timestamp = DateTime.UtcNow
+                    });
+
+                    _context.Notifications.Add(new Notification
+                    {
+                        UserId = null,
+                        TargetRole = "Security",
+                        Message = $"🕵️ Suspicious inactivity detected in room",
+                        IsRead = false,
+                        Timestamp = DateTime.UtcNow
+                    });
+
+                    _context.SaveChanges();
+                    return Ok(new { message = "Suspicious idle recorded" });
+                }
+
+                // =========================
+                // ENTRANCE LOITERING — Lingering at entrance without RFID
+                // =========================
+                case "ENTRANCE_LOITERING":
+                {
+                    int? roomId = data.RoomId;
+                    if (roomId == null && data.CameraId > 0)
+                    {
+                        var camera = _context.CameraDevices
+                            .FirstOrDefault(c => c.Id == data.CameraId);
+                        roomId = camera?.RoomId;
+                    }
+
+                    var severity = ParseSeverity(data.Severity ?? "WARNING");
+
+                    // DEDUP: Only one entrance loitering alert per room per 5 minutes
+                    var recentLoiter = _context.Alerts.Any(a =>
+                        a.RoomId == roomId &&
+                        a.Type == AlertType.EntranceLoitering &&
+                        a.Timestamp > DateTime.UtcNow.AddMinutes(-5));
+
+                    if (recentLoiter)
+                        return Ok(new { message = "Entrance loitering already flagged", duplicate = true });
+
+                    _context.Alerts.Add(new Alert
+                    {
+                        Type = AlertType.EntranceLoitering,
+                        Description = data.Description ?? "Person lingering at entrance without RFID authentication",
+                        Severity = severity,
+                        RoomId = roomId,
+                        Status = AlertStatus.New,
+                        Timestamp = DateTime.UtcNow
+                    });
+
+                    _context.Notifications.Add(new Notification
+                    {
+                        UserId = null,
+                        TargetRole = "Security",
+                        Message = $"🚶 Entrance loitering detected — {data.Description}",
+                        IsRead = false,
+                        Timestamp = DateTime.UtcNow
+                    });
+
+                    _context.SaveChanges();
+                    return Ok(new { message = "Entrance loitering recorded" });
+                }
+
+                // =========================
+                // AFTER HOURS — Person in room outside operating hours
+                // =========================
+                case "AFTER_HOURS":
+                {
+                    int? roomId = data.RoomId;
+                    if (roomId == null && data.CameraId > 0)
+                    {
+                        var camera = _context.CameraDevices
+                            .FirstOrDefault(c => c.Id == data.CameraId);
+                        roomId = camera?.RoomId;
+                    }
+
+                    // DEDUP: Only one after-hours alert per room per 30 minutes
+                    var recentAfterHours = _context.Alerts.Any(a =>
+                        a.RoomId == roomId &&
+                        a.Type == AlertType.AfterHoursPresence &&
+                        a.Timestamp > DateTime.UtcNow.AddMinutes(-30));
+
+                    if (recentAfterHours)
+                        return Ok(new { message = "After-hours alert already active", duplicate = true });
+
+                    _context.Alerts.Add(new Alert
+                    {
+                        Type = AlertType.AfterHoursPresence,
+                        Description = data.Description ?? "Person detected in room outside operating hours",
+                        Severity = SeverityLevel.CRITICAL,
+                        RoomId = roomId,
+                        Status = AlertStatus.New,
+                        Timestamp = DateTime.UtcNow
+                    });
+
+                    _context.Notifications.Add(new Notification
+                    {
+                        UserId = null,
+                        TargetRole = "Admin",
+                        Message = $"🌙 After-hours presence detected — {data.Description}",
+                        IsRead = false,
+                        Timestamp = DateTime.UtcNow
+                    });
+
+                    _context.SaveChanges();
+                    return Ok(new { message = "After-hours alert recorded" });
+                }
+
                 default:
                     return BadRequest(new { error = $"Unknown event type: {data.Event}" });
             }
@@ -762,6 +984,13 @@ namespace WebApp.Controllers
                 "accessdenied" => AlertType.AccessDenied,
                 "forcedentry" => AlertType.ForcedEntry,
                 "door" => AlertType.DoorEvent,
+                // Indoor monitoring events
+                "loitering" => AlertType.Loitering,
+                "occupancyexceeded" => AlertType.OccupancyExceeded,
+                "extendedstay" => AlertType.ExtendedStay,
+                "suspiciousidle" => AlertType.SuspiciousIdle,
+                "entranceloitering" => AlertType.EntranceLoitering,
+                "afterhourspresence" => AlertType.AfterHoursPresence,
                 _ => AlertType.Intrusion
             };
         }
@@ -786,9 +1015,14 @@ namespace WebApp.Controllers
             {
                 "face_obstruction" => AlertType.SuspiciousActivity,
                 "unknown_face" => AlertType.UnauthorizedAccess,
-                "loitering" => AlertType.SuspiciousActivity,
+                "loitering" => AlertType.Loitering,
                 "intrusion" => AlertType.Intrusion,
                 "no_face" => AlertType.SuspiciousActivity,
+                "extended_stay" => AlertType.ExtendedStay,
+                "occupancy_exceeded" => AlertType.OccupancyExceeded,
+                "suspicious_idle" => AlertType.SuspiciousIdle,
+                "entrance_loitering" => AlertType.EntranceLoitering,
+                "after_hours" => AlertType.AfterHoursPresence,
                 _ => AlertType.SuspiciousActivity
             };
         }
@@ -801,8 +1035,13 @@ namespace WebApp.Controllers
                 "intrusion" => SeverityLevel.CRITICAL,
                 "face_obstruction" => SeverityLevel.WARNING,
                 "unknown_face" => SeverityLevel.WARNING,
-                "loitering" => SeverityLevel.INFO,
+                "loitering" => SeverityLevel.WARNING,
                 "no_face" => SeverityLevel.INFO,
+                "extended_stay" => SeverityLevel.WARNING,
+                "occupancy_exceeded" => SeverityLevel.CRITICAL,
+                "suspicious_idle" => SeverityLevel.WARNING,
+                "entrance_loitering" => SeverityLevel.WARNING,
+                "after_hours" => SeverityLevel.CRITICAL,
                 _ => SeverityLevel.WARNING
             };
         }
@@ -819,6 +1058,11 @@ namespace WebApp.Controllers
                 "no_face" => "Body detected without visible face",
                 "face_verified" => "Face verified successfully",
                 "face_detected" => "Face detected",
+                "extended_stay" => "Extended stay warning — approaching time limit",
+                "occupancy_exceeded" => "Room capacity exceeded",
+                "suspicious_idle" => "Suspicious inactivity — person present, no movement",
+                "entrance_loitering" => "Entrance loitering — lingering without RFID",
+                "after_hours" => "After-hours presence detected",
                 _ => "Detection event"
             };
         }

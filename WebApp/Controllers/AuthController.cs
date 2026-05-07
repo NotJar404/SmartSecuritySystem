@@ -187,9 +187,9 @@ namespace SmartSecuritySystem.Controllers
                 ViewBag.OtpEmail = email;
                 ViewBag.ForgotMessage = "A 6-digit verification code has been sent to your email.";
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                ViewBag.ForgotError = "Failed to send verification email. Please try again.";
+                ViewBag.ForgotError = $"Failed to send email: {ex.Message}";
             }
 
             return View("Login");

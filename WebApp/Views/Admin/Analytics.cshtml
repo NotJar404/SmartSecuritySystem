@@ -92,17 +92,55 @@
                     <label>Room/Location</label>
                     <select name="locationFilter" id="locationFilter" class="filter-input">
                         <option value="">All Rooms</option>
-                        <option value="Lobby" selected="@(ViewBag.LocationFilter == "Lobby")">Lobby</option>
-                        <option value="Server Room A" selected="@(ViewBag.LocationFilter == "Server Room A")">Server Room A</option>
+                        @if (ViewBag.AvailableRooms != null)
+                        {
+                            @foreach (var room in ViewBag.AvailableRooms)
+                            {
+                                if (ViewBag.LocationFilter == room.RoomName)
+                                {
+                                    <option value="@room.RoomName" selected>@room.RoomName</option>
+                                }
+                                else
+                                {
+                                    <option value="@room.RoomName">@room.RoomName</option>
+                                }
+                            }
+                        }
                     </select>
                 </div>
 
                 <div class="filter-field">
                     <label>Event Type</label>
                     <select name="eventFilter" id="eventFilter" class="filter-input">
-                        <option value="">All Events</option>
-                        <option value="Alert" selected="@(ViewBag.EventFilter == "Alert")">Alert</option>
-                        <option value="Access" selected="@(ViewBag.EventFilter == "Access")">Access</option>
+                        @{
+                            string eventFilter = ViewBag.EventFilter as string ?? "";
+                        }
+                        @if (string.IsNullOrEmpty(eventFilter))
+                        {
+                            <option value="" selected>All Events</option>
+                        }
+                        else
+                        {
+                            <option value="">All Events</option>
+                        }
+                        
+                        @if (eventFilter == "Alert")
+                        {
+                            <option value="Alert" selected>Alert</option>
+                        }
+                        else
+                        {
+                            <option value="Alert">Alert</option>
+                        }
+                        
+                        @if (eventFilter == "Access")
+                        {
+                            <option value="Access" selected>Access</option>
+                        }
+                        else
+                        {
+                            <option value="Access">Access</option>
+                        }
                     </select>
                 </div>
             </div>
@@ -113,21 +151,21 @@
     <div class="charts-grid">
         <div class="panel">
             <div class="panel-header">
-                <h5>Alert Trends</h5>
-                <small>Weekly incident frequency</small>
+                <h5>Alert Trends by Type</h5>
+                <small>Alerts grouped by type — Intrusion, UnauthorizedAccess, etc.</small>
             </div>
             <div class="chart-wrapper">
-                <canvas id="alertChart"></canvas>
+                <canvas id="alertTypeChart"></canvas>
             </div>
         </div>
 
         <div class="panel">
             <div class="panel-header">
-                <h5>Access Activity</h5>
-                <small>Authorized entry patterns</small>
+                <h5>Access Security Posture</h5>
+                <small>Access results breakdown: Authorized, Suspicious, Unauthorized</small>
             </div>
             <div class="chart-wrapper">
-                <canvas id="accessChart"></canvas>
+                <canvas id="accessResultChart"></canvas>
             </div>
         </div>
     </div>
@@ -135,21 +173,21 @@
     <div class="charts-grid mt-4">
         <div class="panel">
             <div class="panel-header">
-                <h5>Detection Density</h5>
-                <small>Motion and sensor triggers</small>
+                <h5>Detection Type Distribution</h5>
+                <small>Detections by type — Person, Face, Motion, etc.</small>
             </div>
             <div class="chart-wrapper">
-                <canvas id="motionChart"></canvas>
+                <canvas id="detectionTypeChart"></canvas>
             </div>
         </div>
 
         <div class="panel">
             <div class="panel-header">
-                <h5>Facility Occupancy</h5>
-                <small>Zone distribution</small>
+                <h5>Facility Occupancy by Room</h5>
+                <small>Total occupancy count per room</small>
             </div>
             <div class="chart-wrapper">
-                <canvas id="occupancyChart"></canvas>
+                <canvas id="occupancyRoomChart"></canvas>
             </div>
         </div>
     </div>
@@ -247,8 +285,13 @@
                     <label>Location</label>
                     <select id="exportLocation" class="form-control">
                         <option value="">All Rooms</option>
-                        <option>Lobby</option>
-                        <option>Server Room A</option>
+                        @if (ViewBag.AvailableRooms != null)
+                        {
+                            @foreach (var room in ViewBag.AvailableRooms)
+                            {
+                                <option value="@room.RoomName">@room.RoomName</option>
+                            }
+                        }
                     </select>
                 </div>
 
@@ -331,67 +374,429 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+// =============================================
+// HELPER: Load image as Base64 for jsPDF
+// =============================================
+function loadImageAsBase64(url) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = function() {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            canvas.getContext('2d').drawImage(img, 0, 0);
+            resolve(canvas.toDataURL('image/png'));
+        };
+        img.onerror = function() { resolve(null); };
+        img.src = url;
+    });
+}
 
-
-// EXPORT PDF WITH FILTERS
+// =============================================
+// QCU LETTERHEAD PDF EXPORT WITH jsPDF + LOGOS
+// =============================================
 async function generateExportPDF(){
-    const startDate = document.getElementById('exportStartDate').value;
-    const endDate = document.getElementById('exportEndDate').value;
-    const location = document.getElementById('exportLocation').value;
-    const eventType = document.getElementById('exportEventType').value;
+    const startDate = document.getElementById('exportStartDate').value || 'N/A';
+    const endDate = document.getElementById('exportEndDate').value || 'N/A';
+    const location = document.getElementById('exportLocation').value || 'All Rooms';
+    const eventType = document.getElementById('exportEventType').value || 'All Events';
     const paperSize = document.getElementById('paperSize').value;
     const includeCharts = document.getElementById('includeCharts').checked;
     const includeSummary = document.getElementById('includeSummary').checked;
     const includeLogs = document.getElementById('includeLogs').checked;
 
-    const canvas = await html2canvas(document.querySelector(".dashboard-container"), {scale:2});
-    const img = canvas.toDataURL("image/png");
+    // Load logo images as Base64
+    const [qcuLogo, ccistLogo] = await Promise.all([
+        loadImageAsBase64('/images/qcu-logo.png'),
+        loadImageAsBase64('/images/ccist-logo.png')
+    ]);
 
+    const isLandscape = paperSize === 'landscape';
     const pdf = new jsPDF({
-        orientation: paperSize.includes('landscape') ? 'l' : 'p',
+        orientation: isLandscape ? 'l' : 'p',
         unit: 'mm',
         format: paperSize === 'letter' ? 'letter' : 'a4'
     });
 
-    // Title & Metadata
-    pdf.setFontSize(16);
-    pdf.text("Analytics Report", 15, 15);
-    
-    pdf.setFontSize(10);
-    if (startDate) pdf.text(`From: ${startDate}`, 15, 22);
-    if (endDate) pdf.text(`To: ${endDate}`, 15, 28);
-    if (location) pdf.text(`Location: ${location}`, 15, 34);
-    if (eventType) pdf.text(`Event Type: ${eventType}`, 15, 40);
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const centerX = pageWidth / 2;
+    let y = 12;
 
-    // Add image
-    pdf.addImage(img,'PNG',10,50,190,140);
-    
-    pdf.save(`analytics_${new Date().toISOString().split('T')[0]}.pdf`);
+    // ========== LETTERHEAD WITH LOGOS ==========
+    if (qcuLogo) {
+        try { pdf.addImage(qcuLogo, 'PNG', 25, y - 4, 18, 18); } catch(e) {}
+    }
+    if (ccistLogo) {
+        try { pdf.addImage(ccistLogo, 'PNG', pageWidth - 43, y - 4, 18, 18); } catch(e) {}
+    }
+
+    pdf.setFontSize(13);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('QUEZON CITY UNIVERSITY', centerX, y, { align: 'center' });
+    y += 5;
+    pdf.setFontSize(9);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('COLLEGE OF COMPUTER SCIENCE AND INFORMATION TECHNOLOGY', centerX, y, { align: 'center' });
+    y += 4;
+    pdf.setFontSize(8);
+    pdf.text('San Bartolome  |  San Francisco  |  Batasan Hills', centerX, y, { align: 'center' });
+    y += 5;
+
+    // Decorative double line
+    pdf.setDrawColor(180, 130, 80);
+    pdf.setLineWidth(0.8);
+    pdf.line(20, y, pageWidth - 20, y);
+    pdf.setLineWidth(0.3);
+    pdf.line(20, y + 1.5, pageWidth - 20, y + 1.5);
+    y += 8;
+
+    // ========== REPORT TITLE ==========
+    pdf.setFontSize(15);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('ANALYTICS SECURITY REPORT', centerX, y, { align: 'center' });
+    y += 7;
+
+    // Metadata
+    pdf.setFontSize(9);
+    pdf.setFont('helvetica', 'normal');
+    const genDate = new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+    pdf.text(`Generated: ${genDate}`, 25, y);
+    y += 4;
+    pdf.text(`Date Range: ${startDate} to ${endDate}`, 25, y);
+    y += 4;
+    pdf.text(`Location: ${location}   |   Event Type: ${eventType}`, 25, y);
+    y += 8;
+
+    // ========== SUMMARY STATISTICS BOX ==========
+    if (includeSummary) {
+        pdf.setFillColor(250, 245, 238);
+        pdf.setDrawColor(200, 160, 110);
+        pdf.roundedRect(20, y, pageWidth - 40, 28, 2, 2, 'FD');
+
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('SUMMARY STATISTICS', 25, y + 6);
+
+        pdf.setFontSize(9);
+        pdf.setFont('helvetica', 'normal');
+        const aAlerts = document.getElementById('statAlerts')?.textContent || '0';
+        const aAccess = document.getElementById('statAccess')?.textContent || '0';
+        const aDet = document.getElementById('statDetections')?.textContent || '0';
+        const aPerso = '@Model.ActivePersonnelCount';
+
+        const col1 = 28, col2 = centerX + 5;
+        pdf.text(`Active Alerts: ${aAlerts}`, col1, y + 13);
+        pdf.text(`Access Logs: ${aAccess}`, col2, y + 13);
+        pdf.text(`Detections: ${aDet}`, col1, y + 19);
+        pdf.text(`Personnel: ${aPerso}`, col2, y + 19);
+        y += 34;
+    }
+
+    // ========== CHARTS (2x2 GRID) ==========
+    if (includeCharts) {
+        pdf.setFontSize(11);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('CHARTS & ANALYTICS', 25, y);
+        y += 6;
+
+        const chartIds = ['alertTypeChart', 'accessResultChart', 'detectionTypeChart', 'occupancyRoomChart'];
+        const chartImgs = chartIds.map(id => {
+            const c = document.getElementById(id);
+            return c ? c.toDataURL('image/png') : null;
+        }).filter(Boolean);
+
+        const chartW = (pageWidth - 60) / 2;
+        const chartH = 75;
+        for (let i = 0; i < chartImgs.length; i++) {
+            const col = (i % 2);
+            const row = Math.floor(i / 2);
+            const cx = 22 + col * (chartW + 10);
+            const cy = y + row * (chartH + 8);
+
+            if (cy + chartH > pdf.internal.pageSize.getHeight() - 15) {
+                pdf.addPage();
+                y = 15;
+            }
+            pdf.addImage(chartImgs[i], 'PNG', cx, cy, chartW, chartH);
+        }
+        y += Math.ceil(chartImgs.length / 2) * (chartH + 8) + 5;
+    }
+
+    // ========== ALERT BREAKDOWN TABLE ==========
+    if (y > pdf.internal.pageSize.getHeight() - 60) { pdf.addPage(); y = 15; }
+
+    pdf.setFontSize(11);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('ALERT BREAKDOWN', 25, y);
+    y += 6;
+
+    // Table header row
+    pdf.setFillColor(60, 50, 40);
+    pdf.rect(22, y, pageWidth - 44, 7, 'F');
+    pdf.setTextColor(255);
+    pdf.setFontSize(8);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Type', 28, y + 5);
+    pdf.text('Count', 90, y + 5);
+    pdf.text('Severity', 140, y + 5);
+    y += 7;
+    pdf.setTextColor(0);
+
+    // Table rows from alertsByType data
+    pdf.setFont('helvetica', 'normal');
+    const alertTypeData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AlertsByType ?? new Dictionary<string, int>()));
+    const alertTypeKeys = Object.keys(alertTypeData);
+
+    if (alertTypeKeys.length === 0) {
+        pdf.setFillColor(248, 248, 248);
+        pdf.rect(22, y, pageWidth - 44, 7, 'F');
+        pdf.text('No alerts in selected date range', 28, y + 5);
+        y += 7;
+    } else {
+        alertTypeKeys.forEach((type, idx) => {
+            const fill = idx % 2 === 0 ? [248, 245, 240] : [255, 255, 255];
+            pdf.setFillColor(...fill);
+            pdf.rect(22, y, pageWidth - 44, 6, 'F');
+            pdf.text(type, 28, y + 4.5);
+            pdf.text(String(alertTypeData[type]), 90, y + 4.5);
+            const sev = (type.includes('Intrusion') || type.includes('Forced')) ? 'CRITICAL' :
+                        (type.includes('Unauthorized') || type.includes('Suspicious')) ? 'WARNING' : 'INFO';
+            pdf.text(sev, 140, y + 4.5);
+            y += 6;
+        });
+    }
+    y += 6;
+
+    // ========== ACTIVE INTERVENTION QUEUE ==========
+    if (y > pdf.internal.pageSize.getHeight() - 50) { pdf.addPage(); y = 15; }
+
+    pdf.setFontSize(11);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('ACTIVE INTERVENTION QUEUE', 25, y);
+    y += 6;
+
+    const interventionItems = document.querySelectorAll('.status-item');
+    if (interventionItems.length === 0) {
+        pdf.setFontSize(8);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text('No active interventions queued.', 28, y + 4);
+    } else {
+        // Header
+        pdf.setFillColor(60, 50, 40);
+        pdf.rect(22, y, pageWidth - 44, 7, 'F');
+        pdf.setTextColor(255);
+        pdf.setFontSize(8);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('Alert', 28, y + 5);
+        pdf.text('Status / Time', 120, y + 5);
+        y += 7;
+        pdf.setTextColor(0);
+        pdf.setFont('helvetica', 'normal');
+
+        let iRow = 0;
+        interventionItems.forEach(item => {
+            if (iRow >= 15) return;
+            const title = item.querySelector('.status-info p')?.textContent?.trim() || 'N/A';
+            const status = item.querySelector('.status-info small')?.textContent?.trim() || '';
+            const fill = iRow % 2 === 0 ? [248, 245, 240] : [255, 255, 255];
+            pdf.setFillColor(...fill);
+            pdf.rect(22, y, pageWidth - 44, 6, 'F');
+            pdf.text(title.substring(0, 50), 28, y + 4.5);
+            pdf.text(status.substring(0, 40), 120, y + 4.5);
+            y += 6;
+            iRow++;
+        });
+    }
+
+    // ========== FOOTER ==========
+    const totalPages = pdf.internal.getNumberOfPages();
+    for (let p = 1; p <= totalPages; p++) {
+        pdf.setPage(p);
+        const ph = pdf.internal.pageSize.getHeight();
+        pdf.setFontSize(7);
+        pdf.setFont('helvetica', 'italic');
+        pdf.setTextColor(150);
+        pdf.text('SecureVision AI-Assisted Smart Security System  —  Quezon City University', centerX, ph - 8, { align: 'center' });
+        pdf.text(`Page ${p} of ${totalPages}`, pageWidth - 25, ph - 8);
+        pdf.setTextColor(0);
+    }
+
+    // Save PDF
+    const fileName = `QCU_Analytics_${new Date().toISOString().split('T')[0]}.pdf`;
+    pdf.save(fileName);
     closeExportModal();
 }
 
-// CHARTS
-const labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Labels ?? new List<string>()));
+// =============================================
+// CHART CREATION
+// =============================================
+const alertsByType = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AlertsByType ?? new Dictionary<string, int>()));
+const alertTrendsByDayAndType = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AlertTrendsByDayAndType ?? new Dictionary<string, Dictionary<string, int>>()));
+const accessByResult = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AccessByResult ?? new Dictionary<string, int>()));
+const detectionsByType = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.DetectionsByType ?? new Dictionary<string, int>()));
+const occupancyRoomLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.OccupancyRoomLabels ?? new List<string>()));
+const occupancyRoomCounts = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.OccupancyRoomCounts ?? new List<int>()));
 
-function createChart(id,type,data,color){
-    new Chart(document.getElementById(id),{
-        type:type,
-        data:{
-            labels:labels,
-            datasets:[{
-                data:data,
-                borderColor:color,
-                backgroundColor:color+"20",
-                fill:true,
-                tension:0.4
-            }]
+// COLOR SCHEMES
+const colorPalette = [
+    '#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'
+];
+
+// 1. ALERT TRENDS BY DAY AND TYPE (Stacked Bar Chart)
+const alertTypeCtx = document.getElementById('alertTypeChart');
+if (alertTypeCtx) {
+    // Get all unique alert types
+    const allAlertTypes = new Set();
+    Object.values(alertTrendsByDayAndType).forEach(dayData => {
+        Object.keys(dayData).forEach(type => allAlertTypes.add(type));
+    });
+    const alertTypes = Array.from(allAlertTypes);
+    
+    // Create datasets for each alert type
+    const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const datasets = alertTypes.map((type, index) => ({
+        label: type,
+        data: dayLabels.map(day => alertTrendsByDayAndType[day]?.[type] || 0),
+        backgroundColor: colorPalette[index % colorPalette.length],
+        borderColor: colorPalette[index % colorPalette.length],
+        borderWidth: 1
+    }));
+
+    new Chart(alertTypeCtx, {
+        type: 'bar',
+        data: {
+            labels: dayLabels,
+            datasets: datasets
         },
-        options:{responsive:true,maintainAspectRatio:false}
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                x: {
+                    stacked: true,
+                    ticks: { font: { size: 10 } }
+                },
+                y: {
+                    stacked: true,
+                    beginAtZero: true,
+                    ticks: { font: { size: 9 } }
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { font: { size: 11 }, padding: 15 }
+                }
+            }
+        }
     });
 }
 
-createChart("alertChart","line",@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AlertWeekly)),"#ef4444");
-createChart("accessChart","bar",@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AccessWeekly)),"#3b82f6");
-createChart("motionChart","line",@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.MotionWeekly)),"#a855f7");
-createChart("occupancyChart","bar",@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.OccupancyWeekly)),"#D4A373");
+// 2. ACCESS RESULT BREAKDOWN (Doughnut Chart)
+const accessResultCtx = document.getElementById('accessResultChart');
+if (accessResultCtx) {
+    const accessColors = {
+        'AUTHORIZED': '#22c55e',
+        'SUSPICIOUS': '#f97316',
+        'UNAUTHORIZED': '#ef4444'
+    };
+    
+    const accessBgColors = Object.keys(accessByResult).map(key => 
+        accessColors[key] || '#95a5a6'
+    );
+
+    new Chart(accessResultCtx, {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(accessByResult),
+            datasets: [{
+                data: Object.values(accessByResult),
+                backgroundColor: accessBgColors,
+                borderColor: '#fff',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { font: { size: 11 }, padding: 15 }
+                }
+            }
+        }
+    });
+}
+
+// 3. DETECTION TYPE BREAKDOWN (Polar Area Chart)
+const detectionTypeCtx = document.getElementById('detectionTypeChart');
+if (detectionTypeCtx) {
+    new Chart(detectionTypeCtx, {
+        type: 'polarArea',
+        data: {
+            labels: Object.keys(detectionsByType),
+            datasets: [{
+                data: Object.values(detectionsByType),
+                backgroundColor: colorPalette.slice(0, Object.keys(detectionsByType).length).map(c => c + '40'),
+                borderColor: colorPalette.slice(0, Object.keys(detectionsByType).length),
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { font: { size: 11 }, padding: 15 }
+                }
+            },
+            scales: {
+                r: {
+                    ticks: { font: { size: 9 } }
+                }
+            }
+        }
+    });
+}
+
+// 4. OCCUPANCY BY ROOM (Horizontal Bar Chart)
+const occupancyRoomCtx = document.getElementById('occupancyRoomChart');
+if (occupancyRoomCtx) {
+    new Chart(occupancyRoomCtx, {
+        type: 'bar',
+        data: {
+            labels: occupancyRoomLabels,
+            datasets: [{
+                label: 'People Count',
+                data: occupancyRoomCounts,
+                backgroundColor: '#d4a373',
+                borderColor: '#8b6f47',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { font: { size: 11 }, padding: 15 }
+                }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    ticks: { font: { size: 9 } }
+                },
+                y: {
+                    ticks: { font: { size: 10 } }
+                }
+            }
+        }
+    });
+}
 </script>

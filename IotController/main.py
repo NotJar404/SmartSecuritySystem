@@ -44,7 +44,11 @@ class SmartSecuritySystem:
                  api_url="http://localhost:5000/api/access/rfid",
                  base_url="http://localhost:5000",
                  camera_id=1,
-                 room_id=1):
+                 room_id=1,
+                 max_stay_minutes=20,
+                 room_max_capacity=0,
+                 operating_hours_start=None,
+                 operating_hours_end=None):
 
         # =========================
         # HARDWARE MODULES
@@ -162,6 +166,56 @@ class SmartSecuritySystem:
         self.pir_inactivity_threshold = 300      # 5 minutes PIR silence = suspicious
 
         # =========================
+        # INDOOR MONITORING CONFIG (NO DB COLUMNS — all in Python config)
+        # =========================
+        self.max_stay_minutes = max_stay_minutes              # Per-room stay limit (default 20)
+        self.extended_stay_threshold = (max_stay_minutes - 5) * 60  # Warning 5 min before limit
+        self.suspicious_idle_threshold = 600                  # 10 min face + no PIR = suspicious
+
+        # =========================
+        # ENTRANCE LOITERING CONFIG
+        # Graduated response: 5 min → WARNING, 10 min → CRITICAL
+        # (Different from INTRUSION which is sustained-frame-based)
+        # =========================
+        self._entrance_face_start_time = None  # When face first appeared in IDLE
+        self.entrance_loiter_warning = 300     # 5 minutes → WARNING
+        self.entrance_loiter_critical = 600    # 10 minutes → CRITICAL
+        self._entrance_warning_sent = False    # Track if 5-min warning already sent
+        self._entrance_critical_sent = False   # Track if 10-min critical already sent
+
+        # =========================
+        # AFTER-HOURS CONFIG (operating hours)
+        # Set to None to disable after-hours detection
+        # =========================
+        self.operating_hours_start = operating_hours_start  # e.g., 6 (6 AM)
+        self.operating_hours_end = operating_hours_end      # e.g., 22 (10 PM)
+
+        # =========================
+        # IN-MEMORY EVENT COOLDOWN (ANTI-SPAM)
+        # Key: "event_type:room_id" → last push timestamp
+        # Prevents duplicate API calls before they even reach the backend
+        # =========================
+        self._event_cooldowns = {}
+        self._cooldown_durations = {
+            "EXTENDED_STAY": 600,        # 10 min between extended stay alerts
+            "OCCUPANCY_EXCEEDED": 300,   # 5 min between capacity alerts
+            "SUSPICIOUS_IDLE": 900,      # 15 min between idle alerts
+            "ENTRANCE_LOITERING": 300,   # 5 min between entrance loitering
+            "AFTER_HOURS": 1800,         # 30 min between after-hours alerts
+        }
+
+        # =========================
+        # OCCUPANCY EXCEEDED TRACKING
+        # =========================
+        self.room_max_capacity = room_max_capacity  # Max people allowed (0 = disabled)
+        self._capacity_exceeded_sent = False
+
+        # =========================
+        # EXTENDED STAY TRACKING (per session)
+        # =========================
+        self._extended_stay_warned = set()  # session_ids that already got warning
+
+        # =========================
         # EXIT INFERENCE (FALLBACK ONLY)
         # =========================
         self.exit_inference_timeout = 1800  # 30 minutes no activity = soft exit
@@ -246,6 +300,33 @@ class SmartSecuritySystem:
     def get_state(self):
         with self.state_lock:
             return self.system_state
+
+    # =========================
+    # IN-MEMORY EVENT COOLDOWN GATE
+    # Prevents spam before even hitting the REST API
+    # =========================
+    def _can_push_event(self, event_type, now=None):
+        """Check if enough time has passed since last push of this event type."""
+        now = now or time.time()
+        key = f"{event_type}:{self.room_id}"
+        cooldown = self._cooldown_durations.get(event_type, 300)
+        last_push = self._event_cooldowns.get(key, 0)
+
+        if (now - last_push) >= cooldown:
+            self._event_cooldowns[key] = now
+            return True
+        return False
+
+    # =========================
+    # AFTER-HOURS CHECK HELPER
+    # =========================
+    def _is_after_hours(self):
+        """Check if current time is outside operating hours."""
+        if self.operating_hours_start is None or self.operating_hours_end is None:
+            return False  # No schedule configured = always operating
+
+        current_hour = datetime.now().hour
+        return current_hour < self.operating_hours_start or current_hour >= self.operating_hours_end
 
     # =========================
     # MAIN LOOP (STATE-DRIVEN, NOT FRAME-DRIVEN)
@@ -386,18 +467,62 @@ class SmartSecuritySystem:
                 time.sleep(0.1)
 
     # =========================
-    # IDLE DETECTION: Intrusion Check (BUG-1 FIX)
-    # Requires SUSTAINED face detection, not single frame
+    # IDLE DETECTION: Graduated Entrance Response
+    # Phase 1: Entrance Loitering (5 min WARNING, 10 min CRITICAL)
+    # Phase 2: Intrusion (sustained frames without ANY RFID)
     # =========================
     def _handle_idle_detection(self, faces, face_images, now):
         """
-        In IDLE mode: If sustained face presence without RFID → INTRUSION
-        Requires _idle_grace_threshold consecutive frames before alerting.
-        Prevents false alerts from autofocus blur and transient shadows.
+        In IDLE mode (camera default = monitoring entrance area):
+
+        When a face is detected without RFID:
+        1. Track how long the face has been present
+        2. After 5 min → ENTRANCE_LOITERING (WARNING)
+        3. After 10 min → ENTRANCE_LOITERING (CRITICAL)
+        4. Sustained frames without time check → INTRUSION (existing behavior)
+
+        This graduated response prevents false intrusion alerts from
+        people simply walking past or briefly pausing near the entrance.
         """
         if self.current_occupancy > 0:
             # Check if any RFID was recently scanned
             if self.last_rfid_time is None or (now - self.last_rfid_time) > self.rfid_active_window:
+
+                # ========================================
+                # PHASE 1: Track entrance presence duration
+                # ========================================
+                if self._entrance_face_start_time is None:
+                    self._entrance_face_start_time = now
+
+                entrance_duration = now - self._entrance_face_start_time
+
+                # 10 min → CRITICAL entrance loitering
+                if entrance_duration >= self.entrance_loiter_critical and not self._entrance_critical_sent:
+                    if self._can_push_event("ENTRANCE_LOITERING", now):
+                        self.push_state_transition(
+                            event="ENTRANCE_LOITERING",
+                            session_id=str(uuid.uuid4()),
+                            description=f"Person lingering at entrance for {entrance_duration/60:.0f} min without RFID",
+                            severity="HIGH"
+                        )
+                        self._entrance_critical_sent = True
+                        print(f"[ENTRANCE] CRITICAL loitering: {entrance_duration/60:.1f} min")
+
+                # 5 min → WARNING entrance loitering
+                elif entrance_duration >= self.entrance_loiter_warning and not self._entrance_warning_sent:
+                    if self._can_push_event("ENTRANCE_LOITERING", now):
+                        self.push_state_transition(
+                            event="ENTRANCE_LOITERING",
+                            session_id=str(uuid.uuid4()),
+                            description=f"Person lingering at entrance for {entrance_duration/60:.0f} min without RFID",
+                            severity="WARNING"
+                        )
+                        self._entrance_warning_sent = True
+                        print(f"[ENTRANCE] WARNING loitering: {entrance_duration/60:.1f} min")
+
+                # ========================================
+                # PHASE 2: Sustained-frame intrusion check (existing behavior)
+                # ========================================
                 self._idle_face_counter += 1
 
                 # Only alert after SUSTAINED detection
@@ -417,10 +542,23 @@ class SmartSecuritySystem:
 
                     # Start recording on intrusion
                     self._start_recording(session_id)
+
+                    # Reset entrance tracking (escalated to full intrusion)
+                    self._entrance_face_start_time = None
+                    self._entrance_warning_sent = False
+                    self._entrance_critical_sent = False
             else:
                 self._idle_face_counter = 0  # RFID was recent, reset
+                # Reset entrance tracking (RFID resolved the situation)
+                self._entrance_face_start_time = None
+                self._entrance_warning_sent = False
+                self._entrance_critical_sent = False
         else:
             self._idle_face_counter = 0  # No face, reset
+            # Reset entrance tracking (person left)
+            self._entrance_face_start_time = None
+            self._entrance_warning_sent = False
+            self._entrance_critical_sent = False
 
     # =========================
     # ALERT STATE HANDLER (BUG-2 FIX)
@@ -452,19 +590,27 @@ class SmartSecuritySystem:
                     print("[FSM] ALERT auto-cleared (no presence)")
 
     # =========================
-    # INSIDE MONITORING: Tailgating (BUG-10 FIX)
-    # Entry window + sustained mismatch
+    # INSIDE MONITORING: Full Indoor Surveillance
+    # Tailgating + Occupancy + Extended Stay + Suspicious Idle + After-Hours
     # =========================
     def _handle_inside_monitoring(self, faces, face_images, now):
         """
-        In INSIDE mode: Check for tailgating.
-        - During entry window (8s after unlock): single mismatch → WARNING
-        - Outside entry window: require 3 sustained mismatches → INFO
-        Reduces false positives from detection noise.
+        In INSIDE mode: Comprehensive indoor behavioral monitoring.
+
+        Events detected:
+        1. TAILGATING — occupancy > sessions (existing, preserved)
+        2. OCCUPANCY EXCEEDED — people count > room max capacity
+        3. EXTENDED STAY WARNING — approaching stay time limit
+        4. SUSPICIOUS IDLE — face detected + PIR no motion for 10+ min
+        5. AFTER-HOURS PRESENCE — person in room outside operating hours
         """
         with self.session_lock:
             expected_count = len(self.active_sessions)
+            sessions_snapshot = dict(self.active_sessions)
 
+        # ========================================
+        # 1. TAILGATING DETECTION (existing — preserved exactly)
+        # ========================================
         if self.current_occupancy > expected_count and expected_count > 0:
             # Determine if we're in the entry window
             in_entry_window = (
@@ -502,6 +648,69 @@ class SmartSecuritySystem:
                     self._tailgate_counter = 0
         else:
             self._tailgate_counter = 0
+
+        # ========================================
+        # 2. OCCUPANCY EXCEEDED (room over max capacity)
+        # ========================================
+        if self.room_max_capacity > 0 and self.current_occupancy > self.room_max_capacity:
+            if not self._capacity_exceeded_sent:
+                if self._can_push_event("OCCUPANCY_EXCEEDED", now):
+                    self.push_state_transition(
+                        event="OCCUPANCY_EXCEEDED",
+                        session_id=str(uuid.uuid4()),
+                        description=f"Room capacity exceeded: {self.current_occupancy}/{self.room_max_capacity} people"
+                    )
+                    self._capacity_exceeded_sent = True
+                    print(f"[MONITOR] Occupancy exceeded: {self.current_occupancy}/{self.room_max_capacity}")
+        else:
+            # Reset when occupancy drops back below capacity
+            self._capacity_exceeded_sent = False
+
+        # ========================================
+        # 3. EXTENDED STAY WARNING (per-session, 5 min before limit)
+        # ========================================
+        for user_id, session in sessions_snapshot.items():
+            time_inside = now - session["entry_time"]
+            sid = session["session_id"]
+
+            if time_inside >= self.extended_stay_threshold and sid not in self._extended_stay_warned:
+                if self._can_push_event("EXTENDED_STAY", now):
+                    self.push_state_transition(
+                        event="EXTENDED_STAY",
+                        session_id=sid,
+                        description=f"User {user_id} approaching stay limit: {time_inside/60:.0f}/{self.max_stay_minutes} min"
+                    )
+                    self._extended_stay_warned.add(sid)
+                    print(f"[MONITOR] Extended stay warning: {user_id} at {time_inside/60:.1f} min")
+
+        # ========================================
+        # 4. SUSPICIOUS IDLE (face detected + PIR no motion)
+        # ========================================
+        if self.current_occupancy > 0:
+            pir_inactivity = self.pir_sensor.get_inactivity_duration()
+            if pir_inactivity >= self.suspicious_idle_threshold:
+                if self._can_push_event("SUSPICIOUS_IDLE", now):
+                    # Use first active session for context
+                    first_session_id = next(iter(sessions_snapshot.values()), {}).get("session_id", str(uuid.uuid4()))
+                    self.push_state_transition(
+                        event="SUSPICIOUS_IDLE",
+                        session_id=first_session_id,
+                        description=f"Person detected but no movement for {pir_inactivity/60:.0f} min"
+                    )
+                    print(f"[MONITOR] Suspicious idle: {pir_inactivity/60:.1f} min no PIR motion")
+
+        # ========================================
+        # 5. AFTER-HOURS PRESENCE
+        # ========================================
+        if self._is_after_hours() and self.current_occupancy > 0:
+            if self._can_push_event("AFTER_HOURS", now):
+                current_hour = datetime.now().strftime("%H:%M")
+                self.push_state_transition(
+                    event="AFTER_HOURS",
+                    session_id=next(iter(sessions_snapshot.values()), {}).get("session_id", str(uuid.uuid4())),
+                    description=f"Person detected at {current_hour} (outside operating hours {self.operating_hours_start}:00-{self.operating_hours_end}:00)"
+                )
+                print(f"[MONITOR] After-hours presence detected at {current_hour}")
 
     # =========================
     # COMPUTE DETECTION STATE (for anti-spam push)
@@ -747,6 +956,8 @@ class SmartSecuritySystem:
 
                         with self.session_lock:
                             self.active_sessions.pop(user_id, None)
+                            # Clean up extended stay tracking for this session
+                            self._extended_stay_warned.discard(session["session_id"])
 
                             if len(self.active_sessions) == 0:
                                 self.set_state(STATE_IDLE)
@@ -1019,7 +1230,15 @@ def main():
         use_simulated_rfid=True,
         base_url="http://localhost:5000",
         camera_id=1,
-        room_id=1
+        room_id=1,
+        # =============================================
+        # ROOM-SPECIFIC CONFIG (no DB columns needed)
+        # Change these per-room when deploying to Raspberry Pi
+        # =============================================
+        max_stay_minutes=20,          # Stay limit (20 min default, server room=30, lab=60)
+        room_max_capacity=10,         # Max people allowed (0=disabled)
+        operating_hours_start=6,      # Operating hours start (6 AM)
+        operating_hours_end=22        # Operating hours end (10 PM)
     )
 
     if system.initialize():

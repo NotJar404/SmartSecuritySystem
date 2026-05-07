@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using WebApp.Data;
 using WebApp.Models;
@@ -8,6 +9,7 @@ using System.Threading.Tasks;
 
 namespace WebApp.Controllers
 {
+    [Authorize(Roles = "Admin,Security")]
     public class AccessController : Controller
     {
         private readonly AppDbContext _context;
@@ -167,6 +169,7 @@ namespace WebApp.Controllers
         // API: FLAG FOR ADMIN (ANTI-SPAM)
         // =========================
         [HttpPost("api/flag")]
+        [AllowAnonymous]
         public IActionResult FlagForAdmin([FromBody] FlagRequest req)
         {
             // ANTI-SPAM: Check if same flag already exists within 5 minutes
@@ -195,6 +198,7 @@ namespace WebApp.Controllers
         // API: LOCKDOWN ROOM (ANTI-SPAM)
         // =========================
         [HttpPost("api/security/lockdown")]
+        [AllowAnonymous]
         public IActionResult LockdownRoom([FromBody] LockdownRequest req)
         {
             // ANTI-SPAM: Prevent duplicate lockdown notifications
@@ -223,6 +227,7 @@ namespace WebApp.Controllers
         // API: TRIGGER ALARM (ANTI-SPAM)
         // =========================
         [HttpPost("api/security/alarm")]
+        [AllowAnonymous]
         public IActionResult TriggerAlarm()
         {
             // ANTI-SPAM: Prevent rapid alarm spam

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using WebApp.Data;
 using WebApp.Models;
@@ -9,6 +10,7 @@ using System;
 
 namespace WebApp.Controllers
 {
+    [Authorize]
     public class NotificationsController : Controller
     {
         private readonly AppDbContext _context;

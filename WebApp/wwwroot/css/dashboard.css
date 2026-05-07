@@ -483,6 +483,33 @@
 }
 
 /* ========================================================= */
+/* ==================== CHARTS GRID ======================== */
+/* ========================================================= */
+
+.charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+.chart-panel {
+    min-height: auto;
+}
+
+.chart-wrapper {
+    position: relative;
+    height: 300px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.chart-wrapper canvas {
+    max-height: 100%;
+}
+
+/* ========================================================= */
 /* ==================== RESPONSIVE ========================= */
 /* ========================================================= */
 
@@ -497,6 +524,10 @@
 
     .quick-actions-row {
         grid-template-columns: repeat(2, 1fr);
+    }
+
+    .charts-grid {
+        grid-template-columns: 1fr;
     }
 }
 

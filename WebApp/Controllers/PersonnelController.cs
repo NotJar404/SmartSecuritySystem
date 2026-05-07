@@ -124,10 +124,12 @@ namespace SmartSecuritySystem.Controllers
             try
             {
                 SendCredentialEmail(user.Email, user.FullName, user.Username, tempPassword);
+                TempData["Success"] = $"Staff account created and credentials sent to {user.Email}";
             }
             catch (Exception ex)
             {
                 _logger.LogWarning($"Failed to send credentials email: {ex.Message}");
+                TempData["Error"] = $"Account created but email failed: {ex.Message}. Please configure SMTP in appsettings.json.";
             }
         }
 

@@ -30,6 +30,7 @@ namespace WebApp.Controllers
             var model = await BuildDashboardModel(isAdmin: User.IsInRole("Admin"));
             ViewBag.Rooms = await _context.Rooms.ToListAsync();
             ViewBag.IsAdmin = User.IsInRole("Admin");
+            ViewBag.AvailableRooms = model.AvailableRooms;
             return View(model);
         }
 
@@ -46,6 +47,9 @@ namespace WebApp.Controllers
             ViewBag.LocationFilter = locationFilter;
             ViewBag.EventFilter = eventFilter;
             ViewBag.IsAdmin = isAdmin;
+            
+            // Pass available rooms to view for dynamic dropdown
+            ViewBag.AvailableRooms = model.AvailableRooms;
 
             return View(model);
         }
@@ -87,27 +91,60 @@ namespace WebApp.Controllers
 
             if (startDate.HasValue)
             {
-                alertQ = alertQ.Where(x => x.Timestamp >= startDate.Value);
-                accessQ = accessQ.Where(x => x.Timestamp >= startDate.Value);
-                motionQ = motionQ.Where(x => x.Timestamp >= startDate.Value);
+                // Convert Unspecified DateTime to UTC for PostgreSQL compatibility
+                var startDateUtc = DateTime.SpecifyKind(startDate.Value, DateTimeKind.Utc);
+                alertQ = alertQ.Where(x => x.Timestamp >= startDateUtc);
+                accessQ = accessQ.Where(x => x.Timestamp >= startDateUtc);
+                motionQ = motionQ.Where(x => x.Timestamp >= startDateUtc);
             }
             if (endDate.HasValue)
             {
-                var end = endDate.Value.AddDays(1).AddTicks(-1);
-                alertQ = alertQ.Where(x => x.Timestamp <= end);
-                accessQ = accessQ.Where(x => x.Timestamp <= end);
-                motionQ = motionQ.Where(x => x.Timestamp <= end);
+                // Convert Unspecified DateTime to UTC and add 1 day for end-of-day filtering
+                var endDateUtc = DateTime.SpecifyKind(endDate.Value.AddDays(1).AddTicks(-1), DateTimeKind.Utc);
+                alertQ = alertQ.Where(x => x.Timestamp <= endDateUtc);
+                accessQ = accessQ.Where(x => x.Timestamp <= endDateUtc);
+                motionQ = motionQ.Where(x => x.Timestamp <= endDateUtc);
             }
 
-            // Optional: location filter could apply if room matches (simplistic string match for demonstration)
+            // =========================
+            // RESOLVE LOCATION FILTER TO ROOM ID
+            // =========================
+            int? resolvedRoomId = null;
             if (!string.IsNullOrEmpty(locationFilter))
             {
-                // In a real app, map location to RoomId. For now, we leave as is or apply if property exists.
+                var resolvedRoom = await _context.Rooms
+                    .FirstOrDefaultAsync(r => r.RoomName == locationFilter);
+                if (resolvedRoom != null)
+                {
+                    resolvedRoomId = resolvedRoom.RoomId;
+                    // Filter alerts by RoomId
+                    alertQ = alertQ.Where(a => a.RoomId == resolvedRoomId);
+                    // Filter access logs by RoomId
+                    accessQ = accessQ.Where(a => a.RoomId == resolvedRoomId);
+                    // Filter detections by CameraId matching the room
+                    var cameraIdsInRoom = await _context.CameraDevices
+                        .Where(c => c.RoomId == resolvedRoomId)
+                        .Select(c => c.Id)
+                        .ToListAsync();
+                    motionQ = motionQ.Where(d => cameraIdsInRoom.Contains(d.CameraId));
+                }
             }
 
-            var alertDates = await alertQ.Select(a => a.Timestamp).ToListAsync();
-            var accessDates = await accessQ.Select(a => a.Timestamp).ToListAsync();
-            var motionDates = await motionQ.Select(d => d.Timestamp).ToListAsync();
+            // =========================
+            // EVENT TYPE FILTER
+            // =========================
+            // eventFilter: "Alert" = show only alert data, "Access" = show only access data
+            // When a specific filter is active, the other category datasets will be empty
+
+            var alertDates = (string.IsNullOrEmpty(eventFilter) || eventFilter == "Alert")
+                ? await alertQ.Select(a => a.Timestamp).ToListAsync()
+                : new List<DateTime>();
+            var accessDates = (string.IsNullOrEmpty(eventFilter) || eventFilter == "Access")
+                ? await accessQ.Select(a => a.Timestamp).ToListAsync()
+                : new List<DateTime>();
+            var motionDates = (string.IsNullOrEmpty(eventFilter) || eventFilter == "Alert")
+                ? await motionQ.Select(d => d.Timestamp).ToListAsync()
+                : new List<DateTime>();
 
             var occupancy = await SafeLoadRoomOccupancy();
 
@@ -164,6 +201,123 @@ namespace WebApp.Controllers
                 .ToList();
 
             // =========================
+            // ENHANCED CHART DATA QUERIES
+            // =========================
+
+            // 1. ALERTS BY TYPE (Doughnut Chart) - Materialize first, then convert enum
+            var alertsForType = await alertQ.ToListAsync();
+            var alertsByType = alertsForType
+                .GroupBy(a => a.Type)
+                .Select(g => new { Type = g.Key.ToString(), Count = g.Count() })
+                .ToList();
+            
+            var alertsByTypeDictionary = alertsByType
+                .ToDictionary(x => x.Type, x => x.Count);
+
+            // 1B. ALERT TRENDS BY DAY AND TYPE (Stacked Bar Chart) - Materialize first, then group
+            var alertTrendsByDayAndType = new Dictionary<string, Dictionary<string, int>>();
+            var dayLabels = new[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+            
+            // Initialize the structure
+            foreach (var dayLabel in dayLabels)
+            {
+                alertTrendsByDayAndType[dayLabel] = new Dictionary<string, int>();
+            }
+
+            // Materialize alerts first, then group by day and type
+            var alertsByDayType = alertsForType
+                .GroupBy(a => new { DayOfWeek = (int)a.Timestamp.DayOfWeek, AlertType = a.Type.ToString() })
+                .Select(g => new { DayOfWeek = g.Key.DayOfWeek, AlertType = g.Key.AlertType, Count = g.Count() })
+                .ToList();
+
+            // Populate the structure
+            foreach (var item in alertsByDayType)
+            {
+                var dayLabel = dayLabels[item.DayOfWeek];
+                if (!alertTrendsByDayAndType[dayLabel].ContainsKey(item.AlertType))
+                {
+                    alertTrendsByDayAndType[dayLabel][item.AlertType] = 0;
+                }
+                alertTrendsByDayAndType[dayLabel][item.AlertType] += item.Count;
+            }
+
+            // 2. OCCUPANCY BY ROOM (Horizontal Bar Chart)
+            var occupancyByRoom = occupancy
+                .GroupBy(o => o.RoomId)
+                .Select(g => new 
+                { 
+                    RoomId = g.Key,
+                    TotalPeopleCount = g.Sum(x => x.PeopleCount)
+                })
+                .ToList();
+
+            // Get room names from DB
+            var roomIds = occupancyByRoom.Select(o => o.RoomId).Distinct().ToList();
+            var roomNames = await _context.Rooms
+                .Where(r => roomIds.Contains(r.RoomId))
+                .Select(r => new { r.RoomId, r.RoomName })
+                .ToDictionaryAsync(x => x.RoomId, x => x.RoomName);
+
+            var occupancyRoomLabels = new List<string>();
+            var occupancyRoomCounts = new List<int>();
+
+            foreach (var item in occupancyByRoom.OrderByDescending(x => x.TotalPeopleCount))
+            {
+                var roomName = roomNames.TryGetValue(item.RoomId, out var name) ? name : $"Room {item.RoomId}";
+                occupancyRoomLabels.Add(roomName);
+                occupancyRoomCounts.Add(item.TotalPeopleCount);
+            }
+
+            // 3. ACCESS BY RESULT (Authorized/Suspicious/Unauthorized - Doughnut Chart)
+            var accessByResult = await accessQ
+                .GroupBy(a => a.AccessResult)
+                .Select(g => new { Result = g.Key, Count = g.Count() })
+                .ToListAsync();
+
+            var accessByResultDictionary = accessByResult
+                .ToDictionary(x => x.Result ?? "PENDING", x => x.Count);
+
+            // 4. DETECTIONS BY TYPE (Polar/Radar Chart)
+            var detectionsByType = await motionQ
+                .GroupBy(d => d.DetectionType)
+                .Select(g => new { Type = g.Key ?? "Unknown", Count = g.Count() })
+                .ToListAsync();
+
+            var detectionsByTypeDictionary = detectionsByType
+                .ToDictionary(x => x.Type, x => x.Count);
+
+            // 5. AVAILABLE ROOMS (for filter dropdown)
+            var availableRooms = await _context.Rooms
+                .OrderBy(r => r.RoomName)
+                .ToListAsync();
+
+            // =========================
+            // APPLY LOCATION FILTER TO NEW DATA (if specified)
+            // =========================
+            if (!string.IsNullOrEmpty(locationFilter))
+            {
+                // Try to resolve location to RoomId
+                var selectedRoom = availableRooms.FirstOrDefault(r => 
+                    r.RoomName.Equals(locationFilter, StringComparison.OrdinalIgnoreCase));
+
+                if (selectedRoom != null)
+                {
+                    // Re-filter occupancy data by room
+                    occupancyRoomLabels.Clear();
+                    occupancyRoomCounts.Clear();
+                    var filteredOccupancy = occupancyByRoom
+                        .Where(o => o.RoomId == selectedRoom.RoomId)
+                        .ToList();
+                    
+                    foreach (var item in filteredOccupancy)
+                    {
+                        occupancyRoomLabels.Add(selectedRoom.RoomName);
+                        occupancyRoomCounts.Add(item.TotalPeopleCount);
+                    }
+                }
+            }
+
+            // =========================
             // RETURN VIEW MODEL
             // =========================
             return new AdminDashboardViewModel
@@ -177,6 +331,15 @@ namespace WebApp.Controllers
                 AccessWeekly = GroupByWeek(accessDates),
                 MotionWeekly = GroupByWeek(motionDates),
                 OccupancyWeekly = GroupByWeek(occupancy.Select(o => o.Timestamp)),
+
+                // New Enhanced Chart Data
+                AlertsByType = alertsByTypeDictionary,
+                AlertTrendsByDayAndType = alertTrendsByDayAndType,
+                OccupancyRoomLabels = occupancyRoomLabels,
+                OccupancyRoomCounts = occupancyRoomCounts,
+                AccessByResult = accessByResultDictionary,
+                DetectionsByType = detectionsByTypeDictionary,
+                AvailableRooms = availableRooms,
 
                 ActiveInterventions = activeInterventions,
                 AuditLogs = criticalAuditStream,

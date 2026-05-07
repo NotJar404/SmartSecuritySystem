@@ -360,8 +360,42 @@ section.panel.mt-4 {
 
 .chart-wrapper {
     position: relative;
-    height: 300px; /* Uniform height for charts */
+    height: 350px; /* Increased height for legend space */
     width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Chart Legend Styling */
+.chart-wrapper canvas {
+    max-height: 100%;
+}
+
+/* Ensure proper spacing for legends */
+.chartjs-legend {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 12px;
+    padding: 0 8px;
+}
+
+.chartjs-legend li {
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.chartjs-legend li span {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
 }
 
 /* ============================= */

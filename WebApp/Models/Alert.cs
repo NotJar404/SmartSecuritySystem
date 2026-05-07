@@ -98,6 +98,7 @@ namespace WebApp.Models
 
     public enum AlertType
     {
+        // === ACCESS VERIFICATION EVENTS (Access.cshtml) ===
         UnauthorizedAccess,
         Intrusion,
         SuspiciousActivity,
@@ -105,7 +106,15 @@ namespace WebApp.Models
         AccessGranted,
         ForcedEntry,
         DoorEvent,
-        SystemError
+        SystemError,
+
+        // === INDOOR ROOM MONITORING EVENTS (Camera monitoring) ===
+        Loitering,              // Exceeded stay time (configurable per-room, default 20 min)
+        OccupancyExceeded,      // Room headcount > MaxCapacity
+        ExtendedStay,           // Warning: approaching stay limit (5 min before limit)
+        SuspiciousIdle,         // Person present but PIR no motion for extended period
+        EntranceLoitering,      // Lingering at entrance 5-10 min without RFID tap
+        AfterHoursPresence      // Person in room outside operating hours
     }
 
     public enum SeverityLevel
