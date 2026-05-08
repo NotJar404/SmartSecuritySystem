@@ -889,15 +889,41 @@ namespace WebApp.Controllers
 
             try
             {
-                // Find the most recent alert for this session to link
+                // =========================
+                // FIND THE ALERT TO LINK
+                // =========================
                 int? alertId = null;
-                if (!string.IsNullOrEmpty(data.SessionId))
+                int? roomId = null;
+
+                // Get camera's room for context
+                var camera = _context.CameraDevices
+                    .FirstOrDefault(c => c.Id == data.CameraId);
+                roomId = camera?.RoomId;
+
+                // Strategy 1: Find recent alert for this room (most reliable)
+                if (roomId.HasValue)
                 {
-                    // Try to find alert via session's room context
+                    var recentAlert = _context.Alerts
+                        .Where(a => a.RoomId == roomId
+                                 && a.Timestamp > DateTime.UtcNow.AddMinutes(-5))
+                        .OrderByDescending(a => a.Timestamp)
+                        .FirstOrDefault();
+
+                    if (recentAlert != null)
+                    {
+                        alertId = recentAlert.AlertId;
+                        // Link video path directly to alert record
+                        recentAlert.VideoPath = data.FilePath;
+                    }
+                }
+
+                // Strategy 2: If session ID provided, try session-based lookup too
+                if (alertId == null && !string.IsNullOrEmpty(data.SessionId))
+                {
                     var session = _context.OccupancySessions
                         .FirstOrDefault(s => s.SessionId == data.SessionId);
 
-                    if (session != null)
+                    if (session?.RoomId != null)
                     {
                         var recentAlert = _context.Alerts
                             .Where(a => a.RoomId == session.RoomId
@@ -908,25 +934,53 @@ namespace WebApp.Controllers
                         if (recentAlert != null)
                         {
                             alertId = recentAlert.AlertId;
-                            // Link video path to alert record
                             recentAlert.VideoPath = data.FilePath;
                         }
                     }
                 }
 
-                // Insert into recordings table
-                _context.Database.ExecuteSqlRaw(
-                    @"INSERT INTO recordings (camera_id, alert_id, file_path, file_size_mb, is_archived, timestamp)
-                      VALUES ({0}, {1}, {2}, {3}, false, NOW())",
-                    data.CameraId,
-                    alertId.HasValue ? (object)alertId.Value : DBNull.Value,
-                    data.FilePath,
-                    data.FileSizeMb
-                );
+                // =========================
+                // LINK TO ACCESS LOG (for denied events)
+                // =========================
+                if (roomId.HasValue)
+                {
+                    var recentDeniedLog = _context.AccessLogs
+                        .Where(a => a.RoomId == roomId
+                                 && a.AccessResult == "denied"
+                                 && a.Timestamp > DateTime.UtcNow.AddMinutes(-5)
+                                 && string.IsNullOrEmpty(a.VideoPath))
+                        .OrderByDescending(a => a.Timestamp)
+                        .FirstOrDefault();
 
+                    if (recentDeniedLog != null)
+                    {
+                        recentDeniedLog.VideoPath = data.FilePath;
+                    }
+                }
+
+                // =========================
+                // INSERT RECORDING (using EF model)
+                // =========================
+                var recording = new Recording
+                {
+                    CameraId = data.CameraId,
+                    AlertId = alertId,
+                    FilePath = data.FilePath,
+                    FileSizeMb = data.FileSizeMb,
+                    IsArchived = false,
+                    Timestamp = DateTime.UtcNow
+                };
+
+                _context.Recordings.Add(recording);
                 _context.SaveChanges();
 
-                return Ok(new { message = "Recording saved", alertId = alertId });
+                return Ok(new
+                {
+                    message = "Recording saved",
+                    recordingId = recording.RecordingId,
+                    alertId = alertId,
+                    linkedToAccessLog = roomId.HasValue
+                });
             }
             catch (Exception ex)
             {

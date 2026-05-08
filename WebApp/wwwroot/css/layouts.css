@@ -233,6 +233,18 @@ html, body {
     font-weight: bold;
 }
 
+/* NAV DISABLED — Force Password Change Lock */
+.nav-item.nav-disabled {
+    pointer-events: none;
+    opacity: 0.35;
+}
+
+.nav-item.nav-disabled a {
+    cursor: not-allowed;
+    color: var(--text-dim) !important;
+    background: none !important;
+}
+
 /* FOOTER */
 .sidebar-footer {
     padding: 20px;

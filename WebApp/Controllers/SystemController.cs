@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using WebApp.Data;
@@ -62,35 +62,108 @@ namespace WebApp.Controllers
         }
 
         // =========================
-        // TOGGLE SYSTEM FEATURE
+        // TOGGLE SYSTEM FEATURE (REAL DB PERSISTENCE)
         // =========================
         [HttpPost]
-        public IActionResult ToggleFeature([FromBody] FeatureToggleRequest request)
+        public async Task<IActionResult> ToggleFeature([FromBody] FeatureToggleRequest request)
         {
             if (request == null)
                 return BadRequest();
 
+            // Check if this feature maps to an alarm_setting
+            var setting = await _context.AlarmSettings
+                .FirstOrDefaultAsync(s => s.Name.ToLower() == request.Feature.ToLower()
+                                       || s.Type.ToLower() == request.Feature.ToLower());
+
+            if (setting != null)
+            {
+                setting.IsEnabled = request.State;
+                await _context.SaveChangesAsync();
+            }
+
             return Json(new
             {
                 success = true,
-                message = $"{request.Feature} set to {(request.State ? "ON" : "OFF")}"
+                message = $"{request.Feature} set to {(request.State ? "ON" : "OFF")}",
+                persisted = setting != null
             });
         }
 
         // =========================
-        // SAVE GLOBAL SETTINGS
+        // SAVE GLOBAL SETTINGS (REAL PERSISTENCE)
         // =========================
         [HttpPost]
-        public IActionResult SaveSettings([FromBody] SystemSettingsRequest request)
+        public async Task<IActionResult> SaveSettings([FromBody] SystemSettingsRequest request)
         {
             if (request == null)
                 return BadRequest();
 
-            // Logic for pushing to Raspberry Pi via SQL bridge goes here
+            // Update all alarm settings based on ArmSystem flag
+            if (!request.ArmSystem)
+            {
+                var allSettings = await _context.AlarmSettings.ToListAsync();
+                foreach (var s in allSettings)
+                {
+                    s.IsEnabled = false;
+                }
+                await _context.SaveChangesAsync();
+            }
+
             return Json(new
             {
                 success = true,
                 message = "Settings deployed successfully to hardware engine."
+            });
+        }
+
+        // =========================
+        // ALARM SETTINGS API (FOR PYTHON IOT CONTROLLER)
+        // Python polls this endpoint to check which alarms are armed/disarmed
+        // =========================
+        [HttpGet]
+        [AllowAnonymous]  // Pi controller needs access without browser auth
+        [Route("/api/system/alarm-settings")]
+        public async Task<IActionResult> GetAlarmSettings()
+        {
+            var settings = await _context.AlarmSettings.ToListAsync();
+            return Json(settings.Select(s => new
+            {
+                settingId = s.SettingId,
+                name = s.Name,
+                type = s.Type,
+                isEnabled = s.IsEnabled
+            }));
+        }
+
+        // =========================
+        // PI HEARTBEAT (for system.cshtml to check Pi status)
+        // =========================
+        [HttpGet]
+        [Route("/api/system/pi-status")]
+        public IActionResult GetPiStatus()
+        {
+            // Check if we received any camera/detection data recently
+            var lastDetection = _context.DetectionLogs
+                .OrderByDescending(d => d.Timestamp)
+                .FirstOrDefault();
+
+            var lastOccupancy = _context.RoomOccupancy
+                .OrderByDescending(o => o.Timestamp)
+                .FirstOrDefault();
+
+            var latestTimestamp = new[] {
+                lastDetection?.Timestamp,
+                lastOccupancy?.Timestamp
+            }.Where(t => t != null).Max();
+
+            bool isOnline = latestTimestamp.HasValue &&
+                           (System.DateTime.UtcNow - latestTimestamp.Value).TotalMinutes < 5;
+
+            return Json(new
+            {
+                online = isOnline,
+                lastSeen = latestTimestamp?.ToString("o"),
+                activeCameras = _context.CameraDevices.Count(c => c.Status == "active")
             });
         }
     }

@@ -1,0 +1,25 @@
+[Unit]
+Description=Smart Security System - FSM Controller
+Documentation=https://github.com/NotJar404/SmartSecuritySystem
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/SmartSecuritySystem/IotController
+ExecStart=/home/pi/SmartSecuritySystem/venv/bin/python main.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Environment (adjust BASE_URL to your ASP.NET server IP)
+Environment=PYTHONUNBUFFERED=1
+
+# GPIO permissions
+SupplementaryGroups=gpio spi i2c video
+
+[Install]
+WantedBy=multi-user.target

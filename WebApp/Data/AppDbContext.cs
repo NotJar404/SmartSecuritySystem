@@ -26,6 +26,7 @@ namespace WebApp.Data
         public DbSet<RoomOccupancy> RoomOccupancy { get; set; }
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<OccupancySession> OccupancySessions { get; set; }
+        public DbSet<Recording> Recordings { get; set; }
 
         // =========================
         // CONFIGURATION
@@ -159,6 +160,24 @@ namespace WebApp.Data
             modelBuilder.Entity<Notification>()
                 .Property(n => n.TargetRole)
                 .HasMaxLength(50);
+
+            // =========================
+            // RECORDINGS (VIDEO EVIDENCE)
+            // =========================
+            modelBuilder.Entity<Recording>()
+                .ToTable("recordings");
+
+            modelBuilder.Entity<Recording>()
+                .HasOne(r => r.Alert)
+                .WithMany()
+                .HasForeignKey(r => r.AlertId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Recording>()
+                .HasOne(r => r.Camera)
+                .WithMany()
+                .HasForeignKey(r => r.CameraId)
+                .OnDelete(DeleteBehavior.Cascade);
         }
     }
 }

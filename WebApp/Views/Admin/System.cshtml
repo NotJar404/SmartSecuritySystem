@@ -1,4 +1,4 @@
-﻿@using WebApp.Models
+@using WebApp.Models
 @{
     ViewData["Title"] = "AI Assisted Smart Security and Intrusion Detection System";
     // We are now using AlarmSetting instead of Alert to power the toggles
@@ -220,51 +220,95 @@
 
 @section Scripts {
 <script>
+    // =========================
+    // MASTER ARM TOGGLE (persists to alarm_settings)
+    // =========================
     function handleToggle(feature, state) {
         const status = state ? "ARMED" : "DISARMED";
-        console.log(`Hardware Command: ${feature} set to ${status}`);
+        console.log(`[SYSTEM] ${feature} → ${status}`);
+
+        fetch('/System/ToggleFeature', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ feature: feature, state: state })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                showToast(`${feature} ${status}`, 'success');
+            }
+        })
+        .catch(err => {
+            console.error('[SYSTEM] Toggle failed:', err);
+            showToast('Failed to update setting', 'error');
+        });
     }
 
+    // =========================
+    // EYE-STRAIN THEME TOGGLE
+    // =========================
     function updateTheme(isWarm) {
         document.body.classList.toggle('warm-theme-mode', isWarm);
+        localStorage.setItem('warmTheme', isWarm);
     }
 
+    // =========================
+    // ALARM PROTOCOL TOGGLE (REAL DB UPDATE)
+    // =========================
     function confirmToggle(checkbox, alarmName, settingId) {
         const isChecked = checkbox.checked;
         const action = isChecked ? "ACTIVATE" : "DEACTIVATE";
         
         if (confirm(`HCI SAFETY CHECK: Are you sure you want to ${action} the ${alarmName}?`)) {
-            // Updated to perform an actual background update
-            fetch('/Dashboard/UpdateAlarmStatus', {
+            fetch('/System/UpdateAlarmStatus', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: `id=${settingId}&isEnabled=${isChecked}`
             })
             .then(response => {
-                if(!response.ok) throw new Error('Database Sync Failed');
-                console.log(`Sync Successful: ${alarmName} is now ${isChecked}`);
+                if (!response.ok) throw new Error('Database Sync Failed');
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    showToast(`${alarmName} ${isChecked ? 'Armed' : 'Disarmed'}`, 'success');
+                    // Update visual state
+                    const item = checkbox.closest('.alarm-item');
+                    if (item) {
+                        item.classList.toggle('active', isChecked);
+                    }
+                }
             })
             .catch(error => {
-                alert("Hardware Sync Error: Could not reach the database.");
-                checkbox.checked = !isChecked; // Revert UI if DB fails
+                showToast('Hardware Sync Error: Could not reach the database.', 'error');
+                checkbox.checked = !isChecked;
             });
         } else {
-            checkbox.checked = !isChecked; // Revert if user clicks 'Cancel'
+            checkbox.checked = !isChecked;
         }
     }
 
+    // =========================
+    // ARCHIVE HANDLER
+    // =========================
     function handleArchive() {
-        if(confirm("HARDWARE REQUIRED: Is the USB storage device connected to the Raspberry Pi?")) {
-            alert("Archive process initiated. Please do not disconnect the USB until sync is complete.");
+        if (confirm("HARDWARE REQUIRED: Is the USB storage device connected to the Raspberry Pi?")) {
+            showToast("Archive process initiated. Please do not disconnect USB.", 'info');
         }
     }
 
+    // =========================
+    // DATABASE OPTIMIZE
+    // =========================
     function triggerAction(action) {
-        if(confirm(`CRITICAL ACTION: Are you sure you want to trigger: ${action}?`)) {
-            alert(`Signal sent. ${action} in progress.`);
+        if (confirm(`CRITICAL ACTION: Are you sure you want to trigger: ${action}?`)) {
+            showToast(`Signal sent. ${action} in progress.`, 'info');
         }
     }
 
+    // =========================
+    // DEPLOY SETTINGS (REAL API CALL)
+    // =========================
     function saveGlobalSettings() {
         const btn = event.currentTarget;
         const originalContent = btn.innerHTML;
@@ -272,16 +316,115 @@
         btn.innerHTML = '<i class="fa fa-spinner fa-spin me-2"></i>Pushing Config...';
         btn.disabled = true;
 
-        setTimeout(() => {
-            btn.innerHTML = '<i class="fa fa-check-circle me-2"></i>Hardware Synced Successfully';
-            btn.classList.replace('btn-warm-dark', 'btn-success');
-            
+        // Collect all settings from the form
+        const settings = {
+            armSystem: document.getElementById('armSystem')?.checked ?? true,
+            eyeStrainProtection: true,
+            autoMaintenance: true,
+            motionSensitivity: 2,
+            faceAccuracy: 80
+        };
+
+        // Read actual values from inputs if present
+        const sensitivitySelect = document.querySelector('.warm-select');
+        if (sensitivitySelect) settings.motionSensitivity = parseInt(sensitivitySelect.value);
+
+        const accuracyInput = document.querySelector('.warm-num-input');
+        if (accuracyInput) settings.faceAccuracy = parseInt(accuracyInput.value);
+
+        fetch('/System/SaveSettings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                btn.innerHTML = '<i class="fa fa-check-circle me-2"></i>Hardware Synced Successfully';
+                btn.classList.replace('btn-warm-dark', 'btn-success');
+                showToast('Settings deployed to hardware engine', 'success');
+            } else {
+                throw new Error(data.message || 'Deploy failed');
+            }
+        })
+        .catch(err => {
+            btn.innerHTML = '<i class="fa fa-times-circle me-2"></i>Sync Failed';
+            btn.classList.replace('btn-warm-dark', 'btn-danger');
+            showToast('Failed to deploy settings: ' + err.message, 'error');
+        })
+        .finally(() => {
             setTimeout(() => {
                 btn.innerHTML = originalContent;
-                btn.classList.replace('btn-success', 'btn-warm-dark');
+                btn.className = btn.className.replace('btn-success', 'btn-warm-dark').replace('btn-danger', 'btn-warm-dark');
                 btn.disabled = false;
             }, 3000);
-        }, 2000);
+        });
     }
+
+    // =========================
+    // PI STATUS HEARTBEAT (real API poll)
+    // =========================
+    function checkPiStatus() {
+        fetch('/api/system/pi-status')
+        .then(r => r.json())
+        .then(data => {
+            const badge = document.querySelector('.live-badge');
+            const piDot = document.querySelector('.control-card:nth-child(5) .status-indicator-dot');
+            const storageText = document.querySelector('.storage-display small.text-success');
+            
+            if (badge) {
+                if (data.online) {
+                    badge.textContent = '● SYSTEM ACTIVE';
+                    badge.style.color = '#10b981';
+                } else {
+                    badge.textContent = '○ PI OFFLINE';
+                    badge.style.color = '#ef4444';
+                }
+            }
+
+            if (piDot) {
+                piDot.classList.toggle('online', data.online);
+                piDot.classList.toggle('offline', !data.online);
+            }
+        })
+        .catch(() => {
+            const badge = document.querySelector('.live-badge');
+            if (badge) {
+                badge.textContent = '○ CONNECTION ERROR';
+                badge.style.color = '#f59e0b';
+            }
+        });
+    }
+
+    // =========================
+    // TOAST NOTIFICATION HELPER
+    // =========================
+    function showToast(message, type) {
+        const toast = document.createElement('div');
+        toast.className = `toast-notification toast-${type}`;
+        toast.innerHTML = `<i class="fa ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-times-circle' : 'fa-info-circle'} me-2"></i>${message}`;
+        toast.style.cssText = `
+            position: fixed; bottom: 20px; right: 20px; z-index: 9999;
+            padding: 12px 20px; border-radius: 8px; color: white; font-size: 0.85rem;
+            background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3); animation: slideIn 0.3s ease;
+        `;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 4000);
+    }
+
+    // =========================
+    // INIT: Poll Pi status every 30 seconds
+    // =========================
+    document.addEventListener('DOMContentLoaded', function() {
+        checkPiStatus();
+        setInterval(checkPiStatus, 30000);
+
+        // Restore theme preference
+        const warmPref = localStorage.getItem('warmTheme');
+        if (warmPref === 'true') {
+            document.body.classList.add('warm-theme-mode');
+        }
+    });
 </script>
 }

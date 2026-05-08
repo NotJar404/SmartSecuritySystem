@@ -45,6 +45,9 @@ namespace SmartSecuritySystem.Controllers
                     : user.ProfileImagePath
             };
 
+            // Flag for forced password change UI
+            ViewBag.MustChangePassword = user.MustChangePassword;
+
             return View(model);
         }
 

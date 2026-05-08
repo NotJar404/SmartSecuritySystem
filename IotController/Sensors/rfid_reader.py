@@ -1,38 +1,85 @@
+"""
+RC522 RFID Reader Module for Smart Security System
+
+Supports:
+- Real Raspberry Pi 5 GPIO via mfrc522/SimpleMFRC522
+- Simulated mode for laptop/desktop testing
+
+CRITICAL DESIGN:
+- Reads ALL RFID cards, even unregistered/unknown ones
+- Always passes UID to callback — FSM + backend decide what to do
+- Unknown UIDs are logged and can be enrolled from the admin dashboard
+
+GPIO (SPI0):
+    SDA:   GPIO 8  (CE0) — Pin 24
+    SCK:   GPIO 11       — Pin 23
+    MOSI:  GPIO 10       — Pin 19
+    MISO:  GPIO 9        — Pin 21
+    RST:   GPIO 25       — Pin 22
+    3.3V:                — Pin 1
+    GND:                 — Pin 6
+"""
+
 import time
 import threading
-import requests
-import RPi.GPIO as GPIO
-from mfrc522 import SimpleMFRC522
+import platform
+
 
 class RFIDReader:
-    """RC522 RFID Reader for Raspberry Pi 5 (White RFID Cards Supported)"""
+    """RC522 RFID Reader with simulation fallback for laptop testing."""
 
-    def __init__(self, api_url="http://localhost:5000/api/rfid/scan"):
-        self.reader = SimpleMFRC522()
-        self.api_url = api_url
-
+    def __init__(self, simulated=None):
+        """
+        Args:
+            simulated: Force simulation mode. None = auto-detect by platform.
+        """
         self.is_reading = False
         self.last_rfid = None
         self.rfid_callback = None
         self.lock = threading.Lock()
+        self.reader = None
+
+        # Auto-detect: simulate on non-Linux (laptop testing)
+        if simulated is None:
+            self.simulated = platform.system().lower() != "linux"
+        else:
+            self.simulated = simulated
+
+        # Simulation queue for testing
+        self._sim_queue = []
+        self._sim_lock = threading.Lock()
 
     # =========================
     # START READING LOOP
     # =========================
     def start_reading(self, callback=None):
         """
-        Start RFID scanning loop
+        Start RFID scanning loop.
 
-        callback: function(uid) optional
+        callback: function(uid: str) — called for EVERY card tap (known or unknown)
         """
-
         self.rfid_callback = callback
         self.is_reading = True
+
+        if not self.simulated:
+            # Initialize hardware reader ONLY on Pi
+            try:
+                from mfrc522 import SimpleMFRC522
+                self.reader = SimpleMFRC522()
+            except ImportError:
+                print("[RFID ERROR] mfrc522 module not installed. Install: pip install mfrc522")
+                print("[RFID] Falling back to SIMULATED mode")
+                self.simulated = True
+            except Exception as e:
+                print(f"[RFID ERROR] Hardware init failed: {e}")
+                print("[RFID] Falling back to SIMULATED mode")
+                self.simulated = True
 
         thread = threading.Thread(target=self._read_loop, daemon=True)
         thread.start()
 
-        print("[RFID] RC522 Reader Started...")
+        mode = "SIMULATED" if self.simulated else "RC522 HARDWARE"
+        print(f"[RFID] Reader started ({mode})")
         return True
 
     # =========================
@@ -41,46 +88,61 @@ class RFIDReader:
     def _read_loop(self):
         while self.is_reading:
             try:
-                print("[RFID] Waiting for card...")
+                if self.simulated:
+                    # SIMULATION: Check queue for test UIDs
+                    uid = None
+                    with self._sim_lock:
+                        if self._sim_queue:
+                            uid = self._sim_queue.pop(0)
 
-                uid, text = self.reader.read()
+                    if uid:
+                        self._handle_card(uid)
 
-                # Convert UID to string
-                rfid_uid = str(uid).strip()
+                    time.sleep(0.5)  # Poll sim queue every 500ms
+                else:
+                    # REAL HARDWARE: Blocks until card is present
+                    print("[RFID] Waiting for card...")
+                    uid_raw, text = self.reader.read()
 
-                with self.lock:
-                    self.last_rfid = rfid_uid
+                    # Convert UID to clean string
+                    rfid_uid = str(uid_raw).strip()
 
-                print(f"[RFID] Card Detected UID: {rfid_uid}")
+                    self._handle_card(rfid_uid)
 
-                # Send to API immediately
-                self.send_to_server(rfid_uid)
-
-                # Callback (optional local logic)
-                if self.rfid_callback:
-                    self.rfid_callback(rfid_uid)
-
-                time.sleep(1)
+                    # Debounce: wait before reading next card
+                    time.sleep(1)
 
             except Exception as e:
                 print(f"[RFID ERROR] {e}")
                 time.sleep(1)
 
     # =========================
-    # SEND UID TO ASP.NET API
+    # HANDLE CARD (ALL CARDS — known or unknown)
     # =========================
-    def send_to_server(self, uid):
-        try:
-            response = requests.post(
-                self.api_url,
-                json={"uid": uid},
-                timeout=3
-            )
+    def _handle_card(self, uid):
+        """Process any RFID card tap — known or unknown."""
+        with self.lock:
+            self.last_rfid = uid
 
-            print("[SERVER RESPONSE]", response.json())
+        print(f"[RFID] Card detected UID: {uid}")
 
-        except Exception as e:
-            print("[API ERROR]", e)
+        # ALWAYS fire callback — FSM decides what to do with the UID
+        if self.rfid_callback:
+            self.rfid_callback(uid)
+
+    # =========================
+    # SIMULATION HELPERS (LAPTOP TESTING)
+    # =========================
+    def simulate_tap(self, uid):
+        """Queue a simulated RFID tap for testing."""
+        if not self.simulated:
+            print("[RFID] Cannot simulate on real hardware")
+            return
+
+        with self._sim_lock:
+            self._sim_queue.append(str(uid))
+
+        print(f"[RFID SIM] Card queued: {uid}")
 
     # =========================
     # GET LAST RFID
@@ -101,5 +163,10 @@ class RFIDReader:
     # =========================
     def cleanup(self):
         self.is_reading = False
-        GPIO.cleanup()
-        print("[RFID] Cleaned up GPIO")
+        if not self.simulated:
+            try:
+                import RPi.GPIO as GPIO
+                GPIO.cleanup()
+            except:
+                pass
+        print("[RFID] Cleaned up")

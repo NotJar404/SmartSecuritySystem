@@ -35,44 +35,87 @@ class CameraModule:
         self.running = False
 
     def initialize(self):
-        """Initialize camera with fallback support"""
+        """Initialize camera with Pi Camera Module 3 + fallback support"""
         try:
             system = platform.system().lower()
 
             if system == "linux":
-                print("Detected Linux system (Raspberry Pi compatible)")
+                print("[CAMERA] Detected Linux — trying Pi Camera Module 3...")
+
+                # =========================
+                # PRIORITY 1: libcamera via GStreamer (Pi Camera Module 3)
+                # =========================
+                gst_pipeline = (
+                    f"libcamerasrc ! "
+                    f"video/x-raw,width={self.width},height={self.height},"
+                    f"framerate={self.fps}/1 ! "
+                    f"videoconvert ! appsink"
+                )
+                self.cap = cv2.VideoCapture(gst_pipeline, cv2.CAP_GSTREAMER)
+
+                if self.cap.isOpened():
+                    print("[CAMERA] ✓ Pi Camera Module 3 via libcamera (GStreamer)")
+                    return True
+
+                # =========================
+                # PRIORITY 2: picamera2 wrapper (if GStreamer unavailable)
+                # =========================
+                try:
+                    from picamera2 import Picamera2
+                    picam = Picamera2()
+                    picam.configure(picam.create_preview_configuration(
+                        main={"size": (self.width, self.height), "format": "RGB888"}
+                    ))
+                    picam.start()
+                    self._picamera2 = picam
+                    self._use_picamera2 = True
+                    print("[CAMERA] ✓ Pi Camera Module 3 via picamera2")
+                    return True
+                except Exception as e:
+                    print(f"[CAMERA] picamera2 not available: {e}")
+                    self._use_picamera2 = False
+
+                # =========================
+                # PRIORITY 3: V4L2 USB camera on Pi
+                # =========================
+                self.cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
+                if self.cap.isOpened():
+                    print("[CAMERA] ✓ USB camera via V4L2")
+                else:
+                    raise Exception("No camera device found on Linux")
+
             else:
-                print("Detected Desktop system (Laptop/Webcam mode)")
+                # =========================
+                # DESKTOP/LAPTOP — standard OpenCV
+                # =========================
+                print("[CAMERA] Detected Desktop — using webcam")
+                self._use_picamera2 = False
+                self.cap = cv2.VideoCapture(self.camera_id)
 
-            # Try primary camera
-            self.cap = cv2.VideoCapture(self.camera_id)
+                if not self.cap.isOpened():
+                    print("[CAMERA] Primary camera failed, trying index 1...")
+                    self.cap = cv2.VideoCapture(1)
 
-            # Fallback
-            if not self.cap.isOpened():
-                print("Primary camera failed, trying fallback index 1...")
-                self.cap = cv2.VideoCapture(1)
+                if not self.cap.isOpened():
+                    raise Exception("Cannot open any camera device")
 
-            if not self.cap.isOpened():
-                raise Exception("Cannot open any camera device")
+            # Optimize settings (for OpenCV-based captures)
+            if not getattr(self, '_use_picamera2', False):
+                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
+                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+                self.cap.set(cv2.CAP_PROP_FPS, self.fps)
 
-            # Optimize settings
-            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
-            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
-            self.cap.set(cv2.CAP_PROP_FPS, self.fps)
+                # =========================
+                # DISABLE AUTOFOCUS (CRITICAL FOR STABILITY)
+                # =========================
+                self.cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)
+                self.cap.set(cv2.CAP_PROP_FOCUS, 40)
 
-            # =========================
-            # DISABLE AUTOFOCUS (CRITICAL FOR STABILITY)
-            # Autofocus causes 0.5-2s blur cycles that produce
-            # false face detections and occupancy flicker
-            # =========================
-            self.cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)
-            self.cap.set(cv2.CAP_PROP_FOCUS, 40)  # Fixed focus (adjust per camera)
-
-            print("Camera initialized successfully")
+            print("[CAMERA] Initialized successfully")
             return True
 
         except Exception as e:
-            print("Camera init error:", e)
+            print("[CAMERA] Init error:", e)
             return False
 
     def start(self):
@@ -84,21 +127,28 @@ class CameraModule:
         threading.Thread(target=self._loop, daemon=True).start()
 
     def _loop(self):
-        """Continuous capture loop"""
+        """Continuous capture loop (OpenCV or picamera2)"""
         while self.running:
             try:
-                ret, frame = self.cap.read()
-
-                if ret:
-                    with self.lock:
-                        self.frame = frame
-
-                        # Default processed frame = raw frame
-                        if self.processed_frame is None:
-                            self.processed_frame = frame
+                if getattr(self, '_use_picamera2', False):
+                    # Pi Camera Module 3 via picamera2
+                    frame = self._picamera2.capture_array()
+                    if frame is not None:
+                        with self.lock:
+                            self.frame = frame
+                            if self.processed_frame is None:
+                                self.processed_frame = frame
+                else:
+                    # Standard OpenCV capture
+                    ret, frame = self.cap.read()
+                    if ret:
+                        with self.lock:
+                            self.frame = frame
+                            if self.processed_frame is None:
+                                self.processed_frame = frame
 
             except Exception as e:
-                print("Camera loop error:", e)
+                print("[CAMERA] Loop error:", e)
 
             time.sleep(0.01)
 
@@ -122,7 +172,12 @@ class CameraModule:
     def stop(self):
         """Stop camera safely"""
         self.running = False
-        if self.cap:
+        if getattr(self, '_use_picamera2', False) and hasattr(self, '_picamera2'):
+            try:
+                self._picamera2.stop()
+            except:
+                pass
+        elif self.cap:
             self.cap.release()
 
 

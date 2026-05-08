@@ -262,7 +262,7 @@ namespace WebApp.Controllers
         }
 
         // =========================
-        // API: LOG FEED (SESSION-AWARE)
+        // API: LOG FEED (SESSION-AWARE + VIDEO EVIDENCE)
         // =========================
         [HttpGet]
         public async Task<IActionResult> GetLatestLogs()
@@ -295,7 +295,10 @@ namespace WebApp.Controllers
                 ImageUrl = "/images/default-user.png",
                 Status = log.AccessResult,
                 // SESSION-AWARE: Tell the UI if this person is currently inside
-                IsCurrentlyInside = log.PersonId.HasValue && activeSet.Contains(log.PersonId.Value)
+                IsCurrentlyInside = log.PersonId.HasValue && activeSet.Contains(log.PersonId.Value),
+                // VIDEO EVIDENCE: Tell the UI if recording exists for this event
+                HasVideo = !string.IsNullOrEmpty(log.VideoPath),
+                VideoPath = log.VideoPath ?? ""
             });
 
             return Json(result);

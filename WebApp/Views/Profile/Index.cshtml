@@ -1,4 +1,4 @@
-﻿@model WebApp.Models.Profile
+@model WebApp.Models.Profile
 
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
@@ -205,5 +205,52 @@
             reader.onload = e => document.getElementById('profilePreview').src = e.target.result;
             reader.readAsDataURL(input.files[0]);
         }
+    }
+
+    // =========================
+    // FORCED PASSWORD CHANGE — AUTO-FOCUS
+    // =========================
+    @if (ViewBag.MustChangePassword == true)
+    {
+        <text>
+        window.addEventListener('DOMContentLoaded', function() {
+            // Scroll to password section
+            const securityCard = document.querySelector('.security-card');
+            if (securityCard) {
+                securityCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Add a visual pulse to draw attention
+                securityCard.style.boxShadow = '0 0 0 3px var(--accent), 0 6px 18px rgba(0,0,0,0.10)';
+                setTimeout(() => {
+                    securityCard.style.transition = 'box-shadow 1s ease';
+                    securityCard.style.boxShadow = 'var(--shadow-sm)';
+                }, 2000);
+            }
+            // Focus current password field
+            const currentPassField = document.getElementById('currentPass');
+            if (currentPassField) {
+                setTimeout(() => currentPassField.focus(), 500);
+            }
+        });
+        </text>
+    }
+
+    // =========================
+    // TempData MESSAGES
+    // =========================
+    @if (TempData["PasswordError"] != null)
+    {
+        <text>alert("❌ @TempData["PasswordError"]");</text>
+    }
+    @if (TempData["PasswordSuccess"] != null)
+    {
+        <text>alert("✅ @TempData["PasswordSuccess"]");</text>
+    }
+    @if (TempData["Success"] != null)
+    {
+        <text>alert("✅ @TempData["Success"]");</text>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <text>alert("❌ @TempData["Error"]");</text>
     }
 </script>

@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -38,35 +38,38 @@
             </a>
 
             <nav class="sidebar-nav">
+                @{
+                    var mustChangePw = User.HasClaim("MustChangePassword", "true");
+                }
                 <ul>
                     @if (User.IsInRole("Admin"))
                     {
-                        <li class="nav-item @(ViewContext.RouteData.Values["action"]?.ToString() == "Index" ? "active" : "")">
+                        <li class="nav-item @(ViewContext.RouteData.Values["action"]?.ToString() == "Index" ? "active" : "") @(mustChangePw ? "nav-disabled" : "")">
                             <a asp-controller="Admin" asp-action="Index"><i class="fa fa-chart-line"></i> Dashboard</a>
                         </li>
-                        <li class="nav-item">
+                        <li class="nav-item @(mustChangePw ? "nav-disabled" : "")">
                             <a asp-controller="Cameras" asp-action="Index"><i class="fa fa-camera"></i> Camera Config</a>
                         </li>
-                        <li class="nav-item @(ViewContext.RouteData.Values["action"]?.ToString() == "Personnel" ? "active" : "")">
+                        <li class="nav-item @(ViewContext.RouteData.Values["action"]?.ToString() == "Personnel" ? "active" : "") @(mustChangePw ? "nav-disabled" : "")">
                             <a asp-controller="Admin" asp-action="Personnel"><i class="fa fa-user-plus"></i> User Management</a>
                         </li>
-                        <li class="nav-item">
+                        <li class="nav-item @(mustChangePw ? "nav-disabled" : "")">
                             <a asp-controller="Admin" asp-action="Analytics"><i class="fa fa-chart-bar"></i> Analytics Report</a>
                         </li>
-                        <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Logs" ? "active" : "")">
+                        <li class="nav-item @(ViewContext.RouteData.Values["controller"]?.ToString() == "Logs" ? "active" : "") @(mustChangePw ? "nav-disabled" : "")">
                             <a asp-controller="Logs" asp-action="Index"><i class="fa fa-history"></i> Activity Logs</a>
                         </li>
-                        <li class="nav-item">
+                        <li class="nav-item @(mustChangePw ? "nav-disabled" : "")">
                             <a asp-controller="Admin" asp-action="System"><i class="fa fa-gear"></i> System Settings</a>
                         </li>
                     }
                     else
                     {
-                        <li class="nav-item active"><a asp-controller="Dashboard" asp-action="Index"><i class="fa fa-home"></i> Dashboard</a></li>
-                        <li class="nav-item"><a asp-controller="Cameras" asp-action="Index"><i class="fa fa-video"></i> Live Monitoring</a></li>
-                        <li class="nav-item"><a asp-controller="Access" asp-action="Index"><i class="fa fa-door-open"></i> Access Monitoring</a></li>
-                        <li class="nav-item alert-nav"><a asp-controller="Alerts" asp-action="Index"><i class="fa fa-triangle-exclamation"></i> Security Alert</a></li>
-                        <li class="nav-item"><a asp-controller="Logs" asp-action="Index"><i class="fa fa-history"></i> Activity Logs</a></li>
+                        <li class="nav-item active @(mustChangePw ? "nav-disabled" : "")"><a asp-controller="Dashboard" asp-action="Index"><i class="fa fa-home"></i> Dashboard</a></li>
+                        <li class="nav-item @(mustChangePw ? "nav-disabled" : "")"><a asp-controller="Cameras" asp-action="Index"><i class="fa fa-video"></i> Live Monitoring</a></li>
+                        <li class="nav-item @(mustChangePw ? "nav-disabled" : "")"><a asp-controller="Access" asp-action="Index"><i class="fa fa-door-open"></i> Access Monitoring</a></li>
+                        <li class="nav-item alert-nav @(mustChangePw ? "nav-disabled" : "")"><a asp-controller="Alerts" asp-action="Index"><i class="fa fa-triangle-exclamation"></i> Security Alert</a></li>
+                        <li class="nav-item @(mustChangePw ? "nav-disabled" : "")"><a asp-controller="Logs" asp-action="Index"><i class="fa fa-history"></i> Activity Logs</a></li>
                     }
                 </ul>
             </nav>
@@ -106,21 +109,34 @@
                 @{
                     var mustChangePass = User.HasClaim("MustChangePassword", "true");
                     var isProfilePage = ViewContext.RouteData.Values["controller"]?.ToString() == "Profile";
+                    var isAuthPage = ViewContext.RouteData.Values["controller"]?.ToString() == "Auth";
                 }
 
-                @if (mustChangePass)
+                @if (mustChangePass && !isProfilePage && !isAuthPage)
                 {
+                    <!-- FULL BLOCK: Redirect to Profile — user cannot access any page until password changed -->
                     <div class="force-password-banner">
                         <i class="fas fa-shield-alt"></i>
                         <span>You must change your temporary password before accessing the system.</span>
-                        @if (!isProfilePage)
-                        {
-                            <a href="/Profile/Index" class="banner-btn">Change Password Now</a>
-                        }
+                        <a href="/Profile/Index" class="banner-btn">Change Password Now</a>
                     </div>
+                    <script>
+                        // Auto-redirect to Profile page
+                        window.location.href = '/Profile/Index';
+                    </script>
                 }
+                else
+                {
+                    @if (mustChangePass && isProfilePage)
+                    {
+                        <div class="force-password-banner">
+                            <i class="fas fa-shield-alt"></i>
+                            <span>You must change your temporary password before accessing the system. Please update your password below.</span>
+                        </div>
+                    }
 
-                @RenderBody()
+                    @RenderBody()
+                }
             </section>
         </main>
 

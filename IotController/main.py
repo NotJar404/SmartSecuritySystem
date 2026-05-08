@@ -4,14 +4,18 @@ import requests
 import uuid
 import os
 import cv2
+import numpy as np
 from datetime import datetime
 
 from Sensors.camera_module import CameraModule
 from AI.face_detection import FaceDetector
 from AI.face_verfication import FaceVerifier
+from AI.person_detector import PersonDetector
+from AI.person_tracker import CentroidTracker
 from Sensors.rfid_reader import RFIDReader
 from Sensors.pir_sensor import PIRSensor
 from Sensors.lock_sensor import SolenoidLock
+from Sensors.hardware import Buzzer, RGBLed, DoorSensor
 
 
 # =========================
@@ -56,9 +60,26 @@ class SmartSecuritySystem:
         self.camera = CameraModule(camera_id=0)
         self.face_detector = FaceDetector()
         self.face_verifier = FaceVerifier(storage_dir="face_data")
+        self.person_detector = PersonDetector(
+            confidence_threshold=0.5,
+            model_dir=os.path.join(os.path.dirname(__file__), "models")
+        )
+        self.person_tracker = CentroidTracker(
+            max_disappeared=30,
+            max_distance=80
+        )
         self.rfid_reader = RFIDReader()
         self.pir_sensor = PIRSensor()
         self.solenoid_lock = SolenoidLock()
+        self.buzzer = Buzzer()
+        self.rgb_led = RGBLed()
+        self.door_sensor = DoorSensor()
+
+        # =========================
+        # TRACKED PERSONS (person detection state)
+        # =========================
+        self.tracked_persons = {}  # {track_id: TrackedPerson}
+        self._person_session_map = {}  # {track_id: session_user_id}
 
         # =========================
         # CONFIGURATION
@@ -237,6 +258,17 @@ class SmartSecuritySystem:
         # =========================
         self.last_face_update = 0
 
+        # =========================
+        # ALARM SETTINGS (polled from ASP.NET backend)
+        # Controls whether buzzer/alerts actually fire
+        # =========================
+        self._alarm_settings = {
+            "intrusion": True,
+            "fire": True,
+            "earthquake": True,
+            "forcedentry": True
+        }  # Defaults to all armed; updated by polling thread
+
     # =========================
     # INIT SYSTEM
     # =========================
@@ -251,6 +283,12 @@ class SmartSecuritySystem:
 
         self.pir_sensor.initialize()
         self.solenoid_lock.initialize()
+        self.buzzer.initialize()
+        self.rgb_led.initialize()
+        self.door_sensor.initialize()
+
+        # Set initial LED state
+        self.rgb_led.status_idle()
 
         print(f"[FSM] Initial state: {self.system_state}")
         print("[SYSTEM] Initialization complete")
@@ -276,12 +314,20 @@ class SmartSecuritySystem:
             self.rfid_reader.start_reading(callback=self.on_rfid_tapped)
             print("[SYSTEM] RFID reader started")
 
+        # Start door sensor monitoring
+        self.door_sensor.start(callback=self.on_door_change)
+        print("[SYSTEM] Door sensor started")
+
         # Start FSM loops
         threading.Thread(target=self.main_loop, daemon=True).start()
         print("[SYSTEM] Main FSM loop started")
 
         threading.Thread(target=self.loitering_monitor, daemon=True).start()
         print("[SYSTEM] Loitering monitor started")
+
+        # Start alarm settings polling (checks DB every 60s)
+        threading.Thread(target=self._alarm_settings_poller, daemon=True).start()
+        print("[SYSTEM] Alarm settings poller started")
 
     # =========================
     # FSM STATE TRANSITION (THREAD-SAFE)
@@ -290,12 +336,25 @@ class SmartSecuritySystem:
         """
         Transition the global FSM state.
         Only logs when state actually CHANGES.
+        Drives RGB LED on every transition.
         """
         with self.state_lock:
             if self.system_state != new_state:
                 old_state = self.system_state
                 self.system_state = new_state
                 print(f"[FSM] {old_state} → {new_state}")
+
+                # Drive RGB LED based on new state
+                if new_state == STATE_IDLE:
+                    self.rgb_led.status_idle()
+                elif new_state == STATE_ACCESS:
+                    self.rgb_led.status_access()
+                elif new_state == STATE_INSIDE:
+                    self.rgb_led.status_monitoring()
+                elif new_state == STATE_ALERT:
+                    self.rgb_led.status_alert()
+                elif new_state == STATE_LOITERING:
+                    self.rgb_led.status_loitering()
 
     def get_state(self):
         with self.state_lock:
@@ -341,33 +400,62 @@ class SmartSecuritySystem:
                     continue
 
                 # =========================
-                # FACE DETECTION (always runs for camera overlay)
+                # DUAL-MODE DETECTION
+                # IDLE/ACCESS: Face detection (entrance monitoring + RFID verify)
+                # INSIDE/LOITERING: Person detection + tracking (room monitoring)
                 # =========================
-                faces, face_images = self.face_detector.detect_faces(frame)
+                now = time.time()
+                current_state = self.get_state()
+                faces = []
+                face_images = []
+
+                if current_state in (STATE_INSIDE, STATE_LOITERING):
+                    # =========================
+                    # INSIDE MODE: Person detection + tracking
+                    # =========================
+                    person_detections = self.person_detector.detect_persons(frame)
+                    self.tracked_persons = self.person_tracker.update(person_detections)
+
+                    # Update authorization status for each tracked person
+                    self._update_person_authorization()
+
+                    raw_occupancy = self.person_tracker.get_active_count()
+
+                    # Still run face detection at reduced rate for face buffer
+                    # (needed if someone new taps RFID while in INSIDE state)
+                    if now - self.last_face_update > 2:
+                        faces, face_images = self.face_detector.detect_faces(frame)
+                else:
+                    # =========================
+                    # IDLE/ACCESS MODE: Face detection (unchanged)
+                    # =========================
+                    faces, face_images = self.face_detector.detect_faces(frame)
+                    raw_occupancy = len(faces)
+
+                    # Clear person tracker when not in INSIDE state
+                    if len(self.tracked_persons) > 0:
+                        self.person_tracker.reset()
+                        self.tracked_persons = {}
+                        self._person_session_map = {}
 
                 # =========================
                 # OCCUPANCY SMOOTHING (BUG-9 FIX)
                 # Use median of last N frames to reject flicker
                 # =========================
-                raw_occupancy = len(faces)
                 self._occupancy_buffer.append(raw_occupancy)
                 if len(self._occupancy_buffer) > self._occupancy_buffer_size:
                     self._occupancy_buffer.pop(0)
                 self.current_occupancy = sorted(self._occupancy_buffer)[len(self._occupancy_buffer) // 2]
 
-                now = time.time()
-                current_state = self.get_state()
-
                 # =========================
-                # UPDATE PIR ACTIVITY ON FACE DETECTION
+                # UPDATE PIR ACTIVITY ON DETECTION
                 # (Camera supplements PIR for inactivity tracking)
                 # =========================
                 if self.current_occupancy > 0 and self.pir_sensor.simulated:
-                    # In simulation mode, camera detection counts as activity
                     self.pir_sensor.simulate_motion()
 
                 # =========================
-                # OVERLAY (preserved from original)
+                # OVERLAY — STATE + OCCUPANCY TEXT
                 # =========================
                 status_color = {
                     STATE_IDLE: (128, 128, 128),
@@ -376,6 +464,9 @@ class SmartSecuritySystem:
                     STATE_ALERT: (0, 0, 255),
                     STATE_LOITERING: (0, 165, 255),
                 }.get(current_state, (255, 255, 255))
+
+                with self.session_lock:
+                    session_count = len(self.active_sessions)
 
                 cv2.putText(
                     frame,
@@ -387,25 +478,57 @@ class SmartSecuritySystem:
                     2
                 )
 
-                # Draw face boxes
-                for (x, y, w, h) in faces:
-                    cv2.rectangle(frame, (x, y), (x + w, y + h), status_color, 2)
-
-                # =========================
-                # SESSION COUNT OVERLAY
-                # =========================
-                with self.session_lock:
-                    session_count = len(self.active_sessions)
-
                 cv2.putText(
                     frame,
-                    f"Active Sessions: {session_count}",
+                    f"Sessions: {session_count}",
                     (10, 60),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.6,
                     (200, 200, 200),
                     1
                 )
+
+                # =========================
+                # BOUNDING BOX OVERLAY — COLOR-CODED
+                # =========================
+                if current_state in (STATE_INSIDE, STATE_LOITERING):
+                    # INSIDE: Draw person detection boxes with authorization colors
+                    for track_id, person in self.tracked_persons.items():
+                        if person.disappeared > 0:
+                            continue  # Don't draw disappeared persons
+
+                        x, y, w, h = person.bbox
+                        status = person.status
+
+                        # Color coding: GREEN=authorized, RED=unauthorized, YELLOW=unknown
+                        color = {
+                            'authorized': (0, 200, 0),
+                            'unauthorized': (0, 0, 255),
+                            'unknown': (0, 220, 220),
+                        }.get(status, (0, 220, 220))
+
+                        cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
+
+                        # Label with tracking ID and status
+                        label = f"ID:{track_id} [{status.upper()}]"
+                        label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
+
+                        # Background for label
+                        cv2.rectangle(
+                            frame,
+                            (x, y - label_size[1] - 8),
+                            (x + label_size[0] + 4, y),
+                            color, -1
+                        )
+                        cv2.putText(
+                            frame, label, (x + 2, y - 5),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                            (255, 255, 255), 1
+                        )
+                else:
+                    # IDLE/ACCESS: Draw face boxes (original behavior)
+                    for (x, y, w, h) in faces:
+                        cv2.rectangle(frame, (x, y), (x + w, y + h), status_color, 2)
 
                 # =========================
                 # OCCUPANCY PUSH (rate-limited, preserves existing behavior)
@@ -465,6 +588,93 @@ class SmartSecuritySystem:
             except Exception as e:
                 print("[MAIN LOOP ERROR]", e)
                 time.sleep(0.1)
+
+    # =========================
+    # PERSON AUTHORIZATION LOGIC
+    # Determines if tracked persons are authorized based on RFID sessions
+    # =========================
+    def _update_person_authorization(self):
+        """
+        Assign authorization status to each tracked person.
+
+        Rules:
+        1. If tracked_count <= session_count → all persons are 'authorized'
+        2. If tracked_count > session_count → excess are 'unauthorized'
+        3. New persons during entry window → 'unknown' (grace period)
+        """
+        with self.session_lock:
+            session_count = len(self.active_sessions)
+
+        tracked_count = self.person_tracker.get_active_count()
+        now = time.time()
+
+        # Check if we're in the entry window (recent door unlock)
+        in_entry_window = (
+            self._last_unlock_time is not None
+            and (now - self._last_unlock_time) < self._entry_window_duration
+        )
+
+        if tracked_count <= session_count:
+            # Everyone accounted for — all authorized
+            for person in self.tracked_persons.values():
+                if person.disappeared == 0:
+                    person.status = 'authorized'
+        else:
+            # More people than sessions — some are unauthorized
+            authorized_count = 0
+            for person in self.tracked_persons.values():
+                if person.disappeared > 0:
+                    continue
+
+                if authorized_count < session_count:
+                    person.status = 'authorized'
+                    authorized_count += 1
+                elif in_entry_window:
+                    # During entry window: give benefit of doubt
+                    person.status = 'unknown'
+                else:
+                    # Outside entry window: mark as unauthorized
+                    person.status = 'unauthorized'
+
+    def get_tracked_persons_info(self):
+        """
+        Return tracked person metadata for API/UI consumption.
+        Used by Camera.cshtml tracked persons panel.
+        """
+        result = []
+        with self.session_lock:
+            sessions_list = list(self.active_sessions.values())
+
+        for track_id, person in self.tracked_persons.items():
+            if person.disappeared > 0:
+                continue
+
+            # Try to find associated session
+            session = None
+            person_name = "Unknown"
+            entry_time = None
+            session_id = None
+
+            if person.status == 'authorized' and sessions_list:
+                # Associate with first available session
+                idx = min(track_id, len(sessions_list) - 1)
+                if idx < len(sessions_list):
+                    session = sessions_list[idx]
+                    session_id = session.get("session_id")
+                    entry_time = session.get("entry_time")
+                    person_name = f"Session-{session.get('rfid_uid', 'Unknown')}"
+
+            result.append({
+                'trackId': track_id,
+                'bbox': list(person.bbox),
+                'status': person.status,
+                'personName': person_name,
+                'sessionId': session_id,
+                'entryTime': entry_time,
+                'confidence': round(person.confidence * 100, 1) if person.confidence else 0
+            })
+
+        return result
 
     # =========================
     # IDLE DETECTION: Graduated Entrance Response
@@ -542,6 +752,10 @@ class SmartSecuritySystem:
 
                     # Start recording on intrusion
                     self._start_recording(session_id)
+
+                    # Hardware feedback: alarm if intrusion alarm is armed
+                    if self._is_alarm_enabled("intrusion"):
+                        self.buzzer.alarm(duration=10)
 
                     # Reset entrance tracking (escalated to full intrusion)
                     self._entrance_face_start_time = None
@@ -808,6 +1022,10 @@ class SmartSecuritySystem:
             self.solenoid_lock.unlock(duration=5)
             self._last_unlock_time = now
 
+            # Hardware feedback: confirmation beep + green flash
+            self.buzzer.beep(duration=0.2)
+            self.rgb_led.status_granted()
+
             # Push detection event (preserves existing behavior)
             self.push_detection("face_verified", 1, result["confidence"] / 100.0)
 
@@ -835,9 +1053,16 @@ class SmartSecuritySystem:
                 )
                 self.push_detection("unknown_face", 1, result["confidence"] / 100.0, triggered_alert=True)
                 self._start_recording(session_id)
+
+                # Hardware feedback: alarm if intrusion alarm is armed
+                self.rgb_led.status_denied()
+                if self._is_alarm_enabled("intrusion"):
+                    self.buzzer.alarm(duration=5)
+
                 print(f"[ACCESS DENIED] {user_id} — Face MISMATCH")
 
                 time.sleep(2)
+                self.buzzer.stop()  # Ensure buzzer stops before state change
                 self.set_state(STATE_IDLE)
 
             elif failure_type == "No face detected":
@@ -867,6 +1092,9 @@ class SmartSecuritySystem:
                 )
                 print(f"[ACCESS DENIED] {user_id} — No registered face")
 
+                # Warning beep (not full alarm — admin issue, not security threat)
+                self.buzzer.pattern_beep(times=3, interval=0.3)
+
                 time.sleep(2)
                 self.set_state(STATE_IDLE)
 
@@ -888,6 +1116,76 @@ class SmartSecuritySystem:
             with self.session_lock:
                 for user_id, session in self.active_sessions.items():
                     session["last_active"] = time.time()
+
+    # =========================
+    # DOOR SENSOR CALLBACK
+    # =========================
+    def on_door_change(self, is_open):
+        """
+        Magnetic reed switch state-change callback.
+        Detects forced entry when door opens without active session.
+        """
+        if is_open:
+            with self.session_lock:
+                has_active = len(self.active_sessions) > 0
+
+            current_state = self.get_state()
+
+            if not has_active and current_state == STATE_IDLE:
+                # Door opened without any active session = FORCED ENTRY
+                print("[DOOR] FORCED ENTRY — door opened without authorization")
+
+                self.set_state(STATE_ALERT)
+                self._alert_start_time = time.time()
+
+                session_id = str(uuid.uuid4())
+                self.push_state_transition(
+                    event="ALERT",
+                    session_id=session_id,
+                    alert_type="ForcedEntry",
+                    description="Door opened without any active RFID session",
+                    severity="CRITICAL"
+                )
+                self._start_recording(session_id)
+
+                # Hardware feedback: alarm if forced entry alarm is armed
+                if self._is_alarm_enabled("forcedentry"):
+                    self.buzzer.alarm(duration=10)
+
+            elif has_active:
+                print("[DOOR] Door opened — active session present (normal)")
+        else:
+            print("[DOOR] Door closed")
+
+    # =========================
+    # ALARM SETTINGS (DB-DRIVEN)
+    # =========================
+    def _is_alarm_enabled(self, alarm_type):
+        """Check if a specific alarm protocol is armed in the DB."""
+        return self._alarm_settings.get(alarm_type.lower(), True)
+
+    def _fetch_alarm_settings(self):
+        """Fetch alarm_settings from ASP.NET backend."""
+        try:
+            resp = requests.get(
+                f"{self.base_url}/api/system/alarm-settings",
+                timeout=3
+            )
+            if resp.ok:
+                settings = resp.json()
+                self._alarm_settings = {
+                    s["type"].lower(): s["isEnabled"]
+                    for s in settings
+                }
+                print(f"[ALARM] Settings synced: {self._alarm_settings}")
+        except Exception as e:
+            print(f"[ALARM] Settings fetch failed (using last known): {e}")
+
+    def _alarm_settings_poller(self):
+        """Background thread: poll alarm_settings every 60 seconds."""
+        while self.is_running:
+            self._fetch_alarm_settings()
+            time.sleep(60)
 
     # =========================
     # LOITERING MONITOR (REALISTIC ALGORITHM)
@@ -1194,8 +1492,13 @@ class SmartSecuritySystem:
         self.camera.stop()
         self.pir_sensor.cleanup()
         self.solenoid_lock.cleanup()
+        self.buzzer.cleanup()
+        self.rgb_led.cleanup()
+        self.door_sensor.cleanup()
 
         if not self.use_simulated_rfid:
+            self.rfid_reader.cleanup()
+        else:
             self.rfid_reader.stop_reading()
 
         print("[SYSTEM] Shutdown complete")
@@ -1221,13 +1524,20 @@ class SmartSecuritySystem:
             "active_sessions": sessions_info,
             "pir_motion": self.pir_sensor.is_motion_detected(),
             "pir_inactivity_seconds": round(self.pir_sensor.get_inactivity_duration(), 1),
-            "lock_status": self.solenoid_lock.get_status()
+            "lock_status": self.solenoid_lock.get_status(),
+            "buzzer_active": self.buzzer.is_active,
+            "led_color": self.rgb_led.get_status(),
+            "door_open": self.door_sensor.is_door_open(),
+            "alarm_settings": dict(self._alarm_settings)
         }
 
 
 def main():
+    import platform
+    is_pi = platform.system().lower() == "linux"
+
     system = SmartSecuritySystem(
-        use_simulated_rfid=True,
+        use_simulated_rfid=not is_pi,  # Auto: real RFID on Pi, simulated on laptop
         base_url="http://localhost:5000",
         camera_id=1,
         room_id=1,
@@ -1244,10 +1554,14 @@ def main():
     if system.initialize():
         system.start()
 
-        print("\n" + "=" * 50)
-        print(" FSM Security System Running")
-        print(" Press Ctrl+C to stop")
-        print("=" * 50 + "\n")
+        # Fetch alarm settings immediately on boot
+        system._fetch_alarm_settings()
+
+        mode = "RASPBERRY PI" if is_pi else "LAPTOP (SIMULATION)"
+        print(f"\n{'=' * 50}")
+        print(f" FSM Security System Running [{mode}]")
+        print(f" Press Ctrl+C to stop")
+        print(f"{'=' * 50}\n")
 
         try:
             while True:
@@ -1258,7 +1572,9 @@ def main():
                       f"Occupancy: {status['occupancy']} | "
                       f"Sessions: {len(status['active_sessions'])} | "
                       f"PIR: {'MOTION' if status['pir_motion'] else 'IDLE'} | "
-                      f"Lock: {status['lock_status']}")
+                      f"Lock: {status['lock_status']} | "
+                      f"Door: {'OPEN' if status['door_open'] else 'CLOSED'} | "
+                      f"LED: {status['led_color']}")
 
         except KeyboardInterrupt:
             print("\n[SYSTEM] Interrupt received")

@@ -1,5 +1,6 @@
-﻿using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
+using SmartSecuritySystem.Filters;
 using WebApp.Data;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -8,8 +9,12 @@ var builder = WebApplication.CreateBuilder(args);
 // SERVICES 
 // =========================
 
-// MVC
-builder.Services.AddControllersWithViews();
+// MVC + Global Filters
+builder.Services.AddControllersWithViews(options =>
+{
+    // Force new accounts to change password before accessing any page
+    options.Filters.Add<ForcePasswordChangeFilter>();
+});
 
 // =========================
 // DATABASE (POSTGRESQL)

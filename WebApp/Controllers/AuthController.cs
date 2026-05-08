@@ -140,6 +140,12 @@ namespace SmartSecuritySystem.Controllers
                     IsPersistent = rememberMe
                 });
 
+            // Force password change redirect for new accounts
+            if (user.MustChangePassword)
+            {
+                return RedirectToAction("Index", "Profile");
+            }
+
             if (role.Equals("Admin", StringComparison.OrdinalIgnoreCase))
                 return RedirectToAction("Index", "Admin");
 
