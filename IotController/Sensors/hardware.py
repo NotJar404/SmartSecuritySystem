@@ -141,6 +141,89 @@ class Buzzer:
         if self.simulated:
             print("[BUZZER SIM] 🔇 ALARM OFF")
 
+    def alarm_fire(self, duration=15):
+        """Fast intermittent alarm for fire protocol."""
+        self._alarm_running = True
+        thread = threading.Thread(
+            target=self._fire_sequence, args=(duration,), daemon=True
+        )
+        thread.start()
+
+    def _fire_sequence(self, duration):
+        start = time.time()
+        if self.simulated:
+            print(f"[BUZZER SIM] 🔥 FIRE ALARM ({duration}s)")
+        while self._alarm_running and (time.time() - start) < duration:
+            with self.lock:
+                self.is_active = True
+                if not self.simulated:
+                    self._gpio.output(self.pin, GPIO.HIGH)
+            time.sleep(0.15)
+            with self.lock:
+                self.is_active = False
+                if not self.simulated:
+                    self._gpio.output(self.pin, GPIO.LOW)
+            time.sleep(0.1)
+        if self.simulated:
+            print("[BUZZER SIM] 🔇 FIRE ALARM OFF")
+
+    def alarm_earthquake(self, duration=20):
+        """Slow pulsing alarm for earthquake mode."""
+        self._alarm_running = True
+        thread = threading.Thread(
+            target=self._earthquake_sequence, args=(duration,), daemon=True
+        )
+        thread.start()
+
+    def _earthquake_sequence(self, duration):
+        start = time.time()
+        if self.simulated:
+            print(f"[BUZZER SIM] 🌍 EARTHQUAKE ALARM ({duration}s)")
+        while self._alarm_running and (time.time() - start) < duration:
+            with self.lock:
+                self.is_active = True
+                if not self.simulated:
+                    self._gpio.output(self.pin, GPIO.HIGH)
+            time.sleep(0.8)
+            with self.lock:
+                self.is_active = False
+                if not self.simulated:
+                    self._gpio.output(self.pin, GPIO.LOW)
+            time.sleep(0.8)
+        if self.simulated:
+            print("[BUZZER SIM] 🔇 EARTHQUAKE ALARM OFF")
+
+    def alarm_medical(self, duration=15):
+        """Urgent repeating pattern for medical emergency."""
+        self._alarm_running = True
+        thread = threading.Thread(
+            target=self._medical_sequence, args=(duration,), daemon=True
+        )
+        thread.start()
+
+    def _medical_sequence(self, duration):
+        start = time.time()
+        if self.simulated:
+            print(f"[BUZZER SIM] 🚑 MEDICAL ALARM ({duration}s)")
+        while self._alarm_running and (time.time() - start) < duration:
+            # 3 rapid beeps then pause
+            for _ in range(3):
+                if not self._alarm_running:
+                    break
+                with self.lock:
+                    self.is_active = True
+                    if not self.simulated:
+                        self._gpio.output(self.pin, GPIO.HIGH)
+                time.sleep(0.1)
+                with self.lock:
+                    self.is_active = False
+                    if not self.simulated:
+                        self._gpio.output(self.pin, GPIO.LOW)
+                time.sleep(0.1)
+            time.sleep(0.5)
+        if self.simulated:
+            print("[BUZZER SIM] 🔇 MEDICAL ALARM OFF")
+
     def stop(self):
         """Immediately silence the buzzer."""
         self._alarm_running = False
@@ -255,6 +338,60 @@ class RGBLed:
         """Orange — loitering detected."""
         self.set_color(1, 0, 0, "LOITERING/Orange")
         # Note: true orange requires PWM. With digital GPIO, red approximates orange.
+
+    def status_fire(self):
+        """Fast red flashing — fire protocol."""
+        self._blink_running = True
+        thread = threading.Thread(target=self._blink_fast, args=(1, 0, 0, "FIRE"), daemon=True)
+        thread.start()
+
+    def status_earthquake(self):
+        """Slow blue pulsing — earthquake mode."""
+        self._blink_running = True
+        thread = threading.Thread(target=self._blink_slow, args=(0, 0, 1, "EARTHQUAKE"), daemon=True)
+        thread.start()
+
+    def status_medical(self):
+        """Red-blue alternating — medical emergency."""
+        self._blink_running = True
+        thread = threading.Thread(target=self._blink_alternate, daemon=True)
+        thread.start()
+
+    def _blink_fast(self, r, g, b, label):
+        """Fast flashing pattern (fire protocol)."""
+        if self.simulated:
+            print(f"[RGB LED SIM] Fast blink: {label}")
+        while self._blink_running:
+            self.set_color(r, g, b, label)
+            time.sleep(0.15)
+            if not self._blink_running:
+                break
+            self.off()
+            time.sleep(0.15)
+
+    def _blink_slow(self, r, g, b, label):
+        """Slow pulsing pattern (earthquake)."""
+        if self.simulated:
+            print(f"[RGB LED SIM] Slow pulse: {label}")
+        while self._blink_running:
+            self.set_color(r, g, b, label)
+            time.sleep(1.0)
+            if not self._blink_running:
+                break
+            self.off()
+            time.sleep(1.0)
+
+    def _blink_alternate(self):
+        """Red-blue alternating pattern (medical emergency)."""
+        if self.simulated:
+            print("[RGB LED SIM] Alternate: MEDICAL (Red ↔ Blue)")
+        while self._blink_running:
+            self.set_color(1, 0, 0, "MEDICAL/Red")
+            time.sleep(0.3)
+            if not self._blink_running:
+                break
+            self.set_color(0, 0, 1, "MEDICAL/Blue")
+            time.sleep(0.3)
 
     def _flash(self, r, g, b, times, interval, label):
         if self.simulated:

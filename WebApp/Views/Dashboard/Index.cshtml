@@ -92,8 +92,10 @@
                 foreach (var cam in Model.Cameras)
                 {
                     <div class="grid-card dash-cam-card"
-                         onclick="window.location.href='/Cameras/Index?selectedId=@cam.Id'"
-                         style="cursor:pointer; min-width:280px; flex-shrink:0;">
+                         style="cursor:pointer; min-width:280px; flex-shrink:0; transition: transform 0.2s, box-shadow 0.2s;"
+                         onmouseover="this.style.transform='scale(1.02)'; this.style.boxShadow='0 8px 16px rgba(0,0,0,0.2)';"
+                         onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='';"
+                         onclick="window.location.href='/Cameras/Index?selectedId=@cam.Id'">
 
                         <div class="grid-header">
                             <span class="grid-title">@cam.Name</span>
@@ -102,7 +104,7 @@
 
                         <div class="grid-body">
                             <i class="fa fa-camera"></i>
-                            <video class="cctv-video grid-preview" muted autoplay playsinline
+                            <video class="cctv-video grid-preview" muted="muted" autoplay playsinline
                                    data-src="@cam.StreamUrl"></video>
                         </div>
 
@@ -276,51 +278,56 @@
 <!-- VIDEO STREAM LOGIC -->
 <!-- ===================== -->
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script src="~/js/webcam-stream-loader.js"></script>
 
 <script>
 window.addEventListener("DOMContentLoaded", async function () {
 
     const videos = document.querySelectorAll(".cctv-video");
-    let webcamStream = null;
-
-    async function getWebcam() {
-        if (webcamStream) return webcamStream;
-
-        try {
-            webcamStream = await navigator.mediaDevices.getUserMedia({
-                video: true,
-                audio: false
-            });
-            return webcamStream;
-        } catch {
-            return null;
-        }
-    }
+    console.log(`[DASHBOARD] Initializing ${videos.length} camera feeds`);
 
     for (const video of videos) {
-
         const url = video.getAttribute("data-src");
 
-        if (url && url.trim() !== "") {
-
-            if (url.includes(".m3u8") && window.Hls) {
-                const hls = new Hls();
-                hls.loadSource(url);
-                hls.attachMedia(video);
-            } else {
-                video.src = url;
-            }
-
-            video.play().catch(() => {});
-
+        if (url && url.trim() !== '') {
+            // Real camera stream (Pi / IP camera)
+            loadVideoStream(video, url, {
+                onSuccess: (info) => {
+                    console.log('[DASHBOARD] Camera loaded:', info.type, info.isBackendProcessed ? '(backend processed)' : '');
+                },
+                onError: (error) => {
+                    console.error('[DASHBOARD] Camera error:', error);
+                    // Fallback to Python backend if provided stream fails
+                    console.log('[DASHBOARD] Falling back to Python backend at http://localhost:5050/video');
+                    loadVideoStream(video, '', {
+                        onSuccess: (info) => {
+                            console.log('[DASHBOARD] Fallback to backend successful');
+                        },
+                        onError: () => {
+                            console.error('[DASHBOARD] Backend fallback also failed');
+                        },
+                        enableHLS: false,
+                        fallbackToWebcam: false
+                    });
+                },
+                enableHLS: true,
+                fallbackToWebcam: false
+            });
         } else {
-
-            const stream = await getWebcam();
-
-            if (stream) {
-                video.srcObject = stream;
-                video.play().catch(() => {});
-            }
+            // No URL — use Python backend MJPEG (with bounding boxes)
+            console.log('[DASHBOARD] No StreamUrl for camera, using Python backend');
+            loadVideoStream(video, '', {
+                onSuccess: (info) => {
+                    console.log('[DASHBOARD] Backend stream loaded:', info.type);
+                },
+                onError: (error) => {
+                    console.error('[DASHBOARD] Backend stream error:', error);
+                },
+                enableHLS: false,
+                fallbackToWebcam: false
+            });
+            // Try to start the webcam on the backend
+            fetch('http://localhost:5050/start', { method: 'POST', mode: 'no-cors' }).catch(() => {});
         }
     }
 

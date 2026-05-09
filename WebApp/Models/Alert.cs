@@ -107,6 +107,9 @@ namespace WebApp.Models
         ForcedEntry,
         DoorEvent,
         SystemError,
+        BruteForceAttempt,      // "Brute Force Attempt" from DB
+        Tailgating,             // "Tailgating" from Pi FSM
+        MotionDetected,         // "Motion Detected" from PIR sensor
 
         // === INDOOR ROOM MONITORING EVENTS (Camera monitoring) ===
         Loitering,              // Exceeded stay time (configurable per-room, default 20 min)
@@ -120,7 +123,9 @@ namespace WebApp.Models
     public enum SeverityLevel
     {
         INFO,
+        LOW,
         WARNING,
+        HIGH,
         CRITICAL
     }
 

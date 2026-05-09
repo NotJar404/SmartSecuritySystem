@@ -14,6 +14,8 @@
 
 <link rel="stylesheet" href="~/css/camera.css" />
 <link rel="stylesheet" href="~/css/camera-ai.css" />
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script src="~/js/webcam-stream-loader.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/@@vladmandic/face-api@@1.7.12/dist/face-api.min.js"></script>
 <script defer src="~/js/camera-detect.js"></script>
 
@@ -205,7 +207,7 @@
                 </div>
             </div>
 
-            <div class="viewer-body">
+            <div class="viewer-body" style="position:relative;">
                 <div class="rec-badge">● REC</div>
                 <div class="timestamp" id="camTime"></div>
 
@@ -215,6 +217,11 @@
                        playsinline
                        style="width:100%; height:100%; background:black;">
                 </video>
+
+                <!-- Detection overlay canvas (bounding boxes + labels) -->
+                <canvas id="detectOverlay"
+                        style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:5;">
+                </canvas>
 
                 <div class="overlay">
                     <strong id="overlayName"></strong><br />
@@ -398,22 +405,76 @@ function selectCamera(cam) {
     startClock();
 
     if (cam.StreamUrl && cam.StreamUrl.trim() !== "") {
+        // === REAL STREAM (Raspberry Pi / IP camera) ===
         overlaySource.innerText = "Raspberry Pi / Stream";
         stopDetection();
+        stopWebcamVideo(video);
         video.srcObject = null;
-        video.src = cam.StreamUrl;
-        video.load();
-        video.play().catch(err => { console.log("Stream failed:", err); });
-    } else {
-        overlaySource.innerText = "Local Webcam (TEST MODE — AI Detection Active)";
-        navigator.mediaDevices.getUserMedia({ video: true })
-            .then(stream => {
-                video.srcObject = stream;
-                video.play();
-                // Start browser-based face detection for testing
+
+        // Clean up any test mode MJPEG stream
+        var mjpeg = document.getElementById('mjpegTestStream');
+        if (mjpeg) { mjpeg.src = ''; mjpeg.style.display = 'none'; }
+        video.style.display = 'block';
+        fetch('http://localhost:5050/stop', { mode: 'no-cors' }).catch(() => {});
+
+        loadVideoStream(video, cam.StreamUrl, {
+            enableHLS: true,
+            fallbackToWebcam: true,
+            onSuccess: (info) => {
+                console.log('[CAMERA] Stream loaded:', info.type);
+            },
+            onError: (error) => {
+                console.error('[CAMERA] Stream error:', error);
+            },
+            onWebcam: () => {
+                console.log('[CAMERA] Webcam fallback activated');
+                overlaySource.innerText = "Local Webcam (TEST MODE - AI Detection Active)";
                 initWebcamDetection(video, cam.Id, cam.RoomId);
-            })
-            .catch(err => { console.log("Webcam blocked:", err); });
+            }
+        });
+    } else {
+        // === TEST MODE: Use Python stream_server.py (same pipeline as Pi) ===
+        // Bounding boxes are rendered by Python backend, NOT browser-side
+        overlaySource.innerText = "AI Pipeline Stream (TEST MODE)";
+        stopDetection();
+        stopWebcamVideo(video);
+        video.srcObject = null;
+
+        // Tell stream_server.py to start the webcam
+        const STREAM_BASE = 'http://localhost:5050';
+        fetch(STREAM_BASE + '/start', { mode: 'no-cors' }).catch(() => {});
+
+        // Use an <img> tag for MJPEG stream (bounding boxes burned into frames)
+        let mjpegImg = document.getElementById('mjpegTestStream');
+        if (!mjpegImg) {
+            mjpegImg = document.createElement('img');
+            mjpegImg.id = 'mjpegTestStream';
+            mjpegImg.style.cssText = 'width:100%;height:100%;object-fit:contain;background:black;position:absolute;top:0;left:0;z-index:1;';
+            video.parentElement.insertBefore(mjpegImg, video);
+        }
+
+        // Hide the <video> element, show the MJPEG <img>
+        video.style.display = 'none';
+        mjpegImg.style.display = 'block';
+        mjpegImg.src = STREAM_BASE + '/video?t=' + Date.now();
+
+        mjpegImg.onerror = function() {
+            console.warn('[CAMERA] Python stream_server.py not running — falling back to browser webcam');
+            // Fallback: if Python server isn't running, use browser webcam
+            mjpegImg.style.display = 'none';
+            video.style.display = 'block';
+            overlaySource.innerText = "Local Webcam (TEST MODE - No AI Overlays)";
+
+            loadVideoStream(video, null, {
+                fallbackToWebcam: true,
+                onSuccess: (info) => {
+                    console.log('[CAMERA] Browser webcam loaded (no overlays):', info.type);
+                },
+                onError: (error) => {
+                    console.error('[CAMERA] Webcam error:', error);
+                }
+            });
+        };
     }
 }
 
@@ -618,23 +679,48 @@ document.addEventListener('DOMContentLoaded', function() {
     // Intercept camera form with two-step confirmation
     SecureConfirm.interceptForm('cameraForm', 'Confirm Camera Configuration', 'cameraModal');
 
-    // Init grid video previews
-    document.querySelectorAll('.grid-preview').forEach(async function(video) {
+    // Init grid video previews — NO webcam fallback (prevents getUserMedia from
+    // locking the webcam before Python stream_server.py can access it)
+    document.querySelectorAll('.grid-preview').forEach(function(video) {
         const url = video.getAttribute('data-src');
-        if (url && url.trim() !== '') {
-            video.src = url;
-            video.play().catch(() => {});
-        } else {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                video.srcObject = stream;
-                video.play().catch(() => {});
-            } catch(e) {}
-        }
+        loadVideoStream(video, url, {
+            enableHLS: true,
+            fallbackToWebcam: false,
+            onSuccess: (info) => {
+                console.log('[CAMERA GRID] Loaded:', info.type);
+            }
+        });
     });
 
     // START REAL-TIME POLLING
     startPolling();
+
+    // =====================================================
+    // PAGE-LEAVE CLEANUP: Release webcam when user leaves
+    // Uses sendBeacon (guaranteed delivery even during page close)
+    // =====================================================
+    function cleanupCamera() {
+        stopDetection();
+        stopAllWebcamStreams();
+
+        // Clear MJPEG stream
+        var mjpeg = document.getElementById('mjpegTestStream');
+        if (mjpeg) mjpeg.src = '';
+
+        // Also clear any dynamically created MJPEG imgs
+        document.querySelectorAll('.mjpeg-stream-img').forEach(function(img) { img.src = ''; });
+
+        // sendBeacon is GUARANTEED to complete even during page close
+        // (unlike fetch which browsers cancel on unload)
+        if (navigator.sendBeacon) {
+            navigator.sendBeacon('http://localhost:5050/stop');
+        } else {
+            fetch('http://localhost:5050/stop', { mode: 'no-cors', keepalive: true }).catch(() => {});
+        }
+    }
+
+    window.addEventListener('beforeunload', cleanupCamera);
+    window.addEventListener('pagehide', cleanupCamera);  // iOS/mobile backup
 });
 
 </script>

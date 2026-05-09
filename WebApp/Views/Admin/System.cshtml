@@ -1,8 +1,18 @@
 @using WebApp.Models
 @{
     ViewData["Title"] = "AI Assisted Smart Security and Intrusion Detection System";
-    // We are now using AlarmSetting instead of Alert to power the toggles
     var alarmSettings = ViewBag.Alarms as List<WebApp.Models.AlarmSetting> ?? new List<WebApp.Models.AlarmSetting>();
+    
+    // System config — drives ALL toggle/input states (not static)
+    var cfg = ViewBag.Config;
+    bool cfgArm = cfg?.ArmSystem ?? true;
+    bool cfgAutoMaint = cfg?.AutoMaintenance ?? true;
+    int cfgMotion = cfg?.MotionSensitivity ?? 2;
+    int cfgFace = cfg?.FaceAccuracy ?? 80;
+    bool cfgEmail = cfg?.EmailReports ?? true;
+    bool cfgSiren = cfg?.HardwareSiren ?? true;
+    int cfgGate = cfg?.GateHoldOpen ?? 5;
+    bool cfgBio = cfg?.BiometricLock ?? true;
 }
 
 <link rel="stylesheet" href="~/css/System.css" />
@@ -35,7 +45,7 @@
                         <small>Enable/Disable AI monitoring</small>
                     </div>
                     <label class="switch">
-                        <input type="checkbox" id="armSystem" checked onchange="handleToggle('Security Engine', this.checked)">
+                        <input type="checkbox" id="armSystem" @(cfgArm ? "checked" : "") onchange="handleToggle('Security Engine', this.checked)">
                         <span class="slider round"></span>
                     </label>
                 </div>
@@ -46,7 +56,7 @@
                         <small>Apply warm UI color profile</small>
                     </div>
                     <label class="switch">
-                        <input type="checkbox" checked onchange="updateTheme(this.checked)">
+                        <input type="checkbox" id="eyeStrain" checked onchange="updateTheme(this.checked)">
                         <span class="slider round"></span>
                     </label>
                 </div>
@@ -57,7 +67,7 @@
                         <small>Purge old logs every 30 days</small>
                     </div>
                     <label class="switch">
-                        <input type="checkbox" checked>
+                        <input type="checkbox" id="autoMaintenance" @(cfgAutoMaint ? "checked" : "")>
                         <span class="slider round"></span>
                     </label>
                 </div>
@@ -70,21 +80,22 @@
                 </div>
                 <div class="setting-row">
                     <label>Motion Sensitivity</label>
-                    <select class="warm-select">
+                    <select id="motionSensitivity" class="warm-select">
                         <option value="1">Low (Ignore Shadows)</option>
-                        <option value="2" selected>Medium (Balanced)</option>
+                        <option value="2">Medium (Balanced)</option>
                         <option value="3">High (Strict)</option>
                     </select>
+                    <script>document.getElementById('motionSensitivity').value = '@cfgMotion';</script>
                 </div>
                 <div class="setting-row mt-3">
                     <label>Face Accuracy</label>
                     <div class="input-group-custom">
-                        <input type="number" class="warm-num-input" value="80" min="50" max="100" />
+                        <input type="number" id="faceAccuracy" class="warm-num-input" value="@cfgFace" min="50" max="100" oninput="updateAccuracyBar(this.value)" />
                         <span class="unit-tag">%</span>
                     </div>
                 </div>
                 <div class="progress-container mt-2" style="height: 4px;">
-                    <div class="progress-bar-fill" style="width:80%; background: var(--accent);"></div>
+                    <div id="accuracyBar" class="progress-bar-fill" style="width:@(cfgFace)%; background: var(--accent);"></div>
                 </div>
                 <small class="text-muted extra-small mt-2 d-block">Minimum confidence for a positive match.</small>
             </div>
@@ -100,7 +111,7 @@
                         <small>Send snapshots of threats</small>
                     </div>
                     <label class="switch">
-                        <input type="checkbox" checked>
+                        <input type="checkbox" id="emailReports" @(cfgEmail ? "checked" : "")>
                         <span class="slider round"></span>
                     </label>
                 </div>
@@ -110,7 +121,7 @@
                         <small>Enable physical Pi buzzer</small>
                     </div>
                     <label class="switch">
-                        <input type="checkbox" checked>
+                        <input type="checkbox" id="hardwareSiren" @(cfgSiren ? "checked" : "")>
                         <span class="slider round"></span>
                     </label>
                 </div>
@@ -124,7 +135,7 @@
                 <div class="setting-row">
                     <label>Gate Hold-Open</label>
                     <div class="input-group-custom">
-                        <input type="number" class="warm-num-input" value="5" />
+                        <input type="number" id="gateHoldOpen" class="warm-num-input" value="@cfgGate" min="1" max="30" />
                         <span class="unit-tag">sec</span>
                     </div>
                 </div>
@@ -134,7 +145,7 @@
                         <small>Face match required to open</small>
                     </div>
                     <label class="switch">
-                        <input type="checkbox" checked>
+                        <input type="checkbox" id="biometricLock" @(cfgBio ? "checked" : "")>
                         <span class="slider round"></span>
                     </label>
                 </div>
@@ -143,16 +154,16 @@
             <div class="control-card">
                 <div class="card-title-area">
                     <h5><i class="fa fa-microchip me-3"></i>Pi Maintenance</h5>
-                    <span class="status-indicator-dot online"></span>
+                    <span class="status-indicator-dot online" id="piStatusDot"></span>
                 </div>
                 
                 <div class="storage-display mb-3">
                     <div class="d-flex justify-content-between mb-1">
                         <small class="fw-bold">SD Card Storage</small>
-                        <small class="text-success">25% Used</small>
+                        <small id="storagePercent" class="text-muted">Loading...</small>
                     </div>
                     <div class="progress-container" style="height: 6px;">
-                        <div class="progress-bar-fill" style="width:25%"></div>
+                        <div id="storageBar" class="progress-bar-fill" style="width:0%"></div>
                     </div>
                 </div>
 
@@ -289,25 +300,47 @@
     }
 
     // =========================
-    // ARCHIVE HANDLER
+    // ARCHIVE HANDLER (REAL — copies recordings to USB on Pi)
     // =========================
     function handleArchive() {
-        if (confirm("HARDWARE REQUIRED: Is the USB storage device connected to the Raspberry Pi?")) {
-            showToast("Archive process initiated. Please do not disconnect USB.", 'info');
-        }
+        if (!confirm("HARDWARE REQUIRED: Is the USB storage device connected to the Raspberry Pi?")) return;
+
+        showToast("Archive process initiated. Please do not disconnect USB.", 'info');
+
+        fetch('/System/ArchiveRecordings', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                showToast(data.message, 'success');
+            } else {
+                showToast(data.message || 'Archive failed', 'error');
+            }
+        })
+        .catch(err => showToast('Archive error: ' + err.message, 'error'));
     }
 
     // =========================
-    // DATABASE OPTIMIZE
+    // DATABASE OPTIMIZE (REAL — runs VACUUM ANALYZE)
     // =========================
     function triggerAction(action) {
-        if (confirm(`CRITICAL ACTION: Are you sure you want to trigger: ${action}?`)) {
-            showToast(`Signal sent. ${action} in progress.`, 'info');
-        }
+        if (!confirm(`CRITICAL ACTION: Are you sure you want to trigger: ${action}?`)) return;
+
+        showToast(`${action} in progress...`, 'info');
+
+        fetch('/System/OptimizeDatabase', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                showToast(data.message, 'success');
+            } else {
+                showToast(data.message || 'Optimization failed', 'error');
+            }
+        })
+        .catch(err => showToast('Database error: ' + err.message, 'error'));
     }
 
     // =========================
-    // DEPLOY SETTINGS (REAL API CALL)
+    // DEPLOY SETTINGS (REAL API CALL — ALL CARDS)
     // =========================
     function saveGlobalSettings() {
         const btn = event.currentTarget;
@@ -316,21 +349,25 @@
         btn.innerHTML = '<i class="fa fa-spinner fa-spin me-2"></i>Pushing Config...';
         btn.disabled = true;
 
-        // Collect all settings from the form
+        // Collect ALL settings from ALL cards by ID
         const settings = {
-            armSystem: document.getElementById('armSystem')?.checked ?? true,
-            eyeStrainProtection: true,
-            autoMaintenance: true,
-            motionSensitivity: 2,
-            faceAccuracy: 80
+            // Global Settings
+            armSystem:           document.getElementById('armSystem')?.checked ?? true,
+            eyeStrainProtection: document.getElementById('eyeStrain')?.checked ?? true,
+            autoMaintenance:     document.getElementById('autoMaintenance')?.checked ?? true,
+
+            // AI Intelligence
+            motionSensitivity:   parseInt(document.getElementById('motionSensitivity')?.value ?? '2'),
+            faceAccuracy:        parseInt(document.getElementById('faceAccuracy')?.value ?? '80'),
+
+            // Alert Protocols
+            emailReports:        document.getElementById('emailReports')?.checked ?? true,
+            hardwareSiren:       document.getElementById('hardwareSiren')?.checked ?? true,
+
+            // Access Control
+            gateHoldOpen:        parseInt(document.getElementById('gateHoldOpen')?.value ?? '5'),
+            biometricLock:       document.getElementById('biometricLock')?.checked ?? true,
         };
-
-        // Read actual values from inputs if present
-        const sensitivitySelect = document.querySelector('.warm-select');
-        if (sensitivitySelect) settings.motionSensitivity = parseInt(sensitivitySelect.value);
-
-        const accuracyInput = document.querySelector('.warm-num-input');
-        if (accuracyInput) settings.faceAccuracy = parseInt(accuracyInput.value);
 
         fetch('/System/SaveSettings', {
             method: 'POST',
@@ -342,7 +379,7 @@
             if (data.success) {
                 btn.innerHTML = '<i class="fa fa-check-circle me-2"></i>Hardware Synced Successfully';
                 btn.classList.replace('btn-warm-dark', 'btn-success');
-                showToast('Settings deployed to hardware engine', 'success');
+                showToast('All settings deployed to Raspberry Pi hardware engine', 'success');
             } else {
                 throw new Error(data.message || 'Deploy failed');
             }
@@ -362,15 +399,23 @@
     }
 
     // =========================
-    // PI STATUS HEARTBEAT (real API poll)
+    // FACE ACCURACY BAR UPDATE
+    // =========================
+    function updateAccuracyBar(val) {
+        const bar = document.getElementById('accuracyBar');
+        if (bar) bar.style.width = val + '%';
+    }
+
+    // =========================
+    // PI STATUS HEARTBEAT + REAL STORAGE (API poll)
     // =========================
     function checkPiStatus() {
+        // 1. Check if Pi is online
         fetch('/api/system/pi-status')
         .then(r => r.json())
         .then(data => {
             const badge = document.querySelector('.live-badge');
-            const piDot = document.querySelector('.control-card:nth-child(5) .status-indicator-dot');
-            const storageText = document.querySelector('.storage-display small.text-success');
+            const piDot = document.getElementById('piStatusDot');
             
             if (badge) {
                 if (data.online) {
@@ -394,6 +439,34 @@
                 badge.style.color = '#f59e0b';
             }
         });
+
+        // 2. Fetch REAL disk usage from Pi
+        fetch('/api/system/pi-health')
+        .then(r => r.json())
+        .then(data => {
+            const pctEl = document.getElementById('storagePercent');
+            const barEl = document.getElementById('storageBar');
+
+            if (data.diskUsedPercent >= 0) {
+                const pct = data.diskUsedPercent;
+                const color = pct > 85 ? '#ef4444' : pct > 60 ? '#f59e0b' : '#10b981';
+
+                if (pctEl) {
+                    pctEl.textContent = `${pct}% Used (${data.diskUsedGb}/${data.diskTotalGb} GB)`;
+                    pctEl.style.color = color;
+                }
+                if (barEl) {
+                    barEl.style.width = pct + '%';
+                    barEl.style.background = color;
+                }
+            } else {
+                if (pctEl) {
+                    pctEl.textContent = 'Pi Offline';
+                    pctEl.style.color = '#6b7280';
+                }
+            }
+        })
+        .catch(() => {});
     }
 
     // =========================
@@ -420,11 +493,83 @@
         checkPiStatus();
         setInterval(checkPiStatus, 30000);
 
+        // Real-time alarm status (every 3 seconds)
+        checkAlarmStatus();
+        setInterval(checkAlarmStatus, 3000);
+
         // Restore theme preference
         const warmPref = localStorage.getItem('warmTheme');
         if (warmPref === 'true') {
             document.body.classList.add('warm-theme-mode');
         }
     });
+
+    // =========================
+    // REAL-TIME ALARM STATUS (from Python IoT)
+    // =========================
+    function checkAlarmStatus() {
+        fetch('/api/system/alarm-status')
+        .then(r => r.json())
+        .then(data => {
+            const banner = document.getElementById('emergencyBanner');
+
+            if (data.active) {
+                // Show emergency banner
+                if (!banner) {
+                    const b = document.createElement('div');
+                    b.id = 'emergencyBanner';
+                    b.style.cssText = `
+                        position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+                        padding: 12px 20px; text-align: center; font-weight: 700;
+                        font-size: 0.95rem; letter-spacing: 1px;
+                        animation: emergencyPulse 0.6s ease infinite alternate;
+                    `;
+
+                    // Type-specific visual
+                    const typeStyles = {
+                        'intrusion': { bg: '#dc2626', text: '🚨 INTRUSION ALERT' },
+                        'fire':      { bg: '#dc2626', text: '🔥 FIRE PROTOCOL ACTIVE' },
+                        'earthquake':{ bg: '#2563eb', text: '🌍 EARTHQUAKE MODE ACTIVE' },
+                        'forcedentry':{ bg: '#7c3aed', text: '🚑 MEDICAL EMERGENCY' }
+                    };
+                    const style = typeStyles[data.type] || typeStyles['intrusion'];
+                    b.style.background = style.bg;
+                    b.style.color = '#ffffff';
+                    b.innerHTML = `${style.text} — ${data.description || 'Active'}`;
+                    document.body.prepend(b);
+                }
+
+                // Highlight matching alarm item
+                document.querySelectorAll('.alarm-item').forEach(item => {
+                    item.classList.remove('alarm-firing');
+                });
+                const alarmIcons = document.querySelectorAll('.alarm-icon');
+                alarmIcons.forEach(icon => {
+                    if (icon.classList.contains(data.type)) {
+                        icon.closest('.alarm-item')?.classList.add('alarm-firing');
+                    }
+                });
+            } else {
+                // Remove emergency banner
+                if (banner) banner.remove();
+                document.querySelectorAll('.alarm-item').forEach(item => {
+                    item.classList.remove('alarm-firing');
+                });
+            }
+        })
+        .catch(() => {});
+    }
 </script>
+
+<style>
+    /* Emergency alarm pulse — minimal addition, no layout change */
+    @@keyframes emergencyPulse {
+        from { opacity: 1; }
+        to { opacity: 0.7; }
+    }
+    .alarm-firing {
+        box-shadow: 0 0 0 2px #dc2626, 0 0 12px rgba(220, 38, 38, 0.4);
+        border-radius: 8px;
+    }
+</style>
 }

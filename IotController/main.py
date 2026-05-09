@@ -5,7 +5,10 @@ import uuid
 import os
 import cv2
 import numpy as np
-from datetime import datetime
+import json
+from datetime import datetime, timedelta
+from collections import defaultdict
+from flask import Flask, Response
 
 from Sensors.camera_module import CameraModule
 from AI.face_detection import FaceDetector
@@ -39,8 +42,8 @@ class SmartSecuritySystem:
     - Hybrid: works on Raspberry Pi AND laptop webcam
 
     FSM States:
-        IDLE → ACCESS → INSIDE → LOITERING → (EXIT → IDLE)
-                  ↓                    ↓
+        IDLE â†’ ACCESS â†’ INSIDE â†’ LOITERING â†’ (EXIT â†’ IDLE)
+                  â†“                    â†“
                 ALERT              ALERT
     """
 
@@ -182,12 +185,12 @@ class SmartSecuritySystem:
         # =========================
         # LOITERING THRESHOLDS (REALISTIC HUMAN BEHAVIOR)
         # =========================
-        self.loiter_suspicion_threshold = 600    # 10 minutes — suspicion phase
-        self.loiter_critical_threshold = 1200    # 20 minutes — critical loitering
+        self.loiter_suspicion_threshold = 600    # 10 minutes â€” suspicion phase
+        self.loiter_critical_threshold = 1200    # 20 minutes â€” critical loitering
         self.pir_inactivity_threshold = 300      # 5 minutes PIR silence = suspicious
 
         # =========================
-        # INDOOR MONITORING CONFIG (NO DB COLUMNS — all in Python config)
+        # INDOOR MONITORING CONFIG (NO DB COLUMNS â€” all in Python config)
         # =========================
         self.max_stay_minutes = max_stay_minutes              # Per-room stay limit (default 20)
         self.extended_stay_threshold = (max_stay_minutes - 5) * 60  # Warning 5 min before limit
@@ -195,12 +198,12 @@ class SmartSecuritySystem:
 
         # =========================
         # ENTRANCE LOITERING CONFIG
-        # Graduated response: 5 min → WARNING, 10 min → CRITICAL
+        # Graduated response: 5 min â†’ WARNING, 10 min â†’ CRITICAL
         # (Different from INTRUSION which is sustained-frame-based)
         # =========================
         self._entrance_face_start_time = None  # When face first appeared in IDLE
-        self.entrance_loiter_warning = 300     # 5 minutes → WARNING
-        self.entrance_loiter_critical = 600    # 10 minutes → CRITICAL
+        self.entrance_loiter_warning = 300     # 5 minutes â†’ WARNING
+        self.entrance_loiter_critical = 600    # 10 minutes â†’ CRITICAL
         self._entrance_warning_sent = False    # Track if 5-min warning already sent
         self._entrance_critical_sent = False   # Track if 10-min critical already sent
 
@@ -213,7 +216,7 @@ class SmartSecuritySystem:
 
         # =========================
         # IN-MEMORY EVENT COOLDOWN (ANTI-SPAM)
-        # Key: "event_type:room_id" → last push timestamp
+        # Key: "event_type:room_id" â†’ last push timestamp
         # Prevents duplicate API calls before they even reach the backend
         # =========================
         self._event_cooldowns = {}
@@ -269,12 +272,22 @@ class SmartSecuritySystem:
             "forcedentry": True
         }  # Defaults to all armed; updated by polling thread
 
+        # =========================
+        # SYSTEM CONFIG (polled from ASP.NET /api/system/config)
+        # Maps 1:1 to UI card settings in System.cshtml
+        # =========================
+        self._master_armed = True              # Global Settings â†’ Master Arm
+        self._hardware_siren_enabled = True    # Alert Protocols â†’ Hardware Siren
+        self._gate_hold_open = 5               # Access Control â†’ Gate Hold-Open (seconds)
+        self._biometric_lock_enabled = True    # Access Control â†’ Biometric Lock
+        self._active_alarm_priority = 0        # Emergency trigger priority tracker
+
     # =========================
     # INIT SYSTEM
     # =========================
     def initialize(self):
         print("=" * 50)
-        print("[SYSTEM] Smart Security System — State-Based FSM")
+        print("[SYSTEM] Smart Security System â€” State-Based FSM")
         print("=" * 50)
 
         if not self.camera.initialize():
@@ -342,7 +355,7 @@ class SmartSecuritySystem:
             if self.system_state != new_state:
                 old_state = self.system_state
                 self.system_state = new_state
-                print(f"[FSM] {old_state} → {new_state}")
+                print(f"[FSM] {old_state} â†’ {new_state}")
 
                 # Drive RGB LED based on new state
                 if new_state == STATE_IDLE:
@@ -397,6 +410,17 @@ class SmartSecuritySystem:
 
                 if frame is None:
                     time.sleep(0.05)
+                    continue
+
+                # =========================
+                # MASTER ARM CHECK â€” skip detection if disarmed
+                # Still streams video but no AI processing
+                # =========================
+                if not self._master_armed:
+                    cv2.putText(frame, "SYSTEM DISARMED", (10, 30),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+                    self.camera.set_processed_frame(frame)
+                    time.sleep(0.1)
                     continue
 
                 # =========================
@@ -455,7 +479,7 @@ class SmartSecuritySystem:
                     self.pir_sensor.simulate_motion()
 
                 # =========================
-                # OVERLAY — STATE + OCCUPANCY TEXT
+                # OVERLAY â€” STATE + OCCUPANCY TEXT
                 # =========================
                 status_color = {
                     STATE_IDLE: (128, 128, 128),
@@ -489,7 +513,7 @@ class SmartSecuritySystem:
                 )
 
                 # =========================
-                # BOUNDING BOX OVERLAY — COLOR-CODED
+                # BOUNDING BOX OVERLAY â€” COLOR-CODED
                 # =========================
                 if current_state in (STATE_INSIDE, STATE_LOITERING):
                     # INSIDE: Draw person detection boxes with authorization colors
@@ -582,7 +606,11 @@ class SmartSecuritySystem:
                     else:
                         self._empty_frame_counter = 0
 
-                self.camera.frame = frame
+                # =========================
+                # SET PROCESSED FRAME (with all overlays)
+                # This frame is served via /video endpoint at http://localhost:5050
+                # =========================
+                self.camera.set_processed_frame(frame)
                 time.sleep(0.03)
 
             except Exception as e:
@@ -598,9 +626,9 @@ class SmartSecuritySystem:
         Assign authorization status to each tracked person.
 
         Rules:
-        1. If tracked_count <= session_count → all persons are 'authorized'
-        2. If tracked_count > session_count → excess are 'unauthorized'
-        3. New persons during entry window → 'unknown' (grace period)
+        1. If tracked_count <= session_count â†’ all persons are 'authorized'
+        2. If tracked_count > session_count â†’ excess are 'unauthorized'
+        3. New persons during entry window â†’ 'unknown' (grace period)
         """
         with self.session_lock:
             session_count = len(self.active_sessions)
@@ -615,12 +643,12 @@ class SmartSecuritySystem:
         )
 
         if tracked_count <= session_count:
-            # Everyone accounted for — all authorized
+            # Everyone accounted for â€” all authorized
             for person in self.tracked_persons.values():
                 if person.disappeared == 0:
                     person.status = 'authorized'
         else:
-            # More people than sessions — some are unauthorized
+            # More people than sessions â€” some are unauthorized
             authorized_count = 0
             for person in self.tracked_persons.values():
                 if person.disappeared > 0:
@@ -687,9 +715,9 @@ class SmartSecuritySystem:
 
         When a face is detected without RFID:
         1. Track how long the face has been present
-        2. After 5 min → ENTRANCE_LOITERING (WARNING)
-        3. After 10 min → ENTRANCE_LOITERING (CRITICAL)
-        4. Sustained frames without time check → INTRUSION (existing behavior)
+        2. After 5 min â†’ ENTRANCE_LOITERING (WARNING)
+        3. After 10 min â†’ ENTRANCE_LOITERING (CRITICAL)
+        4. Sustained frames without time check â†’ INTRUSION (existing behavior)
 
         This graduated response prevents false intrusion alerts from
         people simply walking past or briefly pausing near the entrance.
@@ -706,7 +734,7 @@ class SmartSecuritySystem:
 
                 entrance_duration = now - self._entrance_face_start_time
 
-                # 10 min → CRITICAL entrance loitering
+                # 10 min â†’ CRITICAL entrance loitering
                 if entrance_duration >= self.entrance_loiter_critical and not self._entrance_critical_sent:
                     if self._can_push_event("ENTRANCE_LOITERING", now):
                         self.push_state_transition(
@@ -718,7 +746,7 @@ class SmartSecuritySystem:
                         self._entrance_critical_sent = True
                         print(f"[ENTRANCE] CRITICAL loitering: {entrance_duration/60:.1f} min")
 
-                # 5 min → WARNING entrance loitering
+                # 5 min â†’ WARNING entrance loitering
                 elif entrance_duration >= self.entrance_loiter_warning and not self._entrance_warning_sent:
                     if self._can_push_event("ENTRANCE_LOITERING", now):
                         self.push_state_transition(
@@ -753,9 +781,12 @@ class SmartSecuritySystem:
                     # Start recording on intrusion
                     self._start_recording(session_id)
 
-                    # Hardware feedback: alarm if intrusion alarm is armed
-                    if self._is_alarm_enabled("intrusion"):
-                        self.buzzer.alarm(duration=10)
+                    # Hardware feedback: alarm via emergency trigger system
+                    self.trigger_emergency(
+                        "intrusion", duration=10,
+                        session_id=session_id,
+                        description="Sustained presence detected without RFID authentication"
+                    )
 
                     # Reset entrance tracking (escalated to full intrusion)
                     self._entrance_face_start_time = None
@@ -781,13 +812,17 @@ class SmartSecuritySystem:
     def _handle_alert_state(self, frame, now):
         """
         In ALERT mode:
-        - Write frames to recording if active
+        - Write frames to recording asynchronously if active
         - Auto-clear after timeout if no presence
-        - Do NOT generate new alerts (already alerted)
+        - DO NOT block main loop (overlays must render in real-time)
         """
-        # Write to recording
+        # Write to recording ASYNCHRONOUSLY to prevent blocking overlay rendering
         if self._is_recording and self._recording_writer is not None:
-            self._recording_writer.write(frame)
+            # Non-blocking frame write to prevent main loop lag
+            try:
+                self._recording_writer.write(frame.copy())
+            except Exception as e:
+                print(f"[RECORDING] Write error: {e}")
 
             # Check recording timeout
             if (now - self._recording_start_time) > self._recording_timeout:
@@ -812,18 +847,18 @@ class SmartSecuritySystem:
         In INSIDE mode: Comprehensive indoor behavioral monitoring.
 
         Events detected:
-        1. TAILGATING — occupancy > sessions (existing, preserved)
-        2. OCCUPANCY EXCEEDED — people count > room max capacity
-        3. EXTENDED STAY WARNING — approaching stay time limit
-        4. SUSPICIOUS IDLE — face detected + PIR no motion for 10+ min
-        5. AFTER-HOURS PRESENCE — person in room outside operating hours
+        1. TAILGATING â€” occupancy > sessions (existing, preserved)
+        2. OCCUPANCY EXCEEDED â€” people count > room max capacity
+        3. EXTENDED STAY WARNING â€” approaching stay time limit
+        4. SUSPICIOUS IDLE â€” face detected + PIR no motion for 10+ min
+        5. AFTER-HOURS PRESENCE â€” person in room outside operating hours
         """
         with self.session_lock:
             expected_count = len(self.active_sessions)
             sessions_snapshot = dict(self.active_sessions)
 
         # ========================================
-        # 1. TAILGATING DETECTION (existing — preserved exactly)
+        # 1. TAILGATING DETECTION (existing â€” preserved exactly)
         # ========================================
         if self.current_occupancy > expected_count and expected_count > 0:
             # Determine if we're in the entry window
@@ -930,7 +965,7 @@ class SmartSecuritySystem:
     # COMPUTE DETECTION STATE (for anti-spam push)
     # =========================
     def _compute_detection_state(self, faces, face_images):
-        """Determine the current detection state — used for state-change-only pushes"""
+        """Determine the current detection state â€” used for state-change-only pushes"""
         if self.current_occupancy > 0:
             if face_images:
                 return "face_detected"
@@ -949,7 +984,7 @@ class SmartSecuritySystem:
             self.push_detection("no_face", 0, 0.0)
 
     # =========================
-    # RFID EVENT (FSM: IDLE → ACCESS → INSIDE)
+    # RFID EVENT (FSM: IDLE â†’ ACCESS â†’ INSIDE)
     # =========================
     def on_rfid_tapped(self, user_id):
         """
@@ -967,7 +1002,7 @@ class SmartSecuritySystem:
         # RFID COOLDOWN (prevent double-swipe spam)
         # =========================
         if self.last_rfid_time and (now - self.last_rfid_time) < self.rfid_cooldown:
-            print(f"[RFID] Cooldown active — ignoring tap for {user_id}")
+            print(f"[RFID] Cooldown active â€” ignoring tap for {user_id}")
             return
 
         self.last_rfid_time = now
@@ -977,22 +1012,27 @@ class SmartSecuritySystem:
         # =========================
         with self.session_lock:
             if str(user_id) in self.active_sessions:
-                print(f"[FSM] User {user_id} already inside — ignoring RFID re-tap")
+                print(f"[FSM] User {user_id} already inside â€” ignoring RFID re-tap")
                 return
 
         # =========================
-        # TRANSITION: → ACCESS MODE
+        # TRANSITION: â†’ ACCESS MODE
         # =========================
         self.set_state(STATE_ACCESS)
 
         # =========================
         # FACE VERIFICATION (with confidence threshold)
+        # Biometric Lock OFF = skip face check, grant access on RFID alone
         # =========================
-        result = self.face_verifier.verify_rfid_with_face(user_id)
+        if not self._biometric_lock_enabled:
+            print(f"[ACCESS] Biometric Lock DISABLED â€” granting access on RFID alone for {user_id}")
+            result = {"verified": True, "confidence": 100, "failure_type": None}
+        else:
+            result = self.face_verifier.verify_rfid_with_face(user_id)
 
         if result["verified"] and result["confidence"] >= self.face_confidence_threshold * 100:
             # =========================
-            # ACCESS GRANTED — Create session
+            # ACCESS GRANTED â€” Create session
             # =========================
             session_id = str(uuid.uuid4())
 
@@ -1006,7 +1046,7 @@ class SmartSecuritySystem:
                 }
 
             # =========================
-            # TRANSITION: → INSIDE MODE
+            # TRANSITION: â†’ INSIDE MODE
             # =========================
             self.set_state(STATE_INSIDE)
 
@@ -1019,7 +1059,7 @@ class SmartSecuritySystem:
             )
 
             # Unlock door + track entry window for tailgating
-            self.solenoid_lock.unlock(duration=5)
+            self.solenoid_lock.unlock(duration=self._gate_hold_open)
             self._last_unlock_time = now
 
             # Hardware feedback: confirmation beep + green flash
@@ -1029,11 +1069,11 @@ class SmartSecuritySystem:
             # Push detection event (preserves existing behavior)
             self.push_detection("face_verified", 1, result["confidence"] / 100.0)
 
-            print(f"[ACCESS GRANTED] {user_id} — Session: {session_id[:8]}...")
+            print(f"[ACCESS GRANTED] {user_id} â€” Session: {session_id[:8]}...")
 
         else:
             # =========================
-            # ACCESS DENIED — Differentiated by failure type (BUG-4 FIX)
+            # ACCESS DENIED â€” Differentiated by failure type (BUG-4 FIX)
             # =========================
             failure_type = result.get("message", "")
 
@@ -1054,26 +1094,29 @@ class SmartSecuritySystem:
                 self.push_detection("unknown_face", 1, result["confidence"] / 100.0, triggered_alert=True)
                 self._start_recording(session_id)
 
-                # Hardware feedback: alarm if intrusion alarm is armed
+                # Hardware feedback: alarm via emergency trigger system
                 self.rgb_led.status_denied()
-                if self._is_alarm_enabled("intrusion"):
-                    self.buzzer.alarm(duration=5)
+                self.trigger_emergency(
+                    "intrusion", duration=5,
+                    session_id=session_id,
+                    description=f"RFID {user_id} face MISMATCH (confidence: {result['confidence']}%)"
+                )
 
-                print(f"[ACCESS DENIED] {user_id} — Face MISMATCH")
+                print(f"[ACCESS DENIED] {user_id} â€” Face MISMATCH")
 
                 time.sleep(2)
                 self.buzzer.stop()  # Ensure buzzer stops before state change
                 self.set_state(STATE_IDLE)
 
             elif failure_type == "No face detected":
-                # TEMPORARY: Camera didn't capture face — allow retry
-                print(f"[ACCESS] {user_id} — No face captured, returning to IDLE")
+                # TEMPORARY: Camera didn't capture face â€” allow retry
+                print(f"[ACCESS] {user_id} â€” No face captured, returning to IDLE")
                 self.set_state(STATE_IDLE)
-                # Do NOT push alert — camera issue, not security threat
+                # Do NOT push alert â€” camera issue, not security threat
 
             elif failure_type == "Face expired":
                 # STALE: Encoding too old
-                print(f"[ACCESS] {user_id} — Face encoding expired, returning to IDLE")
+                print(f"[ACCESS] {user_id} â€” Face encoding expired, returning to IDLE")
                 self.set_state(STATE_IDLE)
 
             elif failure_type == "No registered face":
@@ -1090,17 +1133,17 @@ class SmartSecuritySystem:
                     description=f"RFID {user_id} has no registered face data",
                     severity="WARNING"
                 )
-                print(f"[ACCESS DENIED] {user_id} — No registered face")
+                print(f"[ACCESS DENIED] {user_id} â€” No registered face")
 
-                # Warning beep (not full alarm — admin issue, not security threat)
+                # Warning beep (not full alarm â€” admin issue, not security threat)
                 self.buzzer.pattern_beep(times=3, interval=0.3)
 
                 time.sleep(2)
                 self.set_state(STATE_IDLE)
 
             else:
-                # Unknown failure — safe fallback
-                print(f"[ACCESS] {user_id} — Verification failed: {failure_type}")
+                # Unknown failure â€” safe fallback
+                print(f"[ACCESS] {user_id} â€” Verification failed: {failure_type}")
                 self.set_state(STATE_IDLE)
 
     # =========================
@@ -1133,7 +1176,7 @@ class SmartSecuritySystem:
 
             if not has_active and current_state == STATE_IDLE:
                 # Door opened without any active session = FORCED ENTRY
-                print("[DOOR] FORCED ENTRY — door opened without authorization")
+                print("[DOOR] FORCED ENTRY â€” door opened without authorization")
 
                 self.set_state(STATE_ALERT)
                 self._alert_start_time = time.time()
@@ -1148,12 +1191,15 @@ class SmartSecuritySystem:
                 )
                 self._start_recording(session_id)
 
-                # Hardware feedback: alarm if forced entry alarm is armed
-                if self._is_alarm_enabled("forcedentry"):
-                    self.buzzer.alarm(duration=10)
+                # Hardware feedback: alarm via emergency trigger system
+                self.trigger_emergency(
+                    "forcedentry", duration=10,
+                    session_id=session_id,
+                    description="Door opened without any active RFID session"
+                )
 
             elif has_active:
-                print("[DOOR] Door opened — active session present (normal)")
+                print("[DOOR] Door opened â€” active session present (normal)")
         else:
             print("[DOOR] Door closed")
 
@@ -1182,10 +1228,158 @@ class SmartSecuritySystem:
             print(f"[ALARM] Settings fetch failed (using last known): {e}")
 
     def _alarm_settings_poller(self):
-        """Background thread: poll alarm_settings every 60 seconds."""
+        """Background thread: poll alarm + system settings every 10 seconds."""
         while self.is_running:
             self._fetch_alarm_settings()
-            time.sleep(60)
+            self._fetch_system_config()
+            time.sleep(10)
+
+    # =========================
+    # SYSTEM CONFIG (DB-DRIVEN â€” ALL UI CARDS)
+    # Maps each UI setting to the correct Python variable
+    # =========================
+    def _fetch_system_config(self):
+        """Fetch system_config from ASP.NET backend (all UI card settings)."""
+        try:
+            resp = requests.get(
+                f"{self.base_url}/api/system/config",
+                timeout=3
+            )
+            if resp.ok:
+                config = resp.json()
+
+                # === GLOBAL SETTINGS ===
+                # Master Arm: controls whether detection runs at all
+                arm_system = config.get("armSystem", True)
+                if not arm_system and self.is_running:
+                    print("[CONFIG] Master Arm DISABLED â€” detection paused")
+                self._master_armed = arm_system
+
+                # === AI INTELLIGENCE ===
+                # Motion Sensitivity â†’ person_detector confidence_threshold
+                sensitivity = config.get("motionSensitivity", 2)
+                threshold_map = {1: 0.65, 2: 0.50, 3: 0.35}
+                new_threshold = threshold_map.get(sensitivity, 0.50)
+                if hasattr(self.person_detector, 'confidence_threshold'):
+                    if self.person_detector.confidence_threshold != new_threshold:
+                        self.person_detector.confidence_threshold = new_threshold
+                        print(f"[CONFIG] Motion sensitivity â†’ {sensitivity} (threshold: {new_threshold})")
+
+                # Face Accuracy â†’ face_confidence_threshold
+                face_acc = config.get("faceAccuracy", 80)
+                new_face_threshold = face_acc / 100.0
+                if self.face_confidence_threshold != new_face_threshold:
+                    self.face_confidence_threshold = new_face_threshold
+                    print(f"[CONFIG] Face accuracy â†’ {face_acc}% (threshold: {new_face_threshold})")
+
+                # === ALERT PROTOCOLS ===
+                # Hardware Siren â†’ controls whether buzzer is allowed to fire
+                self._hardware_siren_enabled = config.get("hardwareSiren", True)
+
+                # === ACCESS CONTROL ===
+                # Gate Hold-Open â†’ solenoid_lock unlock duration
+                gate_duration = config.get("gateHoldOpen", 5)
+                self._gate_hold_open = max(1, min(30, gate_duration))
+
+                # Biometric Lock â†’ whether face verification is required
+                self._biometric_lock_enabled = config.get("biometricLock", True)
+
+        except Exception as e:
+            # Silent fail â€” use last known config
+            pass
+
+    # =========================
+    # EMERGENCY TRIGGER (PRIORITY-BASED)
+    # Distinct hardware patterns per alarm type
+    # =========================
+    _ALARM_PRIORITY = {
+        "fire": 4,
+        "intrusion": 3,
+        "forcedentry": 2,
+        "earthquake": 1,
+    }
+
+    def trigger_emergency(self, alarm_type, duration=10, session_id=None, description=""):
+        """
+        Trigger an emergency alarm with type-specific hardware behavior.
+
+        Only fires if the alarm_type is enabled in alarm_settings.
+        Uses priority system: Fire > Intrusion > ForcedEntry > Earthquake.
+        """
+        alarm_key = alarm_type.lower()
+
+        # Gate check: is this alarm armed?
+        if not self._is_alarm_enabled(alarm_key):
+            print(f"[ALARM] {alarm_type} is DISABLED in settings â€” skipping hardware")
+            return False
+
+        # Priority check: don't override a higher-priority alarm
+        current_priority = getattr(self, '_active_alarm_priority', 0)
+        new_priority = self._ALARM_PRIORITY.get(alarm_key, 0)
+
+        if new_priority < current_priority:
+            print(f"[ALARM] {alarm_type} (priority {new_priority}) blocked by active alarm (priority {current_priority})")
+            return False
+
+        self._active_alarm_priority = new_priority
+
+        # Stop any current alarm before starting new one
+        self.buzzer.stop()
+
+        print(f"[ALARM] ðŸš¨ TRIGGERING: {alarm_type.upper()} (priority {new_priority})")
+
+        # Type-specific hardware behavior
+        # LED always fires; buzzer respects Hardware Siren setting
+        if alarm_key == "fire":
+            self.rgb_led.status_fire()
+            if self._hardware_siren_enabled:
+                self.buzzer.alarm_fire(duration=duration)
+        elif alarm_key == "earthquake":
+            self.rgb_led.status_earthquake()
+            if self._hardware_siren_enabled:
+                self.buzzer.alarm_earthquake(duration=duration)
+        elif alarm_key == "forcedentry":
+            self.rgb_led.status_medical()
+            if self._hardware_siren_enabled:
+                self.buzzer.alarm_medical(duration=duration)
+        else:
+            # Default: intrusion (continuous alarm + red blink)
+            self.rgb_led.status_alert()
+            if self._hardware_siren_enabled:
+                self.buzzer.alarm(duration=duration)
+
+        if not self._hardware_siren_enabled:
+            print("[ALARM] Hardware siren DISABLED â€” LED only, no buzzer")
+
+        # Push alarm status to ASP.NET for real-time UI
+        self._push_alarm_status(alarm_key, True, session_id, description)
+
+        # Schedule priority reset after alarm duration
+        def _reset_priority():
+            time.sleep(duration + 1)
+            self._active_alarm_priority = 0
+            self._push_alarm_status(alarm_key, False)
+        threading.Thread(target=_reset_priority, daemon=True).start()
+
+        return True
+
+    def _push_alarm_status(self, alarm_type, is_active, session_id=None, description=""):
+        """Push current alarm status to ASP.NET for UI display."""
+        try:
+            requests.post(
+                f"{self.base_url}/api/system/alarm-status",
+                json={
+                    "type": alarm_type,
+                    "isActive": is_active,
+                    "sessionId": session_id or "",
+                    "description": description,
+                    "roomId": self.room_id,
+                    "timestamp": datetime.now().isoformat()
+                },
+                timeout=2
+            )
+        except Exception as e:
+            print(f"[ALARM] Status push failed: {e}")
 
     # =========================
     # LOITERING MONITOR (REALISTIC ALGORITHM)
@@ -1237,14 +1431,14 @@ class SmartSecuritySystem:
                                 description=f"User {user_id} loitering: {time_inside/60:.0f}min inside, {time_inactive/60:.0f}min inactive"
                             )
 
-                            print(f"[LOITERING] User {user_id} — {time_inside/60:.1f}min inside, {time_inactive/60:.1f}min inactive")
+                            print(f"[LOITERING] User {user_id} â€” {time_inside/60:.1f}min inside, {time_inactive/60:.1f}min inactive")
 
                     # =========================
                     # EXIT INFERENCE (FALLBACK ONLY)
                     # Only if no door sensor available
                     # =========================
                     if time_inactive > self.exit_inference_timeout:
-                        print(f"[EXIT INFERENCE] User {user_id} — {time_inactive/60:.0f}min inactive, assuming exit")
+                        print(f"[EXIT INFERENCE] User {user_id} â€” {time_inactive/60:.0f}min inactive, assuming exit")
 
                         self.push_state_transition(
                             event="EXIT",
@@ -1267,7 +1461,7 @@ class SmartSecuritySystem:
             time.sleep(30)
 
     # =========================
-    # STATE TRANSITION API (→ ASP.NET Backend)
+    # STATE TRANSITION API (â†’ ASP.NET Backend)
     # =========================
     def push_state_transition(self, event, session_id,
                                rfid_uid=None, confidence=0,
@@ -1303,7 +1497,7 @@ class SmartSecuritySystem:
                 if result.get("duplicate"):
                     print(f"[API] Duplicate prevented: {result.get('message')}")
                 else:
-                    print(f"[API] State transition: {event} → OK")
+                    print(f"[API] State transition: {event} â†’ OK")
             else:
                 print(f"[API] State transition failed: {response.status_code}")
 
@@ -1374,9 +1568,9 @@ class SmartSecuritySystem:
     # UNLOCK (preserved from original, now uses SolenoidLock module)
     # =========================
     def trigger_unlock(self):
-        self.solenoid_lock.unlock(duration=5)
+        self.solenoid_lock.unlock(duration=self._gate_hold_open)
         self._last_unlock_time = time.time()
-        print("[ACCESS GRANTED] Door unlocked")
+        print(f"[ACCESS GRANTED] Door unlocked for {self._gate_hold_open}s")
 
     # =========================
     # RECORDING SYSTEM
@@ -1398,7 +1592,7 @@ class SmartSecuritySystem:
             # Get frame dimensions from camera
             frame = self.camera.get_frame()
             if frame is None:
-                print("[RECORDING] Cannot start — no frame available")
+                print("[RECORDING] Cannot start â€” no frame available")
                 return
 
             h, w = frame.shape[:2]
@@ -1532,6 +1726,203 @@ class SmartSecuritySystem:
         }
 
 
+class TestModeDetector:
+    """
+    Person detector + face identifier for test mode (laptop).
+    Pipeline: HOG body detection -> Centroid tracking -> Face ID -> Persistent status
+    """
+
+    def __init__(self, confidence=0.4):
+        self.confidence = confidence
+        self.hog = cv2.HOGDescriptor()
+        self.hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
+        cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+        self.face_cascade = cv2.CascadeClassifier(cascade_path)
+        self.tracked = {}
+        self.next_id = 1
+        self.max_disappeared = 45
+        self.max_match_distance = 150
+        self.bbox_smooth = 0.6
+        self.frame_count = 0
+        self.detect_every = 3
+        self.face_detect_every = 6
+        self.last_detections = []
+
+    def detect(self, frame):
+        self.frame_count += 1
+        if self.frame_count % self.detect_every != 0:
+            return self.last_detections
+        try:
+            small = cv2.resize(frame, (640, 480))
+            scale_x = frame.shape[1] / 640
+            scale_y = frame.shape[0] / 480
+            boxes, weights = self.hog.detectMultiScale(
+                small, winStride=(8, 8), padding=(4, 4), scale=1.05
+            )
+            detections = []
+            for (x, y, w, h), weight in zip(boxes, weights):
+                if weight < self.confidence:
+                    continue
+                detections.append((int(x * scale_x), int(y * scale_y),
+                                   int(w * scale_x), int(h * scale_y), float(weight)))
+            if len(detections) > 1:
+                boxes_nms = [[d[0], d[1], d[2], d[3]] for d in detections]
+                scores = [d[4] for d in detections]
+                indices = cv2.dnn.NMSBoxes(boxes_nms, scores, self.confidence, 0.4)
+                if len(indices) > 0:
+                    if isinstance(indices[0], (list, np.ndarray)):
+                        indices = [i[0] for i in indices]
+                    detections = [detections[i] for i in indices]
+            self.last_detections = detections
+            return detections
+        except Exception as e:
+            print(f"[DETECT ERROR] {e}")
+            return self.last_detections
+
+    def detect_faces_in_bbox(self, frame, bbox):
+        x, y, w, h = bbox
+        fh, fw = frame.shape[:2]
+        x1, y1 = max(0, x), max(0, y)
+        x2, y2 = min(fw, x + w), min(fh, y + h)
+        if x2 - x1 < 30 or y2 - y1 < 30:
+            return False
+        face_h = int((y2 - y1) * 0.5)
+        roi = frame[y1:y1 + face_h, x1:x2]
+        if roi.size == 0:
+            return False
+        gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+        faces = self.face_cascade.detectMultiScale(
+            gray, scaleFactor=1.1, minNeighbors=4, minSize=(20, 20))
+        return len(faces) > 0
+
+    def update_tracking(self, detections):
+        current_centroids = {}
+        for (x, y, w, h, conf) in detections:
+            cx, cy = x + w // 2, y + h // 2
+            current_centroids[(cx, cy)] = (x, y, w, h, conf)
+
+        if len(current_centroids) == 0:
+            for tid in list(self.tracked.keys()):
+                self.tracked[tid]['disappeared'] += 1
+                if self.tracked[tid]['disappeared'] > self.max_disappeared:
+                    del self.tracked[tid]
+            return self.tracked
+
+        if len(self.tracked) == 0:
+            for (cx, cy), (x, y, w, h, conf) in current_centroids.items():
+                self.tracked[self.next_id] = {
+                    'cx': cx, 'cy': cy, 'bbox': (x, y, w, h),
+                    'smooth_bbox': [float(x), float(y), float(w), float(h)],
+                    'conf': conf, 'status': 'unknown', 'disappeared': 0,
+                    'face_seen': False, 'face_check_count': 0
+                }
+                self.next_id += 1
+            return self.tracked
+
+        track_ids = list(self.tracked.keys())
+        track_centers = [(self.tracked[tid]['cx'], self.tracked[tid]['cy']) for tid in track_ids]
+        det_centers = list(current_centroids.keys())
+        used_tracks, used_dets = set(), set()
+        pairs = []
+        for di, dc in enumerate(det_centers):
+            for ti, tc in enumerate(track_centers):
+                dist = np.sqrt((dc[0] - tc[0])**2 + (dc[1] - tc[1])**2)
+                pairs.append((dist, ti, di))
+        pairs.sort()
+        for dist, ti, di in pairs:
+            if ti in used_tracks or di in used_dets:
+                continue
+            if dist > self.max_match_distance:
+                continue
+            tid = track_ids[ti]
+            dc = det_centers[di]
+            x, y, w, h, conf = current_centroids[dc]
+            self.tracked[tid]['cx'] = dc[0]
+            self.tracked[tid]['cy'] = dc[1]
+            self.tracked[tid]['conf'] = conf
+            self.tracked[tid]['disappeared'] = 0
+            self.tracked[tid]['bbox'] = (x, y, w, h)
+            sb = self.tracked[tid]['smooth_bbox']
+            a = self.bbox_smooth
+            sb[0] = a * sb[0] + (1 - a) * x
+            sb[1] = a * sb[1] + (1 - a) * y
+            sb[2] = a * sb[2] + (1 - a) * w
+            sb[3] = a * sb[3] + (1 - a) * h
+            used_tracks.add(ti)
+            used_dets.add(di)
+        for di, dc in enumerate(det_centers):
+            if di not in used_dets:
+                x, y, w, h, conf = current_centroids[dc]
+                self.tracked[self.next_id] = {
+                    'cx': dc[0], 'cy': dc[1], 'bbox': (x, y, w, h),
+                    'smooth_bbox': [float(x), float(y), float(w), float(h)],
+                    'conf': conf, 'status': 'unknown', 'disappeared': 0,
+                    'face_seen': False, 'face_check_count': 0
+                }
+                self.next_id += 1
+        for ti, tid in enumerate(track_ids):
+            if ti not in used_tracks:
+                self.tracked[tid]['disappeared'] += 1
+                if self.tracked[tid]['disappeared'] > self.max_disappeared:
+                    del self.tracked[tid]
+        return self.tracked
+
+    def update_face_status(self, frame):
+        if self.frame_count % self.face_detect_every != 0:
+            return
+        for tid, info in self.tracked.items():
+            if info['disappeared'] > 0 or info['face_seen']:
+                continue
+            has_face = self.detect_faces_in_bbox(frame, info['bbox'])
+            info['face_check_count'] += 1
+            if has_face:
+                info['face_seen'] = True
+                info['status'] = 'unknown'
+
+    def render_overlays(self, frame, tracked):
+        visible = sum(1 for t in tracked.values() if t['disappeared'] == 0)
+        cv2.putText(frame, f"State: MONITORING | Persons: {visible}",
+                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (128, 128, 128), 2)
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        cv2.putText(frame, timestamp, (10, 60),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
+        for tid, info in tracked.items():
+            if info['disappeared'] > 0:
+                continue
+            sb = info['smooth_bbox']
+            x, y, w, h = int(sb[0]), int(sb[1]), int(sb[2]), int(sb[3])
+            conf = info['conf']
+            status = info.get('status', 'unknown')
+            face_seen = info.get('face_seen', False)
+            color = {
+                'authorized': (0, 200, 0),
+                'unauthorized': (0, 0, 255),
+                'unknown': (0, 220, 220),
+            }.get(status, (0, 220, 220))
+            cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
+            corner_len = max(8, min(20, w // 5, h // 5))
+            thickness = 3
+            cv2.line(frame, (x, y), (x + corner_len, y), color, thickness)
+            cv2.line(frame, (x, y), (x, y + corner_len), color, thickness)
+            cv2.line(frame, (x + w, y), (x + w - corner_len, y), color, thickness)
+            cv2.line(frame, (x + w, y), (x + w, y + corner_len), color, thickness)
+            cv2.line(frame, (x, y + h), (x + corner_len, y + h), color, thickness)
+            cv2.line(frame, (x, y + h), (x, y + h - corner_len), color, thickness)
+            cv2.line(frame, (x + w, y + h), (x + w - corner_len, y + h), color, thickness)
+            cv2.line(frame, (x + w, y + h), (x + w, y + h - corner_len), color, thickness)
+            face_icon = "F" if face_seen else "?"
+            label = f"ID:{tid} [{status.upper()}] ({face_icon}) {int(conf * 100)}%"
+            label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
+            cv2.rectangle(frame, (x, y - label_size[1] - 10),
+                          (x + label_size[0] + 8, y), color, -1)
+            cv2.putText(frame, label, (x + 4, y - 5),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+        cv2.putText(frame, "AI Pipeline Active (Test Mode)",
+                    (10, frame.shape[0] - 15),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 200, 255), 1)
+        return frame
+
+
 def main():
     import platform
     is_pi = platform.system().lower() == "linux"
@@ -1556,6 +1947,295 @@ def main():
 
         # Fetch alarm settings immediately on boot
         system._fetch_alarm_settings()
+
+        # =========================
+        # START MJPEG STREAM SERVER (shares FSM camera instance)
+        # Also hosts /health (disk) and /archive (USB backup)
+        # =========================
+        stream_app = Flask(__name__)
+
+        # Pi mode: /video serves processed frames from FSM pipeline
+        # Laptop mode: /video is registered in test mode section below
+        if is_pi:
+            @stream_app.route('/video')
+            def video_feed():
+                def generate():
+                    while True:
+                        frame = system.camera.get_stream_frame()
+                        if frame is None:
+                            time.sleep(0.03)
+                            continue
+                        ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+                        if not ret:
+                            continue
+                        yield (b'--frame\r\n'
+                               b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+                return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+        @stream_app.route('/health')
+        def pi_health():
+            """Return REAL disk usage from the Pi's filesystem."""
+            import shutil
+            try:
+                usage = shutil.disk_usage("/")
+                total_gb = round(usage.total / (1024**3), 1)
+                used_gb = round(usage.used / (1024**3), 1)
+                free_gb = round(usage.free / (1024**3), 1)
+                used_pct = round((usage.used / usage.total) * 100, 1)
+                return json.dumps({
+                    "diskUsedPercent": used_pct,
+                    "diskTotalGb": total_gb,
+                    "diskUsedGb": used_gb,
+                    "diskFreeGb": free_gb,
+                    "recordingsCount": len([f for f in os.listdir(system._recording_dir) if f.endswith('.avi')]) if os.path.isdir(system._recording_dir) else 0
+                }), 200, {'Content-Type': 'application/json'}
+            except Exception as e:
+                return json.dumps({"error": str(e)}), 500, {'Content-Type': 'application/json'}
+
+        @stream_app.route('/archive', methods=['POST'])
+        def archive_recordings():
+            """Copy recordings from Pi to USB drive mount point."""
+            import shutil as sh
+            import glob
+
+            # Common USB mount points on Raspberry Pi OS
+            usb_paths = ["/media/usb", "/media/pi", "/mnt/usb"]
+            # Also check for any mounted removable device
+            if os.path.isdir("/media"):
+                for user_dir in os.listdir("/media"):
+                    full = os.path.join("/media", user_dir)
+                    if os.path.isdir(full):
+                        for dev in os.listdir(full):
+                            candidate = os.path.join(full, dev)
+                            if os.path.ismount(candidate):
+                                usb_paths.insert(0, candidate)
+
+            usb_mount = None
+            for p in usb_paths:
+                if os.path.ismount(p):
+                    usb_mount = p
+                    break
+
+            if not usb_mount:
+                return json.dumps({
+                    "success": False,
+                    "message": "No USB storage device detected. Please insert a USB drive into the Raspberry Pi."
+                }), 200, {'Content-Type': 'application/json'}
+
+            # Copy recordings
+            rec_dir = system._recording_dir
+            if not os.path.isdir(rec_dir):
+                return json.dumps({
+                    "success": False,
+                    "message": "No recordings directory found."
+                }), 200, {'Content-Type': 'application/json'}
+
+            files = glob.glob(os.path.join(rec_dir, "*.avi"))
+            if not files:
+                return json.dumps({
+                    "success": True,
+                    "message": "No recordings to archive.",
+                    "copied": 0
+                }), 200, {'Content-Type': 'application/json'}
+
+            dest_dir = os.path.join(usb_mount, "SmartSecurity_Archive")
+            os.makedirs(dest_dir, exist_ok=True)
+
+            copied = 0
+            for f in files:
+                try:
+                    sh.copy2(f, dest_dir)
+                    copied += 1
+                except Exception:
+                    pass
+
+            return json.dumps({
+                "success": True,
+                "message": f"Archived {copied}/{len(files)} recordings to {dest_dir}",
+                "copied": copied,
+                "total": len(files),
+                "destination": dest_dir
+            }), 200, {'Content-Type': 'application/json'}
+
+        # =========================
+        # TEST MODE ENDPOINTS (Laptop/Desktop Testing)
+        # On-demand webcam activation with HOG detection & bounding boxes
+        # Only active when NOT running on Raspberry Pi
+        # =========================
+        if not is_pi:
+            # Global state for test mode capture
+            test_mode_state = {
+                'cap': None,
+                'current_frame': None,
+                'capture_running': False,
+                'detector': TestModeDetector(),
+                'frame_lock': threading.Lock(),
+                'active_viewers': 0,
+                'viewers_lock': threading.Lock(),
+                'capture_thread_ref': None
+            }
+
+            def _test_mode_capture_loop():
+                """Background thread: capture â†’ detect â†’ track â†’ overlay â†’ store frame."""
+                state = test_mode_state
+                cap = cv2.VideoCapture(0)
+                
+                if not cap.isOpened():
+                    print("[STREAM] Trying camera index 1...")
+                    cap = cv2.VideoCapture(1)
+
+                if not cap.isOpened():
+                    print("[STREAM] ERROR: Cannot open any camera device for test mode!")
+                    state['capture_running'] = False
+                    return
+
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                cap.set(cv2.CAP_PROP_FPS, 30)
+
+                print("[STREAM] Test Mode Webcam opened - camera ON")
+                print("[STREAM] Pipeline: Capture â†’ HOG Detection â†’ Tracking â†’ Overlays â†’ MJPEG")
+
+                while state['capture_running']:
+                    ret, frame = cap.read()
+                    if not ret:
+                        time.sleep(0.03)
+                        continue
+
+                    # === UNIFIED PIPELINE (matches Pi's main.py) ===
+                    detections = state['detector'].detect(frame)
+                    tracked = state['detector'].update_tracking(detections)
+                    state['detector'].update_face_status(frame)
+                    frame = state['detector'].render_overlays(frame, tracked)
+
+                    with state['frame_lock']:
+                        state['current_frame'] = frame.copy()
+
+                if cap is not None and cap.isOpened():
+                    cap.release()
+                    cap = None
+                
+                state['cap'] = None
+                print("[STREAM] Test mode capture loop stopped")
+
+            def _test_mode_start_capture():
+                """Open webcam and start capture loop."""
+                state = test_mode_state
+                
+                if state['capture_running']:
+                    return True
+
+                state['capture_running'] = True
+                state['capture_thread_ref'] = threading.Thread(target=_test_mode_capture_loop, daemon=True)
+                state['capture_thread_ref'].start()
+
+                # Wait up to 2 seconds for camera to open
+                for _ in range(20):
+                    if state['cap'] is not None and state['cap'].isOpened():
+                        return True
+                    time.sleep(0.1)
+
+                return state['cap'] is not None and state['cap'].isOpened()
+
+            def _test_mode_stop_capture():
+                """Release webcam and stop capture loop."""
+                state = test_mode_state
+                state['capture_running'] = False
+                time.sleep(0.2)
+
+                if state['cap'] is not None:
+                    state['cap'].release()
+                    state['cap'] = None
+                    print("[STREAM] Test mode webcam released - camera OFF")
+
+                with state['frame_lock']:
+                    state['current_frame'] = None
+
+            @stream_app.after_request
+            def add_test_mode_cors(response):
+                """Enable CORS for test mode endpoints."""
+                response.headers['Access-Control-Allow-Origin'] = '*'
+                response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+                return response
+
+            @stream_app.route('/start', methods=['POST', 'GET'])
+            def test_mode_webcam_start():
+                """Start test mode webcam for camera.cshtml."""
+                state = test_mode_state
+                with state['viewers_lock']:
+                    state['active_viewers'] += 1
+
+                ok = _test_mode_start_capture()
+                return json.dumps({
+                    "success": ok,
+                    "message": "Test mode webcam started" if ok else "Failed to open webcam",
+                    "viewers": state['active_viewers'],
+                    "mode": "TEST"
+                }), 200, {'Content-Type': 'application/json'}
+
+            @stream_app.route('/stop', methods=['POST', 'GET'])
+            def test_mode_webcam_stop():
+                """Stop test mode webcam."""
+                state = test_mode_state
+                with state['viewers_lock']:
+                    state['active_viewers'] = max(0, state['active_viewers'] - 1)
+
+                if state['active_viewers'] <= 0:
+                    _test_mode_stop_capture()
+                    msg = "Test mode webcam stopped - no viewers"
+                else:
+                    msg = f"Viewer disconnected, {state['active_viewers']} still watching"
+
+                return json.dumps({
+                    "success": True,
+                    "message": msg,
+                    "viewers": state['active_viewers']
+                }), 200, {'Content-Type': 'application/json'}
+
+            @stream_app.route('/status', methods=['GET'])
+            def test_mode_status():
+                """Get test mode capture status."""
+                state = test_mode_state
+                return json.dumps({
+                    "active": state['capture_running'],
+                    "viewers": state['active_viewers'],
+                    "mode": "TEST"
+                }), 200, {'Content-Type': 'application/json'}
+
+            @stream_app.route('/video', methods=['GET'])
+            def test_mode_video_feed():
+                """Serve MJPEG stream with bounding boxes. Auto-starts webcam if needed."""
+                state = test_mode_state
+                
+                if not state['capture_running']:
+                    _test_mode_start_capture()
+
+                def generate():
+                    while state['capture_running']:
+                        with state['frame_lock']:
+                            frame = state['current_frame']
+
+                        if frame is None:
+                            time.sleep(0.05)
+                            continue
+
+                        ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+                        if not ret:
+                            continue
+
+                        yield (b'--frame\r\n'
+                               b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+
+                return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+            print("[STREAM] Test mode endpoints enabled: /start, /stop, /status, /video")
+
+        stream_thread = threading.Thread(
+            target=lambda: stream_app.run(host='0.0.0.0', port=5050, debug=False, threaded=True),
+            daemon=True
+        )
+        stream_thread.start()
+        print("[STREAM] MJPEG server started on port 5050 (overlays enabled)")
 
         mode = "RASPBERRY PI" if is_pi else "LAPTOP (SIMULATION)"
         print(f"\n{'=' * 50}")

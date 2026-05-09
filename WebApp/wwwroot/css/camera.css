@@ -717,7 +717,6 @@
     margin-top: 6px;
 }
 
-/* Modal Footer */
 .modal-footer {
     background: var(--bg-hover);
     border-top: 1px solid var(--border);
@@ -829,3 +828,128 @@
 #focusView.fs-docked .viewer { margin-left: 320px }
 
 #focusView.fs-docked .viewer-body { height: 100vh }
+/* ========================================================= */
+/* ==================== WEBCAM STYLES ==================== */
+/* ========================================================= */
+
+/* Webcam badge indicator */
+.webcam-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-left: 8px;
+    animation: pulse-badge 2s ease-in-out infinite;
+}
+
+.webcam-badge i {
+    font-size: 10px;
+}
+
+/* Pulse animation for webcam badge */
+@keyframes pulse-badge {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+/* Webcam stream indicator class */
+.is-webcam-stream {
+    border: 2px solid rgba(102, 126, 234, 0.3);
+}
+
+.grid-card.is-webcam-stream {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+}
+
+/* Video error overlay */
+.video-error-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    border-radius: 8px;
+}
+
+.video-error-content {
+    text-align: center;
+    color: #fff;
+    font-size: 14px;
+}
+
+.video-error-content i {
+    display: block;
+    font-size: 48px;
+    color: #ef4444;
+    margin-bottom: 12px;
+}
+
+.video-error-content p {
+    margin: 0 0 8px 0;
+    font-weight: 500;
+}
+
+.video-error-content small {
+    display: block;
+    color: #ccc;
+    font-size: 12px;
+}
+
+/* Test mode indicator in focus view */
+.test-mode-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #667eea;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    animation: pulse-badge 2s ease-in-out infinite;
+}
+
+/* Webcam permission denied style */
+.webcam-denied {
+    background: #fbbf24;
+    border-color: #f59e0b;
+}
+
+.webcam-denied .grid-body {
+    background: rgba(251, 191, 36, 0.1);
+}
+
+/* Loading state for webcam */
+.webcam-loading {
+    position: relative;
+    overflow: hidden;
+}
+
+.webcam-loading::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    animation: shimmer 1.5s infinite;
+    z-index: 5;
+}
+
+@keyframes shimmer {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}

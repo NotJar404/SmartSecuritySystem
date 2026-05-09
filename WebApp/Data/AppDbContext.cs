@@ -66,17 +66,24 @@ namespace WebApp.Data
 
             // =========================
             // ALERTS (FIXED + ROOM RELATIONSHIP)
+            // Custom converters to handle DB values with spaces like 'Brute Force Attempt'
             // =========================
             modelBuilder.Entity<Alert>()
                 .ToTable("alerts");
 
             modelBuilder.Entity<Alert>()
                 .Property(a => a.Type)
-                .HasConversion<string>();
+                .HasConversion(
+                    v => v.ToString(),
+                    v => ParseAlertTypeFromDb(v)
+                );
 
             modelBuilder.Entity<Alert>()
                 .Property(a => a.Severity)
-                .HasConversion<string>();
+                .HasConversion(
+                    v => v.ToString(),
+                    v => ParseSeverityFromDb(v)
+                );
 
             modelBuilder.Entity<Alert>()
                 .Property(a => a.Status)
@@ -178,6 +185,45 @@ namespace WebApp.Data
                 .WithMany()
                 .HasForeignKey(r => r.CameraId)
                 .OnDelete(DeleteBehavior.Cascade);
+        }
+
+        // =========================
+        // DB STRING → ENUM PARSERS (handles spaces, mixed case)
+        // =========================
+        private static AlertType ParseAlertTypeFromDb(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return AlertType.SuspiciousActivity;
+
+            // Try direct parse first (e.g. "Intrusion")
+            if (Enum.TryParse<AlertType>(value, true, out var result))
+                return result;
+
+            // Strip spaces and try again (e.g. "Brute Force Attempt" → "BruteForceAttempt")
+            var stripped = value.Replace(" ", "").Replace("-", "").Replace("_", "");
+            if (Enum.TryParse<AlertType>(stripped, true, out var result2))
+                return result2;
+
+            // Fallback
+            return AlertType.SuspiciousActivity;
+        }
+
+        private static SeverityLevel ParseSeverityFromDb(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return SeverityLevel.WARNING;
+
+            // Map legacy database values to enum values
+            var normalized = value.Trim().ToUpper();
+            if (normalized == "HIGH") return SeverityLevel.CRITICAL;
+            if (normalized == "LOW") return SeverityLevel.INFO;
+
+            if (Enum.TryParse<SeverityLevel>(value, true, out var result))
+                return result;
+
+            var stripped = value.Replace(" ", "").Replace("-", "").Replace("_", "");
+            if (Enum.TryParse<SeverityLevel>(stripped, true, out var result2))
+                return result2;
+
+            return SeverityLevel.WARNING;
         }
     }
 }
