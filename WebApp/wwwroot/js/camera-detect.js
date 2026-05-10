@@ -17,6 +17,7 @@ let detectionCanvas = null;
 let detectionInterval = null;
 let modelsLoaded = false;
 let detectionInitialized = false;  // Prevent double-init
+let usingMJPEGStream = false;  // Track if using Python backend MJPEG
 
 let activeCameraId = null;
 let activeRoomId = null;
@@ -41,7 +42,7 @@ let stabilityFrames = 0;
 /* =========================
    INIT (with defer-safe retry)
 ========================= */
-async function initWebcamDetection(videoElement, cameraId, roomId) {
+async function initWebcamDetection(videoElement, cameraId, roomId, isMJPEGStream = false) {
     // Prevent double-init from both onSuccess and onWebcam callbacks
     if (detectionInitialized && activeCameraId === cameraId) {
         console.log('[DETECT] Already initialized for camera', cameraId);
@@ -50,6 +51,21 @@ async function initWebcamDetection(videoElement, cameraId, roomId) {
 
     activeCameraId = cameraId;
     activeRoomId = roomId;
+    usingMJPEGStream = isMJPEGStream;
+    
+    console.log('[DETECT] Initializing for camera ID:', cameraId, '- MJPEG Stream:', isMJPEGStream);
+    
+    // Skip browser-side detection if using MJPEG stream from Python backend
+    // The backend already renders the bounding boxes and the polling fetches detection data
+    if (isMJPEGStream) {
+        console.log('[DETECT] Using MJPEG stream from Python backend - skipping browser-side detection');
+        console.log('[DETECT] Detection data will be fetched via polling and displayed in focus panel');
+        detectionInitialized = true;
+        // Clear canvas since backend handles overlays
+        clearOverlayCanvas();
+        return;
+    }
+
     detectionInitialized = true;
 
     if (!detectionCanvas) {
@@ -332,12 +348,19 @@ function stopDetection() {
     }
 
     clearOverlayCanvas();
+    
+    // Stop Python backend webcam if it's running
+    if (usingMJPEGStream && activeCameraId) {
+        fetch('http://localhost:5050/stop', { method: 'POST' }).catch(() => {});
+    }
 
     // Reset state for next camera
     lastDetectionType = '';
     lastFaceCount = -1;
     stableFaceCount = 0;
     stabilityFrames = 0;
+    usingMJPEGStream = false;
+    activeCameraId = null;
 }
 
 /* =========================

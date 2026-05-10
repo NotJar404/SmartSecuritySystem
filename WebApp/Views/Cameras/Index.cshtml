@@ -392,8 +392,12 @@ function openFromGrid(id, name, streamUrl, location, roomId) {
 }
 
 // =====================================================
-// CAMERA SELECTION
+// CAMERA SELECTION — STREAM LOADER
+// Two modes: MJPEG (main.py running) or Webcam (browser direct)
 // =====================================================
+let _streamHealthTimer = null;
+let _mjpegFallbackTimer = null;
+
 function selectCamera(cam) {
     selectedCamera = cam;
 
@@ -404,78 +408,130 @@ function selectCamera(cam) {
 
     startClock();
 
-    if (cam.StreamUrl && cam.StreamUrl.trim() !== "") {
-        // === REAL STREAM (Raspberry Pi / IP camera) ===
-        overlaySource.innerText = "Raspberry Pi / Stream";
-        stopDetection();
-        stopWebcamVideo(video);
-        video.srcObject = null;
+    // Cleanup previous state
+    stopDetection();
+    stopAllWebcamStreams();
+    stopWebcamVideo(video);
+    video.srcObject = null;
+    if (_streamHealthTimer) { clearInterval(_streamHealthTimer); _streamHealthTimer = null; }
+    if (_mjpegFallbackTimer) { clearTimeout(_mjpegFallbackTimer); _mjpegFallbackTimer = null; }
 
-        // Clean up any test mode MJPEG stream
-        var mjpeg = document.getElementById('mjpegTestStream');
-        if (mjpeg) { mjpeg.src = ''; mjpeg.style.display = 'none'; }
-        video.style.display = 'block';
-        fetch('http://localhost:5050/stop', { mode: 'no-cors' }).catch(() => {});
+    // Stream URL: database value or default localhost:5050/video
+    const STREAM_BASE = 'http://localhost:5050';
+    const streamUrl = (cam.StreamUrl && cam.StreamUrl.trim() !== '')
+        ? cam.StreamUrl
+        : STREAM_BASE + '/video';
 
-        loadVideoStream(video, cam.StreamUrl, {
-            enableHLS: true,
-            fallbackToWebcam: true,
-            onSuccess: (info) => {
-                console.log('[CAMERA] Stream loaded:', info.type);
-            },
-            onError: (error) => {
-                console.error('[CAMERA] Stream error:', error);
-            },
-            onWebcam: () => {
-                console.log('[CAMERA] Webcam fallback activated');
-                overlaySource.innerText = "Local Webcam (TEST MODE - AI Detection Active)";
-                initWebcamDetection(video, cam.Id, cam.RoomId);
-            }
-        });
-    } else {
-        // === TEST MODE: Use Python stream_server.py (same pipeline as Pi) ===
-        // Bounding boxes are rendered by Python backend, NOT browser-side
-        overlaySource.innerText = "AI Pipeline Stream (TEST MODE)";
-        stopDetection();
-        stopWebcamVideo(video);
-        video.srcObject = null;
+    // Get or create the MJPEG <img> element
+    let mjpegImg = document.getElementById('mjpegTestStream');
+    if (!mjpegImg) {
+        mjpegImg = document.createElement('img');
+        mjpegImg.id = 'mjpegTestStream';
+        mjpegImg.style.cssText = 'width:100%;height:100%;object-fit:contain;background:#000;position:absolute;top:0;left:0;z-index:3;';
+        video.parentElement.insertBefore(mjpegImg, video);
+    }
 
-        // Tell stream_server.py to start the webcam
-        const STREAM_BASE = 'http://localhost:5050';
-        fetch(STREAM_BASE + '/start', { mode: 'no-cors' }).catch(() => {});
+    // Start with MJPEG visible, video hidden
+    video.style.display = 'none';
+    mjpegImg.style.display = 'block';
+    overlaySource.innerText = "Connecting...";
 
-        // Use an <img> tag for MJPEG stream (bounding boxes burned into frames)
-        let mjpegImg = document.getElementById('mjpegTestStream');
-        if (!mjpegImg) {
-            mjpegImg = document.createElement('img');
-            mjpegImg.id = 'mjpegTestStream';
-            mjpegImg.style.cssText = 'width:100%;height:100%;object-fit:contain;background:black;position:absolute;top:0;left:0;z-index:1;';
-            video.parentElement.insertBefore(mjpegImg, video);
+    // Hide browser-side detection canvas (Python backend renders its own overlays)
+    const detectCanvas = document.getElementById('detectOverlay');
+    if (detectCanvas) detectCanvas.style.display = 'none';
+
+    // =================================================================
+    // TRY MJPEG FIRST (works when main.py is running)
+    // =================================================================
+    let _mjpegConnected = false;
+
+    mjpegImg.onload = function() {
+        // MJPEG stream connected — main.py is serving frames with AI overlays
+        _mjpegConnected = true;
+        if (_mjpegFallbackTimer) { clearTimeout(_mjpegFallbackTimer); _mjpegFallbackTimer = null; }
+        overlaySource.innerText = "AI Pipeline Stream (HD \u2022 Bounding Boxes Active)";
+        console.log('[CAMERA] MJPEG stream connected — AI overlays active');
+        _startStreamHealthMonitor(mjpegImg, streamUrl);
+    };
+
+    mjpegImg.onerror = function() {
+        // MJPEG failed — don't retry, let the fallback timer handle it
+        console.log('[CAMERA] MJPEG stream error — waiting for fallback');
+    };
+
+    // Load the MJPEG stream
+    mjpegImg.src = streamUrl + (streamUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
+
+    // =================================================================
+    // FALLBACK: After 2 seconds, if MJPEG didn't connect,
+    // open the webcam directly via getUserMedia.
+    // This guarantees the user ALWAYS sees their camera feed.
+    // =================================================================
+    _mjpegFallbackTimer = setTimeout(() => {
+        if (_mjpegConnected) return;  // MJPEG worked, no fallback needed
+
+        console.log('[CAMERA] MJPEG not available — opening webcam directly');
+        _switchToWebcam(mjpegImg, cam);
+    }, 2000);
+}
+
+/**
+ * Switch from MJPEG to direct browser webcam via getUserMedia.
+ * This is the guaranteed fallback — always works as long as the user has a webcam.
+ */
+function _switchToWebcam(mjpegImg, cam) {
+    // Hide MJPEG, show video element
+    mjpegImg.src = '';
+    mjpegImg.style.display = 'none';
+    video.style.display = 'block';
+    overlaySource.innerText = "Live Webcam";
+
+    // Restore detectOverlay canvas for browser-side face detection
+    const dc = document.getElementById('detectOverlay');
+    if (dc) dc.style.display = '';
+
+    // Open webcam directly — no intermediate functions, no chains
+    navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+        audio: false
+    })
+    .then(stream => {
+        video.srcObject = stream;
+        video.play().catch(() => {});
+        console.log('[CAMERA] Webcam opened successfully');
+        overlaySource.innerText = "Live Webcam (HD)";
+
+        // Start browser-side face detection on the webcam feed
+        if (typeof initWebcamDetection === 'function' && cam) {
+            initWebcamDetection(video, cam.Id, cam.RoomId, false);
+        }
+    })
+    .catch(err => {
+        console.error('[CAMERA] Webcam access failed:', err);
+        overlaySource.innerText = "Camera unavailable — check permissions";
+    });
+}
+
+function _startStreamHealthMonitor(mjpegImg, streamUrl) {
+    // Clear any existing monitor
+    if (_streamHealthTimer) clearInterval(_streamHealthTimer);
+
+    // Check every 15 seconds if the stream is still alive
+    _streamHealthTimer = setInterval(() => {
+        if (!mjpegImg || mjpegImg.style.display === 'none') {
+            clearInterval(_streamHealthTimer);
+            return;
         }
 
-        // Hide the <video> element, show the MJPEG <img>
-        video.style.display = 'none';
-        mjpegImg.style.display = 'block';
-        mjpegImg.src = STREAM_BASE + '/video?t=' + Date.now();
-
-        mjpegImg.onerror = function() {
-            console.warn('[CAMERA] Python stream_server.py not running — falling back to browser webcam');
-            // Fallback: if Python server isn't running, use browser webcam
-            mjpegImg.style.display = 'none';
-            video.style.display = 'block';
-            overlaySource.innerText = "Local Webcam (TEST MODE - No AI Overlays)";
-
-            loadVideoStream(video, null, {
-                fallbackToWebcam: true,
-                onSuccess: (info) => {
-                    console.log('[CAMERA] Browser webcam loaded (no overlays):', info.type);
-                },
-                onError: (error) => {
-                    console.error('[CAMERA] Webcam error:', error);
-                }
+        // Ping the /status endpoint to check if backend is alive
+        fetch('http://localhost:5050/status', { mode: 'cors' })
+            .then(r => r.json())
+            .catch(() => {
+                // Backend unreachable — reconnect stream
+                console.log('[CAMERA] Backend unreachable, reconnecting stream');
+                mjpegImg.src = streamUrl + (streamUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
             });
-        };
-    }
+    }, 15000);
 }
 
 function startClock() {
@@ -692,8 +748,102 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // START REAL-TIME POLLING
+    // START REAL-TIME POLLING (ASP.NET backend)
     startPolling();
+
+    // =====================================================
+    // REAL-TIME AI PANEL — polls Python FSM directly (1s)
+    // Updates: Occupancy, Face Status, Threat Level, Alerts
+    // =====================================================
+    const PYTHON_STATUS_URL = 'http://localhost:5050/status';
+    let aiPollInterval = null;
+
+    function startAIPanelPolling() {
+        if (aiPollInterval) clearInterval(aiPollInterval);
+        aiPollInterval = setInterval(fetchAIStatus, 1000);
+        fetchAIStatus(); // immediate first fetch
+    }
+
+    function fetchAIStatus() {
+        fetch(PYTHON_STATUS_URL, { mode: 'cors' })
+            .then(r => r.json())
+            .then(data => {
+                // People Detected
+                const pc = document.getElementById('focusPeopleCount');
+                if (pc) {
+                    const newCount = String(data.occupancy || 0);
+                    if (pc.textContent !== newCount) {
+                        pc.textContent = newCount;
+                        pc.classList.add('count-flip');
+                        setTimeout(() => pc.classList.remove('count-flip'), 400);
+                    }
+                }
+
+                // Face Recognition
+                const fs = document.getElementById('focusFaceStatus');
+                if (fs) {
+                    if (data.face_detected) {
+                        fs.textContent = 'Detected';
+                        fs.className = 'ai-stat-value face-text-detected';
+                    } else {
+                        fs.textContent = 'No Face';
+                        fs.className = 'ai-stat-value face-text-none';
+                    }
+                }
+
+                // Threat Level
+                const tl = document.getElementById('focusThreatLevel');
+                if (tl) {
+                    tl.textContent = data.threat_level || 'SAFE';
+                    tl.className = 'ai-stat-value threat-text-' + (data.threat_level || 'safe').toLowerCase();
+                }
+
+                // Active Alerts
+                const ac = document.getElementById('focusAlertCount');
+                if (ac) {
+                    const alertCount = data.state === 'ALERT' ? 1 : 0;
+                    ac.textContent = String(alertCount);
+                }
+
+                // Detection Feed (live events)
+                const feed = document.getElementById('detectionFeed');
+                if (feed) {
+                    const stateIcons = {
+                        'IDLE': 'fa-eye', 'ACCESS': 'fa-door-open',
+                        'INSIDE': 'fa-home', 'LOITERING': 'fa-clock',
+                        'ALERT': 'fa-exclamation-triangle',
+                        'MONITORING': 'fa-video'
+                    };
+                    const stateColors = {
+                        'IDLE': 'safe', 'ACCESS': 'safe',
+                        'INSIDE': 'safe', 'LOITERING': 'warning',
+                        'ALERT': 'alert', 'MONITORING': 'safe'
+                    };
+                    const icon = stateIcons[data.state] || 'fa-satellite-dish';
+                    const color = stateColors[data.state] || 'safe';
+                    const motionTag = data.pir_motion ? '🟢 Motion' : '⚪ No Motion';
+                    const recTag = data.recording ? ' | 🔴 REC' : '';
+                    const armedTag = data.armed === false ? ' | ⚠️ DISARMED' : '';
+                    const modeTag = data.mode ? ` (${data.mode})` : '';
+
+                    feed.innerHTML = `<div class="feed-item feed-${color}">
+                        <i class="fas ${icon}"></i>
+                        <span>State: <strong>${data.state}</strong>${modeTag} | ${motionTag}${recTag}${armedTag}</span>
+                        <small>Occupancy: ${data.occupancy} | Tracked: ${data.tracked_persons}</small>
+                    </div>`;
+                }
+            })
+            .catch(() => {
+                // Python backend not running — show offline
+                const feed = document.getElementById('detectionFeed');
+                if (feed) {
+                    feed.innerHTML = '<span class="feed-placeholder"><i class="fas fa-satellite-dish"></i> AI backend offline</span>';
+                }
+            });
+    }
+
+    // Start AI polling when focus view is active
+    startAIPanelPolling();
 
     // =====================================================
     // PAGE-LEAVE CLEANUP: Release webcam when user leaves
@@ -702,6 +852,10 @@ document.addEventListener('DOMContentLoaded', function() {
     function cleanupCamera() {
         stopDetection();
         stopAllWebcamStreams();
+
+        // Clear stream timers
+        if (_mjpegFallbackTimer) { clearTimeout(_mjpegFallbackTimer); _mjpegFallbackTimer = null; }
+        if (_streamHealthTimer) { clearInterval(_streamHealthTimer); _streamHealthTimer = null; }
 
         // Clear MJPEG stream
         var mjpeg = document.getElementById('mjpegTestStream');

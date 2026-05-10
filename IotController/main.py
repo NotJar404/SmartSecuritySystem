@@ -15,6 +15,7 @@ from AI.face_detection import FaceDetector
 from AI.face_verfication import FaceVerifier
 from AI.person_detector import PersonDetector
 from AI.person_tracker import CentroidTracker
+from AI.overlay_renderer import render_full_frame
 from Sensors.rfid_reader import RFIDReader
 from Sensors.pir_sensor import PIRSensor
 from Sensors.lock_sensor import SolenoidLock
@@ -404,21 +405,33 @@ class SmartSecuritySystem:
     # MAIN LOOP (STATE-DRIVEN, NOT FRAME-DRIVEN)
     # =========================
     def main_loop(self):
+        # Render debug counters
+        self._render_debug_time = 0
+        self._render_box_total = 0
+        self._render_frame_total = 0
+
         while self.is_running:
             try:
                 frame = self.camera.get_frame()
 
                 if frame is None:
+                    if not hasattr(self, '_null_frame_warned'):
+                        print("[DEBUG] Frame is None — camera not delivering frames yet")
+                        self._null_frame_warned = True
                     time.sleep(0.05)
                     continue
+                elif not hasattr(self, '_first_frame_logged'):
+                    print(f"[DEBUG] First frame received! Shape: {frame.shape}")
+                    self._first_frame_logged = True
 
                 # =========================
-                # MASTER ARM CHECK â€” skip detection if disarmed
+                # MASTER ARM CHECK — skip detection if disarmed
                 # Still streams video but no AI processing
                 # =========================
                 if not self._master_armed:
-                    cv2.putText(frame, "SYSTEM DISARMED", (10, 30),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+                    frame, _ = render_full_frame(
+                        frame, state='IDLE', occupancy=0, armed=False
+                    )
                     self.camera.set_processed_frame(frame)
                     time.sleep(0.1)
                     continue
@@ -426,19 +439,20 @@ class SmartSecuritySystem:
                 # =========================
                 # DUAL-MODE DETECTION
                 # IDLE/ACCESS: Face detection (entrance monitoring + RFID verify)
-                # INSIDE/LOITERING: Person detection + tracking (room monitoring)
+                # INSIDE/LOITERING/ALERT: Person detection + tracking (room monitoring)
                 # =========================
                 now = time.time()
                 current_state = self.get_state()
                 faces = []
                 face_images = []
 
-                if current_state in (STATE_INSIDE, STATE_LOITERING):
+                if current_state in (STATE_INSIDE, STATE_LOITERING, STATE_ALERT):
                     # =========================
-                    # INSIDE MODE: Person detection + tracking
+                    # INSIDE/LOITERING/ALERT MODE: Person detection + tracking
+                    # Keeps tracking during ALERT so bounding boxes don't vanish
                     # =========================
                     person_detections = self.person_detector.detect_persons(frame)
-                    self.tracked_persons = self.person_tracker.update(person_detections)
+                    self.tracked_persons = self.person_tracker.update(person_detections, frame)
 
                     # Update authorization status for each tracked person
                     self._update_person_authorization()
@@ -451,16 +465,18 @@ class SmartSecuritySystem:
                         faces, face_images = self.face_detector.detect_faces(frame)
                 else:
                     # =========================
-                    # IDLE/ACCESS MODE: Face detection (unchanged)
+                    # IDLE/ACCESS MODE: Face detection
                     # =========================
                     faces, face_images = self.face_detector.detect_faces(frame)
                     raw_occupancy = len(faces)
 
-                    # Clear person tracker when not in INSIDE state
-                    if len(self.tracked_persons) > 0:
-                        self.person_tracker.reset()
-                        self.tracked_persons = {}
-                        self._person_session_map = {}
+                    # Debug: periodically log detection stats
+                    if not hasattr(self, '_last_debug_log'):
+                        self._last_debug_log = 0
+                    if now - self._last_debug_log > 5:
+                        blur = self.face_detector.last_blur_score
+                        print(f"[DEBUG] Blur: {blur:.1f} | Faces: {len(faces)} | State: {current_state}")
+                        self._last_debug_log = now
 
                 # =========================
                 # OCCUPANCY SMOOTHING (BUG-9 FIX)
@@ -479,80 +495,45 @@ class SmartSecuritySystem:
                     self.pir_sensor.simulate_motion()
 
                 # =========================
-                # OVERLAY â€” STATE + OCCUPANCY TEXT
+                # UNIFIED OVERLAY RENDERING
+                # Single call replaces ALL inline bounding box + HUD drawing.
+                # render_full_frame handles: HUD, person boxes, face boxes,
+                # corner accents, labels, REC indicator — everything.
                 # =========================
-                status_color = {
-                    STATE_IDLE: (128, 128, 128),
-                    STATE_ACCESS: (0, 255, 255),
-                    STATE_INSIDE: (0, 255, 0),
-                    STATE_ALERT: (0, 0, 255),
-                    STATE_LOITERING: (0, 165, 255),
-                }.get(current_state, (255, 255, 255))
-
                 with self.session_lock:
                     session_count = len(self.active_sessions)
 
-                cv2.putText(
+                frame, boxes_rendered = render_full_frame(
                     frame,
-                    f"State: {current_state} | Occupancy: {self.current_occupancy}",
-                    (10, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    status_color,
-                    2
+                    state=current_state,
+                    occupancy=self.current_occupancy,
+                    sessions=session_count,
+                    tracked_persons=self.tracked_persons if current_state in (STATE_INSIDE, STATE_LOITERING, STATE_ALERT) else None,
+                    faces=faces if current_state in (STATE_IDLE, STATE_ACCESS) else None,
+                    is_recording=self._is_recording,
+                    armed=self._master_armed
                 )
 
-                cv2.putText(
-                    frame,
-                    f"Sessions: {session_count}",
-                    (10, 60),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6,
-                    (200, 200, 200),
-                    1
-                )
+                # === SET PROCESSED FRAME IMMEDIATELY after rendering ===
+                # This is the CRITICAL fix: the processed frame with overlays
+                # is set BEFORE any state processing to prevent the stream
+                # from serving a raw frame.
+                self.camera.set_processed_frame(frame)
 
-                # =========================
-                # BOUNDING BOX OVERLAY â€” COLOR-CODED
-                # =========================
-                if current_state in (STATE_INSIDE, STATE_LOITERING):
-                    # INSIDE: Draw person detection boxes with authorization colors
-                    for track_id, person in self.tracked_persons.items():
-                        if person.disappeared > 0:
-                            continue  # Don't draw disappeared persons
-
-                        x, y, w, h = person.bbox
-                        status = person.status
-
-                        # Color coding: GREEN=authorized, RED=unauthorized, YELLOW=unknown
-                        color = {
-                            'authorized': (0, 200, 0),
-                            'unauthorized': (0, 0, 255),
-                            'unknown': (0, 220, 220),
-                        }.get(status, (0, 220, 220))
-
-                        cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
-
-                        # Label with tracking ID and status
-                        label = f"ID:{track_id} [{status.upper()}]"
-                        label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
-
-                        # Background for label
-                        cv2.rectangle(
-                            frame,
-                            (x, y - label_size[1] - 8),
-                            (x + label_size[0] + 4, y),
-                            color, -1
-                        )
-                        cv2.putText(
-                            frame, label, (x + 2, y - 5),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-                            (255, 255, 255), 1
-                        )
-                else:
-                    # IDLE/ACCESS: Draw face boxes (original behavior)
-                    for (x, y, w, h) in faces:
-                        cv2.rectangle(frame, (x, y), (x + w, y + h), status_color, 2)
+                # Render debug logging (every 5 seconds)
+                self._render_frame_total += 1
+                self._render_box_total += boxes_rendered
+                if now - self._render_debug_time > 5:
+                    avg_boxes = self._render_box_total / max(1, self._render_frame_total)
+                    tracked_count = len(self.tracked_persons)
+                    print(f"[RENDER] State: {current_state} | "
+                          f"Boxes/frame: {avg_boxes:.1f} | "
+                          f"Tracked: {tracked_count} | "
+                          f"Faces: {len(faces)} | "
+                          f"FPS: {self._render_frame_total / 5:.1f}")
+                    self._render_debug_time = now
+                    self._render_box_total = 0
+                    self._render_frame_total = 0
 
                 # =========================
                 # OCCUPANCY PUSH (rate-limited, preserves existing behavior)
@@ -606,15 +587,12 @@ class SmartSecuritySystem:
                     else:
                         self._empty_frame_counter = 0
 
-                # =========================
-                # SET PROCESSED FRAME (with all overlays)
-                # This frame is served via /video endpoint at http://localhost:5050
-                # =========================
-                self.camera.set_processed_frame(frame)
                 time.sleep(0.03)
 
             except Exception as e:
-                print("[MAIN LOOP ERROR]", e)
+                import traceback
+                print(f"[MAIN LOOP ERROR] {e}")
+                traceback.print_exc()
                 time.sleep(0.1)
 
     # =========================
@@ -1726,202 +1704,6 @@ class SmartSecuritySystem:
         }
 
 
-class TestModeDetector:
-    """
-    Person detector + face identifier for test mode (laptop).
-    Pipeline: HOG body detection -> Centroid tracking -> Face ID -> Persistent status
-    """
-
-    def __init__(self, confidence=0.4):
-        self.confidence = confidence
-        self.hog = cv2.HOGDescriptor()
-        self.hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
-        cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-        self.face_cascade = cv2.CascadeClassifier(cascade_path)
-        self.tracked = {}
-        self.next_id = 1
-        self.max_disappeared = 45
-        self.max_match_distance = 150
-        self.bbox_smooth = 0.6
-        self.frame_count = 0
-        self.detect_every = 3
-        self.face_detect_every = 6
-        self.last_detections = []
-
-    def detect(self, frame):
-        self.frame_count += 1
-        if self.frame_count % self.detect_every != 0:
-            return self.last_detections
-        try:
-            small = cv2.resize(frame, (640, 480))
-            scale_x = frame.shape[1] / 640
-            scale_y = frame.shape[0] / 480
-            boxes, weights = self.hog.detectMultiScale(
-                small, winStride=(8, 8), padding=(4, 4), scale=1.05
-            )
-            detections = []
-            for (x, y, w, h), weight in zip(boxes, weights):
-                if weight < self.confidence:
-                    continue
-                detections.append((int(x * scale_x), int(y * scale_y),
-                                   int(w * scale_x), int(h * scale_y), float(weight)))
-            if len(detections) > 1:
-                boxes_nms = [[d[0], d[1], d[2], d[3]] for d in detections]
-                scores = [d[4] for d in detections]
-                indices = cv2.dnn.NMSBoxes(boxes_nms, scores, self.confidence, 0.4)
-                if len(indices) > 0:
-                    if isinstance(indices[0], (list, np.ndarray)):
-                        indices = [i[0] for i in indices]
-                    detections = [detections[i] for i in indices]
-            self.last_detections = detections
-            return detections
-        except Exception as e:
-            print(f"[DETECT ERROR] {e}")
-            return self.last_detections
-
-    def detect_faces_in_bbox(self, frame, bbox):
-        x, y, w, h = bbox
-        fh, fw = frame.shape[:2]
-        x1, y1 = max(0, x), max(0, y)
-        x2, y2 = min(fw, x + w), min(fh, y + h)
-        if x2 - x1 < 30 or y2 - y1 < 30:
-            return False
-        face_h = int((y2 - y1) * 0.5)
-        roi = frame[y1:y1 + face_h, x1:x2]
-        if roi.size == 0:
-            return False
-        gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-        faces = self.face_cascade.detectMultiScale(
-            gray, scaleFactor=1.1, minNeighbors=4, minSize=(20, 20))
-        return len(faces) > 0
-
-    def update_tracking(self, detections):
-        current_centroids = {}
-        for (x, y, w, h, conf) in detections:
-            cx, cy = x + w // 2, y + h // 2
-            current_centroids[(cx, cy)] = (x, y, w, h, conf)
-
-        if len(current_centroids) == 0:
-            for tid in list(self.tracked.keys()):
-                self.tracked[tid]['disappeared'] += 1
-                if self.tracked[tid]['disappeared'] > self.max_disappeared:
-                    del self.tracked[tid]
-            return self.tracked
-
-        if len(self.tracked) == 0:
-            for (cx, cy), (x, y, w, h, conf) in current_centroids.items():
-                self.tracked[self.next_id] = {
-                    'cx': cx, 'cy': cy, 'bbox': (x, y, w, h),
-                    'smooth_bbox': [float(x), float(y), float(w), float(h)],
-                    'conf': conf, 'status': 'unknown', 'disappeared': 0,
-                    'face_seen': False, 'face_check_count': 0
-                }
-                self.next_id += 1
-            return self.tracked
-
-        track_ids = list(self.tracked.keys())
-        track_centers = [(self.tracked[tid]['cx'], self.tracked[tid]['cy']) for tid in track_ids]
-        det_centers = list(current_centroids.keys())
-        used_tracks, used_dets = set(), set()
-        pairs = []
-        for di, dc in enumerate(det_centers):
-            for ti, tc in enumerate(track_centers):
-                dist = np.sqrt((dc[0] - tc[0])**2 + (dc[1] - tc[1])**2)
-                pairs.append((dist, ti, di))
-        pairs.sort()
-        for dist, ti, di in pairs:
-            if ti in used_tracks or di in used_dets:
-                continue
-            if dist > self.max_match_distance:
-                continue
-            tid = track_ids[ti]
-            dc = det_centers[di]
-            x, y, w, h, conf = current_centroids[dc]
-            self.tracked[tid]['cx'] = dc[0]
-            self.tracked[tid]['cy'] = dc[1]
-            self.tracked[tid]['conf'] = conf
-            self.tracked[tid]['disappeared'] = 0
-            self.tracked[tid]['bbox'] = (x, y, w, h)
-            sb = self.tracked[tid]['smooth_bbox']
-            a = self.bbox_smooth
-            sb[0] = a * sb[0] + (1 - a) * x
-            sb[1] = a * sb[1] + (1 - a) * y
-            sb[2] = a * sb[2] + (1 - a) * w
-            sb[3] = a * sb[3] + (1 - a) * h
-            used_tracks.add(ti)
-            used_dets.add(di)
-        for di, dc in enumerate(det_centers):
-            if di not in used_dets:
-                x, y, w, h, conf = current_centroids[dc]
-                self.tracked[self.next_id] = {
-                    'cx': dc[0], 'cy': dc[1], 'bbox': (x, y, w, h),
-                    'smooth_bbox': [float(x), float(y), float(w), float(h)],
-                    'conf': conf, 'status': 'unknown', 'disappeared': 0,
-                    'face_seen': False, 'face_check_count': 0
-                }
-                self.next_id += 1
-        for ti, tid in enumerate(track_ids):
-            if ti not in used_tracks:
-                self.tracked[tid]['disappeared'] += 1
-                if self.tracked[tid]['disappeared'] > self.max_disappeared:
-                    del self.tracked[tid]
-        return self.tracked
-
-    def update_face_status(self, frame):
-        if self.frame_count % self.face_detect_every != 0:
-            return
-        for tid, info in self.tracked.items():
-            if info['disappeared'] > 0 or info['face_seen']:
-                continue
-            has_face = self.detect_faces_in_bbox(frame, info['bbox'])
-            info['face_check_count'] += 1
-            if has_face:
-                info['face_seen'] = True
-                info['status'] = 'unknown'
-
-    def render_overlays(self, frame, tracked):
-        visible = sum(1 for t in tracked.values() if t['disappeared'] == 0)
-        cv2.putText(frame, f"State: MONITORING | Persons: {visible}",
-                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (128, 128, 128), 2)
-        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-        cv2.putText(frame, timestamp, (10, 60),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
-        for tid, info in tracked.items():
-            if info['disappeared'] > 0:
-                continue
-            sb = info['smooth_bbox']
-            x, y, w, h = int(sb[0]), int(sb[1]), int(sb[2]), int(sb[3])
-            conf = info['conf']
-            status = info.get('status', 'unknown')
-            face_seen = info.get('face_seen', False)
-            color = {
-                'authorized': (0, 200, 0),
-                'unauthorized': (0, 0, 255),
-                'unknown': (0, 220, 220),
-            }.get(status, (0, 220, 220))
-            cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
-            corner_len = max(8, min(20, w // 5, h // 5))
-            thickness = 3
-            cv2.line(frame, (x, y), (x + corner_len, y), color, thickness)
-            cv2.line(frame, (x, y), (x, y + corner_len), color, thickness)
-            cv2.line(frame, (x + w, y), (x + w - corner_len, y), color, thickness)
-            cv2.line(frame, (x + w, y), (x + w, y + corner_len), color, thickness)
-            cv2.line(frame, (x, y + h), (x + corner_len, y + h), color, thickness)
-            cv2.line(frame, (x, y + h), (x, y + h - corner_len), color, thickness)
-            cv2.line(frame, (x + w, y + h), (x + w - corner_len, y + h), color, thickness)
-            cv2.line(frame, (x + w, y + h), (x + w, y + h - corner_len), color, thickness)
-            face_icon = "F" if face_seen else "?"
-            label = f"ID:{tid} [{status.upper()}] ({face_icon}) {int(conf * 100)}%"
-            label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
-            cv2.rectangle(frame, (x, y - label_size[1] - 10),
-                          (x + label_size[0] + 8, y), color, -1)
-            cv2.putText(frame, label, (x + 4, y - 5),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-        cv2.putText(frame, "AI Pipeline Active (Test Mode)",
-                    (10, frame.shape[0] - 15),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 200, 255), 1)
-        return frame
-
 
 def main():
     import platform
@@ -1954,23 +1736,46 @@ def main():
         # =========================
         stream_app = Flask(__name__)
 
-        # Pi mode: /video serves processed frames from FSM pipeline
-        # Laptop mode: /video is registered in test mode section below
-        if is_pi:
-            @stream_app.route('/video')
-            def video_feed():
-                def generate():
-                    while True:
-                        frame = system.camera.get_stream_frame()
-                        if frame is None:
-                            time.sleep(0.03)
-                            continue
-                        ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
-                        if not ret:
-                            continue
-                        yield (b'--frame\r\n'
-                               b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-                return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+        # =========================
+        # CORS — Required for camera.cshtml on ASP.NET (different port)
+        # Without this, browser blocks /status, /ready, /start fetch calls
+        # =========================
+        @stream_app.after_request
+        def add_cors(response):
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+            return response
+
+        # =========================
+        # UNIFIED /video — serves FSM-processed frames on BOTH Pi and Laptop
+        # The FSM main_loop draws overlays → set_processed_frame() → get_stream_frame()
+        # This is the ONLY /video route. No duplicate test-mode route needed.
+        # HD 1280x720 frames with AI overlays burned in.
+        # =========================
+        @stream_app.route('/video')
+        def video_feed():
+            def generate():
+                while True:
+                    frame = system.camera.get_stream_frame()
+                    if frame is None:
+                        time.sleep(0.01)
+                        continue
+                    # JPEG quality 80 = sharp HD, good compression ratio
+                    ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                    if not ret:
+                        continue
+                    yield (b'--frame\r\n'
+                           b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+            return Response(
+                generate(),
+                mimetype='multipart/x-mixed-replace; boundary=frame',
+                headers={
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0',
+                    'Access-Control-Allow-Origin': '*'
+                }
+            )
 
         @stream_app.route('/health')
         def pi_health():
@@ -2057,178 +1862,72 @@ def main():
                 "destination": dest_dir
             }), 200, {'Content-Type': 'application/json'}
 
+
         # =========================
-        # TEST MODE ENDPOINTS (Laptop/Desktop Testing)
-        # On-demand webcam activation with HOG detection & bounding boxes
-        # Only active when NOT running on Raspberry Pi
+        # CORS + COMPATIBILITY ROUTES
+        # Camera is always running via CameraModule while main.py runs.
+        # /start and /stop exist for frontend compatibility (sendBeacon).
         # =========================
-        if not is_pi:
-            # Global state for test mode capture
-            test_mode_state = {
-                'cap': None,
-                'current_frame': None,
-                'capture_running': False,
-                'detector': TestModeDetector(),
-                'frame_lock': threading.Lock(),
-                'active_viewers': 0,
-                'viewers_lock': threading.Lock(),
-                'capture_thread_ref': None
-            }
+        @stream_app.after_request
+        def add_cors(response):
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+            return response
 
-            def _test_mode_capture_loop():
-                """Background thread: capture â†’ detect â†’ track â†’ overlay â†’ store frame."""
-                state = test_mode_state
-                cap = cv2.VideoCapture(0)
-                
-                if not cap.isOpened():
-                    print("[STREAM] Trying camera index 1...")
-                    cap = cv2.VideoCapture(1)
+        @stream_app.route('/start', methods=['POST', 'GET'])
+        def stream_start():
+            ready = system.camera._frame_ready.is_set() if hasattr(system.camera, '_frame_ready') else True
+            return json.dumps({
+                'success': True,
+                'ready': ready,
+                'message': 'Camera running via FSM pipeline'
+            }), 200, {'Content-Type': 'application/json'}
 
-                if not cap.isOpened():
-                    print("[STREAM] ERROR: Cannot open any camera device for test mode!")
-                    state['capture_running'] = False
-                    return
+        @stream_app.route('/ready', methods=['GET'])
+        def stream_ready():
+            """Instant health check — frontend pings this before loading /video."""
+            ready = system.camera._frame_ready.is_set() if hasattr(system.camera, '_frame_ready') else True
+            return json.dumps({
+                'ready': ready,
+                'state': system.get_state(),
+                'armed': system._master_armed
+            }), 200, {'Content-Type': 'application/json'}
 
-                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                cap.set(cv2.CAP_PROP_FPS, 30)
+        @stream_app.route('/stop', methods=['POST', 'GET'])
+        def stream_stop():
+            return json.dumps({'success': True, 'message': 'Camera managed by FSM lifecycle'}), 200, {'Content-Type': 'application/json'}
 
-                print("[STREAM] Test Mode Webcam opened - camera ON")
-                print("[STREAM] Pipeline: Capture â†’ HOG Detection â†’ Tracking â†’ Overlays â†’ MJPEG")
+        @stream_app.route('/status', methods=['GET'])
+        def stream_status():
+            """Full FSM status for real-time AI panel updates."""
+            status = system.get_system_status()
+            tracked = len(system.tracked_persons)
+            face_detected = system.current_occupancy > 0 and system.get_state() in (STATE_IDLE, STATE_ACCESS)
+            
+            # Determine threat level from state
+            state = system.get_state()
+            threat = 'SAFE'
+            if state == STATE_ALERT:
+                threat = 'ALERT'
+            elif state == STATE_LOITERING:
+                threat = 'WARNING'
+            elif system.current_occupancy > system.room_max_capacity and system.room_max_capacity > 0:
+                threat = 'WARNING'
 
-                while state['capture_running']:
-                    ret, frame = cap.read()
-                    if not ret:
-                        time.sleep(0.03)
-                        continue
+            return json.dumps({
+                'active': True,
+                'mode': 'FSM',
+                'state': state,
+                'occupancy': system.current_occupancy,
+                'sessions': len(system.active_sessions),
+                'tracked_persons': tracked,
+                'face_detected': face_detected,
+                'threat_level': threat,
+                'recording': system._is_recording,
+                'pir_motion': system.pir_sensor.is_motion_detected(),
+                'armed': system._master_armed
+            }), 200, {'Content-Type': 'application/json'}
 
-                    # === UNIFIED PIPELINE (matches Pi's main.py) ===
-                    detections = state['detector'].detect(frame)
-                    tracked = state['detector'].update_tracking(detections)
-                    state['detector'].update_face_status(frame)
-                    frame = state['detector'].render_overlays(frame, tracked)
-
-                    with state['frame_lock']:
-                        state['current_frame'] = frame.copy()
-
-                if cap is not None and cap.isOpened():
-                    cap.release()
-                    cap = None
-                
-                state['cap'] = None
-                print("[STREAM] Test mode capture loop stopped")
-
-            def _test_mode_start_capture():
-                """Open webcam and start capture loop."""
-                state = test_mode_state
-                
-                if state['capture_running']:
-                    return True
-
-                state['capture_running'] = True
-                state['capture_thread_ref'] = threading.Thread(target=_test_mode_capture_loop, daemon=True)
-                state['capture_thread_ref'].start()
-
-                # Wait up to 2 seconds for camera to open
-                for _ in range(20):
-                    if state['cap'] is not None and state['cap'].isOpened():
-                        return True
-                    time.sleep(0.1)
-
-                return state['cap'] is not None and state['cap'].isOpened()
-
-            def _test_mode_stop_capture():
-                """Release webcam and stop capture loop."""
-                state = test_mode_state
-                state['capture_running'] = False
-                time.sleep(0.2)
-
-                if state['cap'] is not None:
-                    state['cap'].release()
-                    state['cap'] = None
-                    print("[STREAM] Test mode webcam released - camera OFF")
-
-                with state['frame_lock']:
-                    state['current_frame'] = None
-
-            @stream_app.after_request
-            def add_test_mode_cors(response):
-                """Enable CORS for test mode endpoints."""
-                response.headers['Access-Control-Allow-Origin'] = '*'
-                response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
-                return response
-
-            @stream_app.route('/start', methods=['POST', 'GET'])
-            def test_mode_webcam_start():
-                """Start test mode webcam for camera.cshtml."""
-                state = test_mode_state
-                with state['viewers_lock']:
-                    state['active_viewers'] += 1
-
-                ok = _test_mode_start_capture()
-                return json.dumps({
-                    "success": ok,
-                    "message": "Test mode webcam started" if ok else "Failed to open webcam",
-                    "viewers": state['active_viewers'],
-                    "mode": "TEST"
-                }), 200, {'Content-Type': 'application/json'}
-
-            @stream_app.route('/stop', methods=['POST', 'GET'])
-            def test_mode_webcam_stop():
-                """Stop test mode webcam."""
-                state = test_mode_state
-                with state['viewers_lock']:
-                    state['active_viewers'] = max(0, state['active_viewers'] - 1)
-
-                if state['active_viewers'] <= 0:
-                    _test_mode_stop_capture()
-                    msg = "Test mode webcam stopped - no viewers"
-                else:
-                    msg = f"Viewer disconnected, {state['active_viewers']} still watching"
-
-                return json.dumps({
-                    "success": True,
-                    "message": msg,
-                    "viewers": state['active_viewers']
-                }), 200, {'Content-Type': 'application/json'}
-
-            @stream_app.route('/status', methods=['GET'])
-            def test_mode_status():
-                """Get test mode capture status."""
-                state = test_mode_state
-                return json.dumps({
-                    "active": state['capture_running'],
-                    "viewers": state['active_viewers'],
-                    "mode": "TEST"
-                }), 200, {'Content-Type': 'application/json'}
-
-            @stream_app.route('/video', methods=['GET'])
-            def test_mode_video_feed():
-                """Serve MJPEG stream with bounding boxes. Auto-starts webcam if needed."""
-                state = test_mode_state
-                
-                if not state['capture_running']:
-                    _test_mode_start_capture()
-
-                def generate():
-                    while state['capture_running']:
-                        with state['frame_lock']:
-                            frame = state['current_frame']
-
-                        if frame is None:
-                            time.sleep(0.05)
-                            continue
-
-                        ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
-                        if not ret:
-                            continue
-
-                        yield (b'--frame\r\n'
-                               b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-
-                return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
-
-            print("[STREAM] Test mode endpoints enabled: /start, /stop, /status, /video")
 
         stream_thread = threading.Thread(
             target=lambda: stream_app.run(host='0.0.0.0', port=5050, debug=False, threaded=True),

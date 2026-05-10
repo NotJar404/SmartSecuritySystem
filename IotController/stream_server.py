@@ -29,6 +29,10 @@ import shutil
 import os
 import json
 from flask import Flask, Response, request
+
+# Import the unified overlay renderer (same as main.py uses)
+from AI.overlay_renderer import render_full_frame
+
 app = Flask(__name__)
 
 # Manual CORS (no flask-cors dependency needed)
@@ -294,12 +298,6 @@ class TestModeDetector:
         """
         Run face detection on tracked persons.
         PERSISTENT STATUS: once face is detected, status sticks.
-        
-        This mirrors main.py's _update_person_authorization():
-        - If face is seen -> mark as 'unknown' (no RFID session in test mode)
-        - In test mode, all detected faces default to 'unknown' since there's
-          no RFID to verify. On Pi, main.py checks active_sessions.
-        - The key is: the status NEVER resets to a worse state once set.
         """
         if self.frame_count % self.face_detect_every != 0:
             return
@@ -320,91 +318,10 @@ class TestModeDetector:
 
             if has_face:
                 info['face_seen'] = True
-                # In test mode (no RFID system), face detected = 'unknown'
-                # On Pi, main.py would check RFID sessions to set authorized/unauthorized
-                # Status is now PERMANENT for this track ID
                 info['status'] = 'unknown'
                 print(f"[FACE] Track ID:{tid} - Face detected, status locked: {info['status']}")
             elif info['face_check_count'] > 30:
-                # After ~3 seconds without seeing a face (person facing away),
-                # keep as 'unknown' - don't escalate in test mode
                 pass
-
-    def render_overlays(self, frame, tracked):
-        """
-        Draw bounding boxes + labels on frame.
-        Uses smooth_bbox for stable, jitter-free rendering.
-        MATCHES main.py overlay style exactly.
-        """
-        # Count only visible persons
-        visible = sum(1 for t in tracked.values() if t['disappeared'] == 0)
-
-        # State text (top-left)
-        cv2.putText(frame, f"State: MONITORING | Persons: {visible}",
-                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (128, 128, 128), 2)
-
-        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-        cv2.putText(frame, timestamp, (10, 60),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
-
-        for tid, info in tracked.items():
-            if info['disappeared'] > 0:
-                continue
-
-            # Use smoothed bbox for stable rendering
-            sb = info['smooth_bbox']
-            x, y, w, h = int(sb[0]), int(sb[1]), int(sb[2]), int(sb[3])
-            conf = info['conf']
-            status = info.get('status', 'unknown')
-            face_seen = info.get('face_seen', False)
-
-            # Color coding (matches main.py exactly)
-            color = {
-                'authorized': (0, 200, 0),     # GREEN
-                'unauthorized': (0, 0, 255),    # RED
-                'unknown': (0, 220, 220),       # YELLOW
-            }.get(status, (0, 220, 220))
-
-            # === BOUNDING BOX ===
-            cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
-
-            # === CORNER ACCENTS (YOLO-style) ===
-            corner_len = max(8, min(20, w // 5, h // 5))
-            thickness = 3
-            # Top-left
-            cv2.line(frame, (x, y), (x + corner_len, y), color, thickness)
-            cv2.line(frame, (x, y), (x, y + corner_len), color, thickness)
-            # Top-right
-            cv2.line(frame, (x + w, y), (x + w - corner_len, y), color, thickness)
-            cv2.line(frame, (x + w, y), (x + w, y + corner_len), color, thickness)
-            # Bottom-left
-            cv2.line(frame, (x, y + h), (x + corner_len, y + h), color, thickness)
-            cv2.line(frame, (x, y + h), (x, y + h - corner_len), color, thickness)
-            # Bottom-right
-            cv2.line(frame, (x + w, y + h), (x + w - corner_len, y + h), color, thickness)
-            cv2.line(frame, (x + w, y + h), (x + w, y + h - corner_len), color, thickness)
-
-            # === LABEL ===
-            face_icon = "F" if face_seen else "?"
-            label = f"ID:{tid} [{status.upper()}] ({face_icon}) {int(conf * 100)}%"
-            label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
-
-            # Label background
-            cv2.rectangle(frame,
-                          (x, y - label_size[1] - 10),
-                          (x + label_size[0] + 8, y),
-                          color, -1)
-
-            # Label text
-            cv2.putText(frame, label, (x + 4, y - 5),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-
-        # Pipeline indicator (bottom-left)
-        cv2.putText(frame, "AI Pipeline Active (Test Mode)",
-                    (10, frame.shape[0] - 15),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 200, 255), 1)
-
-        return frame
 
 
 # Global detector instance
@@ -461,10 +378,17 @@ def _capture_loop():
     """
     Background thread: capture -> detect -> track -> face ID -> overlay -> store frame.
     SAME pipeline as main.py on the Pi.
+    Uses the UNIFIED overlay renderer for identical visual output.
     """
     global cap, current_frame, capture_running
+    import platform
 
-    cap = cv2.VideoCapture(0)
+    # Use DirectShow on Windows for faster init + lower latency
+    if platform.system().lower() == 'windows':
+        cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+    else:
+        cap = cv2.VideoCapture(0)
+
     if not cap.isOpened():
         print("[STREAM] Trying camera index 1...")
         cap = cv2.VideoCapture(1)
@@ -474,18 +398,32 @@ def _capture_loop():
         capture_running = False
         return
 
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    # HD resolution for sharp in-page stream
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
     cap.set(cv2.CAP_PROP_FPS, 30)
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Always get latest frame
 
-    print("[STREAM] Webcam opened - camera ON")
+    # Disable autofocus for stability
+    try:
+        cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)
+        cap.set(cv2.CAP_PROP_FOCUS, 40)
+    except Exception:
+        pass
+
+    actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    print(f"[STREAM] Webcam opened - {actual_w}x{actual_h} (HD) - camera ON")
     print("[STREAM] Pipeline: HOG+SVM -> Tracking -> Face ID -> Overlays -> MJPEG")
 
     while capture_running:
         ret, frame = cap.read()
         if not ret:
-            time.sleep(0.03)
+            time.sleep(0.01)
             continue
+
+        # Mirror for selfie-view on webcam (matches camera_module.py behavior)
+        frame = cv2.flip(frame, 1)
 
         # === UNIFIED PIPELINE (matches main.py) ===
         # Step 1: Person Detection (HOG+SVM body detector)
@@ -495,11 +433,23 @@ def _capture_loop():
         tracked = detector.update_tracking(detections)
 
         # Step 3: Face Detection + Status Lock
-        # Detects face WITHIN person bbox, locks status permanently
         detector.update_face_status(frame)
 
-        # Step 4: Overlay Rendering (bounding boxes, labels, tracking IDs)
-        frame = detector.render_overlays(frame, tracked)
+        # Step 4: UNIFIED Overlay Rendering (same renderer as main.py)
+        # Count visible persons
+        visible = sum(1 for t in tracked.values() if t['disappeared'] == 0)
+
+        frame, boxes = render_full_frame(
+            frame,
+            state='MONITORING',
+            occupancy=visible,
+            sessions=0,
+            tracked_persons=tracked,
+            faces=None,
+            is_recording=False,
+            armed=True,
+            extra_info="AI Pipeline Active (Test Mode)"
+        )
 
         # Step 5: Store processed frame for MJPEG streaming
         with frame_lock:
@@ -560,24 +510,46 @@ def video_feed():
                 frame = current_frame
 
             if frame is None:
-                time.sleep(0.05)
+                time.sleep(0.01)
                 continue
 
-            ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+            # JPEG quality 80 = sharp HD video
+            ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
             if not ret:
                 continue
 
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
 
-    return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+    return Response(
+        generate(),
+        mimetype='multipart/x-mixed-replace; boundary=frame',
+        headers={
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+            'Access-Control-Allow-Origin': '*'
+        }
+    )
 
 
 @app.route('/status')
 def webcam_status():
+    """Return stream status with tracked person info for AI panel."""
+    visible = sum(1 for t in detector.tracked.values() if t.get('disappeared', 0) == 0)
     return json.dumps({
         "active": capture_running,
-        "viewers": active_viewers
+        "viewers": active_viewers,
+        "mode": "TEST",
+        "state": "MONITORING" if capture_running else "OFFLINE",
+        "occupancy": visible,
+        "sessions": 0,
+        "tracked_persons": visible,
+        "face_detected": any(t.get('face_seen', False) for t in detector.tracked.values()),
+        "threat_level": "SAFE",
+        "recording": False,
+        "pir_motion": False,
+        "armed": True
     }), 200, {'Content-Type': 'application/json'}
 
 

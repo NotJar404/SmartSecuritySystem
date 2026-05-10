@@ -85,12 +85,13 @@ async function loadStream(videoElement, streamUrl, options = {}) {
                 if (!mjpegImg) {
                     mjpegImg = document.createElement('img');
                     mjpegImg.className = 'mjpeg-stream-img';
-                    mjpegImg.style.cssText = 'width:100%;height:100%;object-fit:contain;background:black;position:absolute;top:0;left:0;z-index:1;';
+                    mjpegImg.style.cssText = 'width:100%;height:100%;object-fit:contain;background:black;position:absolute;top:0;left:0;z-index:2;';
                     videoElement.parentElement.insertBefore(mjpegImg, videoElement);
                 }
 
                 // Hide <video>, show <img>
                 videoElement.style.display = 'none';
+                videoElement.removeAttribute('controls');
                 mjpegImg.style.display = 'block';
                 mjpegImg.src = streamUrl + (streamUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
 
@@ -276,16 +277,15 @@ function initializeVideoElements(selector = '.grid-preview, .cctv-video') {
     videos.forEach((video) => {
         const url = video.getAttribute('data-src');
         loadVideoStream(video, url, {
+            // IMPORTANT: Card previews must NOT grab the webcam via getUserMedia.
+            // If they do, main.py's OpenCV can't access the webcam → black stream in focus view.
+            // Cards show camera icon placeholder if MJPEG isn't available.
+            fallbackToWebcam: false,
             onSuccess: (info) => {
                 console.log('[StreamLoader] Video loaded:', info);
-                addWebcamIndicator(video);
             },
             onError: (error) => {
-                console.error('[StreamLoader] Video failed:', error);
-            },
-            onWebcam: (info) => {
-                console.log('[StreamLoader] Using webcam for video element');
-                addWebcamIndicator(video);
+                console.log('[StreamLoader] Card preview not available (normal if main.py not running)');
             }
         });
     });

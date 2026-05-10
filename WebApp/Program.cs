@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authentication.Cookies;
+﻿using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using SmartSecuritySystem.Filters;
 using WebApp.Data;
@@ -64,6 +64,14 @@ builder.Services.AddAuthorization();
 // BUILD APP
 // =========================
 var app = builder.Build();
+
+// =========================
+// CONFIGURE URLS / PORTS
+// =========================
+var httpPort = Environment.GetEnvironmentVariable("ASPNETCORE_HTTP_PORT") ?? "5145";
+var httpsPort = Environment.GetEnvironmentVariable("ASPNETCORE_HTTPS_PORT") ?? "7229";
+app.Urls.Add($"http://localhost:{httpPort}");
+app.Urls.Add($"https://localhost:{httpsPort}");
 
 // =========================
 // MIDDLEWARE

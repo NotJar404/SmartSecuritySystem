@@ -2,7 +2,6 @@ import cv2
 import threading
 import time
 import platform
-from flask import Flask, Response
 
 
 # =========================
@@ -12,27 +11,49 @@ class CameraModule:
     """
     Universal Camera Module
     Supports:
-    - Laptop webcam
-    - Raspberry Pi camera
+    - Laptop webcam (HD 1280x720, mirrored)
+    - Raspberry Pi camera (libcamera, picamera2, V4L2)
     - USB cameras
 
-    Now supports:
-    - AI overlay frames
-    - Safe multithreading
+    Architecture:
+    - Capture thread writes ONLY to self._raw_frame
+    - Main loop reads raw frame via get_frame()
+    - Main loop draws overlays and writes via set_processed_frame()
+    - Stream reads via get_stream_frame() → processed if available, else raw
+    - NO RACE CONDITION: capture thread NEVER touches processed_frame
+
+    Performance:
+    - HD resolution (1280x720) for sharp video on ASP.NET frontend
+    - Webcam mirroring for natural selfie-view on laptop
+    - Warm-up ensures first frame is available before stream starts
+    - MJPEG buffer optimization for minimal latency
     """
 
-    def __init__(self, camera_id=0, width=640, height=480, fps=30):
+    def __init__(self, camera_id=0, width=1280, height=720, fps=30, mirror=None):
         self.camera_id = camera_id
         self.width = width
         self.height = height
         self.fps = fps
 
-        self.cap = None
-        self.frame = None
-        self.processed_frame = None  # NEW: for AI overlays
+        # Auto-detect mirror: True for laptop webcam, False for Pi camera
+        if mirror is None:
+            self._mirror = platform.system().lower() != "linux"
+        else:
+            self._mirror = mirror
 
-        self.lock = threading.Lock()
+        self.cap = None
+        self._raw_frame = None           # Written ONLY by capture thread
+        self._processed_frame = None     # Written ONLY by set_processed_frame()
+        self._has_processed = False      # True once main loop has set at least one processed frame
+        self._frame_ready = threading.Event()  # Signals when first frame is captured
+
+        self._lock = threading.Lock()
         self.running = False
+
+        # Compatibility aliases
+        self.frame = None
+        self.processed_frame = None
+        self.lock = self._lock
 
     def initialize(self):
         """Initialize camera with Pi Camera Module 3 + fallback support"""
@@ -86,14 +107,21 @@ class CameraModule:
 
             else:
                 # =========================
-                # DESKTOP/LAPTOP — standard OpenCV
+                # DESKTOP/LAPTOP — DirectShow backend (more reliable on Windows)
                 # =========================
-                print("[CAMERA] Detected Desktop — using webcam")
+                print("[CAMERA] Detected Desktop -- using webcam (DirectShow)")
                 self._use_picamera2 = False
-                self.cap = cv2.VideoCapture(self.camera_id)
+                self.cap = cv2.VideoCapture(self.camera_id, cv2.CAP_DSHOW)
+
+                if not self.cap.isOpened():
+                    print("[CAMERA] DirectShow failed, trying default backend...")
+                    self.cap = cv2.VideoCapture(self.camera_id)
 
                 if not self.cap.isOpened():
                     print("[CAMERA] Primary camera failed, trying index 1...")
+                    self.cap = cv2.VideoCapture(1, cv2.CAP_DSHOW)
+
+                if not self.cap.isOpened():
                     self.cap = cv2.VideoCapture(1)
 
                 if not self.cap.isOpened():
@@ -106,10 +134,27 @@ class CameraModule:
                 self.cap.set(cv2.CAP_PROP_FPS, self.fps)
 
                 # =========================
-                # DISABLE AUTOFOCUS (CRITICAL FOR STABILITY)
+                # BUFFER SIZE = 1: Ensures we always get the LATEST frame
+                # Prevents stale frames from accumulating in the driver buffer
                 # =========================
-                self.cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)
-                self.cap.set(cv2.CAP_PROP_FOCUS, 40)
+                self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+                # =========================
+                # DISABLE AUTOFOCUS (CRITICAL FOR STABILITY)
+                # Not all cameras support this — ignore failures
+                # =========================
+                try:
+                    self.cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)
+                    self.cap.set(cv2.CAP_PROP_FOCUS, 40)
+                except Exception:
+                    print("[CAMERA] Autofocus control not supported — skipping")
+
+                # Report actual resolution
+                actual_w = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                actual_h = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                actual_fps = int(self.cap.get(cv2.CAP_PROP_FPS))
+                mirror_status = "ON (selfie mode)" if self._mirror else "OFF"
+                print(f"[CAMERA] Resolution: {actual_w}x{actual_h} @ {actual_fps}fps | Mirror: {mirror_status}")
 
             print("[CAMERA] Initialized successfully")
             return True
@@ -119,55 +164,113 @@ class CameraModule:
             return False
 
     def start(self):
-        """Start camera capture thread"""
+        """Start camera capture thread and wait for first frame (warm-up)."""
         if self.running:
             return
 
         self.running = True
+
+        # =========================
+        # DRAIN STALE FRAMES: Camera drivers (DirectShow, V4L2) buffer
+        # 3-5 old frames internally. If we don't drain them, the first
+        # /video frame will be stale/delayed. Read and discard a few.
+        # =========================
+        if self.cap is not None and not getattr(self, '_use_picamera2', False):
+            for _ in range(5):
+                self.cap.read()  # Discard stale buffered frames
+
         threading.Thread(target=self._loop, daemon=True).start()
 
+        # =========================
+        # WARM-UP: Wait for first LIVE frame to be captured
+        # Webcam typically delivers first frame in <0.5s
+        # Pi Camera Module 3 typically within 1-2s
+        # =========================
+        print("[CAMERA] Warming up...")
+        if self._frame_ready.wait(timeout=2.0):
+            print("[CAMERA] ✓ Stream ready — first frame captured")
+        else:
+            print("[CAMERA] ⚠ Warm-up timeout — stream may start with delay")
+
     def _loop(self):
-        """Continuous capture loop (OpenCV or picamera2)"""
+        """
+        Continuous capture loop (OpenCV or picamera2).
+
+        CRITICAL: This loop writes ONLY to self._raw_frame.
+        It NEVER writes to self._processed_frame.
+        This eliminates the race condition that caused bounding boxes to disappear.
+        """
+        _frame_count = 0
         while self.running:
             try:
                 if getattr(self, '_use_picamera2', False):
                     # Pi Camera Module 3 via picamera2
                     frame = self._picamera2.capture_array()
                     if frame is not None:
-                        with self.lock:
+                        with self._lock:
+                            self._raw_frame = frame
                             self.frame = frame
-                            if self.processed_frame is None:
-                                self.processed_frame = frame
+                        self._frame_ready.set()
                 else:
                     # Standard OpenCV capture
                     ret, frame = self.cap.read()
-                    if ret:
-                        with self.lock:
+                    if ret and frame is not None:
+                        # Apply mirror for webcam mode (selfie view)
+                        if self._mirror:
+                            frame = cv2.flip(frame, 1)
+
+                        with self._lock:
+                            self._raw_frame = frame
                             self.frame = frame
-                            if self.processed_frame is None:
-                                self.processed_frame = frame
+                        self._frame_ready.set()
 
             except Exception as e:
                 print("[CAMERA] Loop error:", e)
 
-            time.sleep(0.01)
+            _frame_count += 1
+            # No sleep for first 10 frames to fill pipeline fast,
+            # then 10ms (~100fps cap) to prevent CPU spin
+            if _frame_count > 10:
+                time.sleep(0.01)
 
     def get_frame(self):
-        """Raw frame (for AI processing)"""
-        with self.lock:
-            return None if self.frame is None else self.frame.copy()
+        """
+        Get raw frame for AI processing.
+        Returns a COPY so the caller can draw on it without affecting the capture thread.
+        """
+        with self._lock:
+            if self._raw_frame is None:
+                return None
+            return self._raw_frame.copy()
 
     def set_processed_frame(self, frame):
-        """Set AI-processed frame (with overlays)"""
-        with self.lock:
+        """
+        Set the AI-processed frame (with overlays drawn on it).
+        This is the ONLY way to update the processed frame.
+        Called by the main loop after drawing all overlays.
+        """
+        if frame is None:
+            return
+        with self._lock:
+            self._processed_frame = frame
+            self._has_processed = True
             self.processed_frame = frame
 
     def get_stream_frame(self):
-        """Frame used for streaming (processed if available)"""
-        with self.lock:
-            if self.processed_frame is not None:
-                return self.processed_frame.copy()
-            return None if self.frame is None else self.frame.copy()
+        """
+        Get frame for MJPEG streaming.
+        Returns the PROCESSED frame (with overlays) if available,
+        otherwise returns the raw frame.
+
+        IMPORTANT: Returns a COPY to prevent the stream encoder
+        from interfering with the main loop's frame.
+        """
+        with self._lock:
+            if self._has_processed and self._processed_frame is not None:
+                return self._processed_frame.copy()
+            if self._raw_frame is not None:
+                return self._raw_frame.copy()
+            return None
 
     def stop(self):
         """Stop camera safely"""
@@ -179,59 +282,3 @@ class CameraModule:
                 pass
         elif self.cap:
             self.cap.release()
-
-
-# =========================
-# FLASK STREAM SERVER
-# =========================
-app = Flask(__name__)
-camera = CameraModule(camera_id=0)
-
-
-def generate_frames():
-    """
-    MJPEG stream for ASP.NET
-    Shows AI overlays if available
-    """
-    while True:
-        frame = camera.get_stream_frame()
-
-        if frame is None:
-            continue
-
-        success, buffer = cv2.imencode('.jpg', frame)
-        if not success:
-            continue
-
-        yield (
-            b'--frame\r\n'
-            b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n'
-        )
-
-
-@app.route('/video')
-def video_feed():
-    return Response(
-        generate_frames(),
-        mimetype='multipart/x-mixed-replace; boundary=frame'
-    )
-
-
-# =========================
-# MAIN START
-# =========================
-if __name__ == "__main__":
-    print("===================================")
-    print(" Smart Camera Stream Starting...")
-    print(" Hybrid Mode: Laptop + Raspberry Pi")
-    print(" Stream URL: http://localhost:5000/video")
-    print("===================================")
-
-    if not camera.initialize():
-        print("Failed to start camera")
-        exit()
-
-    camera.start()
-
-    # Allow LAN access (important for ASP.NET)
-    app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)

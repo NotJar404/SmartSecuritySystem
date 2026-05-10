@@ -17,9 +17,9 @@ class FaceDetector:
         # =========================
         # TUNING PARAMETERS
         # =========================
-        self.min_face_size = (40, 40)
+        self.min_face_size = (30, 30)
         self.scale_factor = 1.1
-        self.min_neighbors = 7  # slightly stricter → fewer false positives
+        self.min_neighbors = 5  # balanced: fewer false positives, still detects reliably
 
         # OPTIONAL PERFORMANCE MODE (Pi friendly)
         self.use_resize = True
@@ -31,7 +31,7 @@ class FaceDetector:
         # Frames below this Laplacian variance are too blurry
         # for reliable face detection — skip entirely
         # =========================
-        self.blur_threshold = 50.0
+        self.blur_threshold = 8.0
         self.last_blur_score = 0
 
     # =========================
@@ -81,6 +81,7 @@ class FaceDetector:
             )
 
             face_images = []
+            scaled_faces = []
 
             # =========================
             # PROCESS DETECTED FACES
@@ -100,14 +101,21 @@ class FaceDetector:
                     w = int(w * scale_x)
                     h = int(h * scale_y)
 
+                # Clamp to frame bounds
+                x = max(0, x)
+                y = max(0, y)
+                w = min(w, original_frame.shape[1] - x)
+                h = min(h, original_frame.shape[0] - y)
+
                 face = original_frame[y:y+h, x:x+w]
 
                 if face.size == 0:
                     continue
 
+                scaled_faces.append((x, y, w, h))
                 face_images.append(face)
 
-            return list(faces), face_images
+            return scaled_faces, face_images
 
         except Exception as e:
             print("[FACE DETECTION ERROR]", e)

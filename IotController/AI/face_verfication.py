@@ -1,6 +1,11 @@
 import cv2
 import numpy as np
-import face_recognition
+try:
+    import face_recognition
+    _HAS_FACE_RECOGNITION = True
+except ImportError:
+    _HAS_FACE_RECOGNITION = False
+    print("[WARN] face_recognition not installed — face verification disabled (install dlib + face_recognition for Pi)")
 import base64
 import pickle
 import os
@@ -25,7 +30,7 @@ class FaceVerifier:
     # ENCODING
     # =========================
     def extract_encoding(self, image):
-        if image is None:
+        if image is None or not _HAS_FACE_RECOGNITION:
             return None
 
         rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -109,6 +114,10 @@ class FaceVerifier:
             return result
 
         # AI comparison
+        if not _HAS_FACE_RECOGNITION:
+            result["message"] = "face_recognition not installed"
+            return result
+
         distance = face_recognition.face_distance(
             [stored_encoding],
             self.current_encoding

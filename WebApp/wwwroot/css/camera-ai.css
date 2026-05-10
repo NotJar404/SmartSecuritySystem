@@ -53,16 +53,22 @@
 .face-text-verified { color:var(--status-active); }
 .face-text-unknown { color:var(--accent-dark); }
 .face-text-obstructed { color:var(--alert); }
+.face-text-detected { color: var(--info-blue); }
+.face-text-none { color: var(--text-dim); }
 
 /* Detection feed */
 .ai-detection-feed { background:var(--bg-hover); border-radius:8px; padding:10px 14px; min-height:36px; display:flex; align-items:center; }
 .feed-placeholder { color:var(--text-dim); font-size:12px; display:flex; align-items:center; gap:8px; }
 .feed-placeholder i { color:var(--accent); animation:feedPulse 2s ease-in-out infinite; }
 @keyframes feedPulse { 0%,100%{opacity:0.5}50%{opacity:1} }
-.feed-item { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-main); width:100%; }
+.feed-item { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-main); width:100%; flex-wrap:wrap; }
 .feed-item small { margin-left:auto; color:var(--text-dim); font-size:11px; }
+.feed-item strong { font-weight:700; }
+.feed-safe i { color:var(--status-active); }
 .feed-warning i { color:var(--accent-dark); }
+.feed-alert i { color:var(--alert); animation:alertBlink 1s ease-in-out infinite; }
 .feed-critical i { color:var(--alert); }
+@keyframes alertBlink { 0%,100%{opacity:1}50%{opacity:0.4} }
 
 /* Webcam detection overlay */
 .webcam-detect-badge { position:absolute; top:12px; right:120px; background:rgba(45,122,86,0.85); color:#fff; padding:6px 12px; border-radius:999px; font-size:11px; font-weight:600; z-index:5; display:flex; align-items:center; gap:6px; }
