@@ -199,8 +199,13 @@ class CameraModule:
         CRITICAL: This loop writes ONLY to self._raw_frame.
         It NEVER writes to self._processed_frame.
         This eliminates the race condition that caused bounding boxes to disappear.
+
+        WATCHDOG: Detects consecutive frame failures and auto-restarts camera.
         """
         _frame_count = 0
+        _consecutive_failures = 0
+        _max_failures = 30  # ~3 seconds of failures at 10ms/frame
+
         while self.running:
             try:
                 if getattr(self, '_use_picamera2', False):
@@ -211,6 +216,9 @@ class CameraModule:
                             self._raw_frame = frame
                             self.frame = frame
                         self._frame_ready.set()
+                        _consecutive_failures = 0
+                    else:
+                        _consecutive_failures += 1
                 else:
                     # Standard OpenCV capture
                     ret, frame = self.cap.read()
@@ -223,15 +231,54 @@ class CameraModule:
                             self._raw_frame = frame
                             self.frame = frame
                         self._frame_ready.set()
+                        _consecutive_failures = 0
+                    else:
+                        _consecutive_failures += 1
+
+                # =========================
+                # WATCHDOG: Auto-restart on sustained failure
+                # =========================
+                if _consecutive_failures >= _max_failures:
+                    print(f"[CAMERA WATCHDOG] {_consecutive_failures} consecutive failures — attempting restart...")
+                    _consecutive_failures = 0
+                    self._restart_capture()
 
             except Exception as e:
                 print("[CAMERA] Loop error:", e)
+                _consecutive_failures += 1
 
             _frame_count += 1
             # No sleep for first 10 frames to fill pipeline fast,
             # then 10ms (~100fps cap) to prevent CPU spin
             if _frame_count > 10:
                 time.sleep(0.01)
+
+    def _restart_capture(self):
+        """Watchdog restart: release and re-initialize camera capture."""
+        try:
+            if getattr(self, '_use_picamera2', False):
+                try:
+                    self._picamera2.stop()
+                except:
+                    pass
+                time.sleep(1)
+                self._picamera2.start()
+                print("[CAMERA WATCHDOG] picamera2 restarted")
+            elif self.cap is not None:
+                self.cap.release()
+                time.sleep(1)
+                # Re-open with same settings
+                self.cap = cv2.VideoCapture(self.camera_id)
+                if self.cap.isOpened():
+                    self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
+                    self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+                    self.cap.set(cv2.CAP_PROP_FPS, self.fps)
+                    self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                    print("[CAMERA WATCHDOG] OpenCV capture restarted")
+                else:
+                    print("[CAMERA WATCHDOG] Failed to reopen camera")
+        except Exception as e:
+            print(f"[CAMERA WATCHDOG] Restart failed: {e}")
 
     def get_frame(self):
         """

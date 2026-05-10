@@ -28,5 +28,8 @@ namespace WebApp.Models
         public ICollection<CameraDevice> Cameras { get; set; } = new List<CameraDevice>();
 
         public ICollection<RoomOccupancy> OccupancyLogs { get; set; } = new List<RoomOccupancy>();
+
+        // Room-based access control
+        public ICollection<PersonRoomAccess> PersonAccess { get; set; } = new List<PersonRoomAccess>();
     }
 }

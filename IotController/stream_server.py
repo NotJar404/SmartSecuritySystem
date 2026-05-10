@@ -93,11 +93,11 @@ class TestModeDetector:
         #                face_seen, face_check_count}
         self.tracked = {}
         self.next_id = 1
-        self.max_disappeared = 45   # ~4.5 sec @ 10fps (stable tracking)
+        self.max_disappeared = 60   # ~6 sec @ 10fps (stable tracking)
         self.max_match_distance = 150
 
         # Bbox smoothing factor (0=no smoothing, 1=frozen)
-        self.bbox_smooth = 0.6
+        self.bbox_smooth = 0.65
 
         # Detection intervals
         self.frame_count = 0

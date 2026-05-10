@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic; // ✅ ADD THIS
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -51,5 +51,8 @@ namespace WebApp.Models
 
         // 🔗 THIS IS THE CONNECTION TO access_logs
         public ICollection<AccessLog>? AccessLogs { get; set; }
+
+        // 🔗 Room-based access control
+        public ICollection<PersonRoomAccess> RoomAccess { get; set; } = new List<PersonRoomAccess>();
     }
 }

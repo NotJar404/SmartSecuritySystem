@@ -20,6 +20,35 @@ import numpy as np
 
 
 # =========================
+# TEXT SIZE CACHE (avoid repeated getTextSize calls)
+# =========================
+_text_size_cache = {}
+_TEXT_CACHE_MAX = 200
+
+
+def _cached_text_size(text, font, font_scale, thickness):
+    """Cache cv2.getTextSize results to avoid recomputation every frame."""
+    key = (text, font, round(font_scale, 2), thickness)
+    if key not in _text_size_cache:
+        if len(_text_size_cache) > _TEXT_CACHE_MAX:
+            _text_size_cache.clear()  # Simple eviction
+        _text_size_cache[key] = cv2.getTextSize(text, font, font_scale, thickness)[0]
+    return _text_size_cache[key]
+
+
+def _draw_confidence_bar(frame, x, y, w, confidence, color):
+    """Draw a small horizontal confidence bar below a label."""
+    bar_h = 3
+    bar_w = min(w, 80)
+    fill_w = int(bar_w * min(1.0, confidence))
+    # Background
+    cv2.rectangle(frame, (x, y + 2), (x + bar_w, y + 2 + bar_h), (60, 60, 60), -1)
+    # Fill
+    if fill_w > 0:
+        cv2.rectangle(frame, (x, y + 2), (x + fill_w, y + 2 + bar_h), color, -1)
+
+
+# =========================
 # RESOLUTION SCALING
 # =========================
 def _scale_factor(frame):
@@ -46,6 +75,8 @@ STATUS_COLORS = {
     'ALERT': (0, 0, 255),
     'LOITERING': (0, 165, 255),
     'MONITORING': (128, 128, 128),
+    'LOCKDOWN': (0, 0, 200),
+    'EMERGENCY': (0, 0, 255),
 }
 
 PERSON_COLORS = {
@@ -105,6 +136,7 @@ def draw_label(frame, text, x, y, bg_color, text_color=COLOR_WHITE, font_scale=N
     """
     Draw a label with background above a bounding box.
     Auto-scales based on frame resolution.
+    Uses cached text size computation for performance.
     
     Args:
         frame: OpenCV frame (modified in-place)
@@ -119,7 +151,7 @@ def draw_label(frame, text, x, y, bg_color, text_color=COLOR_WHITE, font_scale=N
         font_scale = 0.45 * sf
     thickness = max(1, int(1 * sf))
     font = cv2.FONT_HERSHEY_SIMPLEX
-    label_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
+    label_size = _cached_text_size(text, font, font_scale, thickness)
     
     # Ensure label doesn't go above frame
     label_y = max(label_size[1] + 10, y)
@@ -138,6 +170,7 @@ def draw_label(frame, text, x, y, bg_color, text_color=COLOR_WHITE, font_scale=N
         font, font_scale,
         text_color, thickness, cv2.LINE_AA
     )
+    return label_y  # Return for confidence bar positioning
 
 
 def render_person_boxes(frame, tracked_persons, max_disappeared_render=15):
@@ -196,11 +229,16 @@ def render_person_boxes(frame, tracked_persons, max_disappeared_render=15):
         # Corner accents (thick, YOLO-style — auto-scaled)
         draw_corner_accents(frame, sx, sy, sw, sh, color)
 
-        # Label: ID + status + face indicator + confidence (auto-scaled)
-        face_flag = "F" if face_seen else "?"
+        # Label: ID + status icon + confidence (cleaner format)
+        status_icon = {"authorized": "\u2713", "unauthorized": "\u2717", "unknown": "?"}.get(status, "?")
         conf_pct = int(confidence * 100) if confidence <= 1.0 else int(confidence)
-        label = f"ID:{track_id} [{status.upper()}] ({face_flag}) {conf_pct}%"
-        draw_label(frame, label, sx, sy, color)
+        label = f"ID:{track_id} [{status.upper()}] {status_icon} {conf_pct}%"
+        label_y = draw_label(frame, label, sx, sy, color)
+
+        # Confidence bar below label (lightweight — single rectangle fill)
+        conf_val = confidence if confidence <= 1.0 else confidence / 100.0
+        if label_y is not None:
+            _draw_confidence_bar(frame, sx, label_y, sw, conf_val, color)
 
         rendered += 1
 
@@ -328,6 +366,65 @@ def render_rec_indicator(frame, is_recording):
                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, COLOR_REC_RED, 2, cv2.LINE_AA)
 
 
+def render_lockdown_overlay(frame):
+    """
+    Render LOCKDOWN overlay — transparent blinking RED border + text.
+    Lightweight: uses addWeighted for transparency, no expensive effects.
+    """
+    h, w = frame.shape[:2]
+    sf = _scale_factor(frame)
+    border = max(4, int(6 * sf))
+
+    # Blinking red border (alternates every 0.5s)
+    if int(time.time() * 2) % 2 == 0:
+        overlay = frame.copy()
+        cv2.rectangle(overlay, (0, 0), (w, h), (0, 0, 200), border)
+        cv2.addWeighted(overlay, 0.6, frame, 0.4, 0, frame)
+
+    # LOCKDOWN text (center of frame)
+    text = "LOCKDOWN ACTIVE"
+    font_scale = 1.0 * sf
+    thickness = max(2, int(3 * sf))
+    text_size = _cached_text_size(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)
+    tx = (w - text_size[0]) // 2
+    ty = h // 2
+
+    # Background for text readability
+    cv2.rectangle(frame, (tx - 10, ty - text_size[1] - 10),
+                  (tx + text_size[0] + 10, ty + 10), (0, 0, 0), -1)
+    cv2.putText(frame, text, (tx, ty),
+                cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 255), thickness, cv2.LINE_AA)
+
+
+def render_emergency_overlay(frame):
+    """
+    Render EMERGENCY overlay — alternating RED/YELLOW border + text.
+    Lightweight: simple rectangle alternation.
+    """
+    h, w = frame.shape[:2]
+    sf = _scale_factor(frame)
+    border = max(4, int(6 * sf))
+
+    # Alternating red/yellow border
+    color = (0, 0, 255) if int(time.time() * 3) % 2 == 0 else (0, 200, 255)
+    overlay = frame.copy()
+    cv2.rectangle(overlay, (0, 0), (w, h), color, border)
+    cv2.addWeighted(overlay, 0.5, frame, 0.5, 0, frame)
+
+    # EMERGENCY text
+    text = "EMERGENCY"
+    font_scale = 1.2 * sf
+    thickness = max(2, int(3 * sf))
+    text_size = _cached_text_size(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)
+    tx = (w - text_size[0]) // 2
+    ty = h // 2
+
+    cv2.rectangle(frame, (tx - 10, ty - text_size[1] - 10),
+                  (tx + text_size[0] + 10, ty + 10), (0, 0, 0), -1)
+    cv2.putText(frame, text, (tx, ty),
+                cv2.FONT_HERSHEY_SIMPLEX, font_scale, color, thickness, cv2.LINE_AA)
+
+
 def render_full_frame(frame, state, occupancy, sessions=0,
                       tracked_persons=None, faces=None,
                       is_recording=False, armed=True,
@@ -362,7 +459,7 @@ def render_full_frame(frame, state, occupancy, sessions=0,
                extra_info=extra_info, armed=armed)
 
     # 2. Bounding boxes (state-dependent)
-    if state in ('INSIDE', 'LOITERING', 'ALERT', 'MONITORING'):
+    if state in ('INSIDE', 'LOITERING', 'ALERT', 'MONITORING', 'LOCKDOWN', 'EMERGENCY'):
         if tracked_persons:
             boxes_rendered = render_person_boxes(frame, tracked_persons)
     else:
@@ -371,8 +468,14 @@ def render_full_frame(frame, state, occupancy, sessions=0,
             state_color = STATUS_COLORS.get(state, (128, 128, 128))
             boxes_rendered = render_face_boxes(frame, faces, state_color, state)
 
-    # 3. REC indicator (ALERT state)
+    # 3. REC indicator (ALERT state or active recording)
     if state == 'ALERT' or is_recording:
         render_rec_indicator(frame, is_recording)
+
+    # 4. Lockdown / Emergency overlays (transparent, lightweight)
+    if state == 'LOCKDOWN':
+        render_lockdown_overlay(frame)
+    elif state == 'EMERGENCY':
+        render_emergency_overlay(frame)
 
     return frame, boxes_rendered

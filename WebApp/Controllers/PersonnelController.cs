@@ -13,6 +13,7 @@ using System.Linq;
 using System;
 using System.Security.Claims;
 using System.Collections.Generic;
+using Microsoft.EntityFrameworkCore;
 
 namespace SmartSecuritySystem.Controllers
 {
@@ -76,7 +77,8 @@ namespace SmartSecuritySystem.Controllers
                     SecurityLevel = m.SecurityLevel,
                     HasFaceData = !string.IsNullOrEmpty(m.FaceEmbedding),
                     CreatedAt = m.CreatedAt,
-                    LastAccess = null // 🔥 can be upgraded later from access_logs
+                    LastAccess = null,
+                    RoomCount = _context.PersonRoomAccess.Count(pra => pra.PersonId == m.PersonId)
                 }).ToList()
             };
         }
@@ -157,6 +159,11 @@ namespace SmartSecuritySystem.Controllers
 
             _context.AuthorizedPersonnel.Add(member);
             _context.SaveChanges();
+
+            // ⚠️ WARN: No room assignments = fail-secure = denied everywhere
+            TempData["Warning"] = $"\"{name}\" has been registered but has NO room access assigned. " +
+                                  $"They will be DENIED at all doors until you assign rooms. " +
+                                  $"Click the 🚪 door icon to assign room access.";
         }
 
         // =====================================================

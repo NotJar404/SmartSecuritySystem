@@ -92,6 +92,115 @@ namespace WebApp.Controllers
         }
 
         // =========================
+        // RFID UID LOOKUP (for Python edge controller)
+        // Returns whether a scanned RFID UID belongs to a registered person
+        // + ROOM-BASED ACCESS CONTROL (fail-secure)
+        // =========================
+        [HttpGet]
+        [AllowAnonymous]
+        [Route("/api/access/rfid")]
+        public IActionResult RfidLookup([FromQuery] string uid, [FromQuery] int? roomId)
+        {
+            if (string.IsNullOrEmpty(uid))
+                return BadRequest(new { error = "UID is required" });
+
+            var person = _context.AuthorizedPersonnel
+                .FirstOrDefault(p => p.RfidTag == uid);
+
+            if (person == null)
+                return Ok(new { found = false, uid, roomAllowed = false });
+
+            // ROOM-BASED ACCESS CHECK (fail-secure: deny if no mapping exists)
+            bool roomAllowed = false;
+            string roomName = "Unknown";
+
+            if (roomId.HasValue)
+            {
+                var roomAccess = _context.PersonRoomAccess
+                    .Include(pra => pra.Room)
+                    .FirstOrDefault(pra => pra.PersonId == person.PersonId && pra.RoomId == roomId.Value);
+
+                if (roomAccess != null && roomAccess.AccessLevel == "allowed")
+                {
+                    roomAllowed = true;
+                    roomName = roomAccess.Room?.RoomName ?? "Unknown";
+                }
+                else
+                {
+                    // Get room name for logging even on deny
+                    var room = _context.Rooms.FirstOrDefault(r => r.RoomId == roomId.Value);
+                    roomName = room?.RoomName ?? "Unknown";
+                }
+            }
+            else
+            {
+                // No roomId sent — legacy behavior, but still fail-secure
+                roomAllowed = false;
+            }
+
+            return Ok(new
+            {
+                found = true,
+                uid,
+                personId = person.PersonId,
+                fullName = person.FullName,
+                department = person.Department,
+                roomAllowed,
+                roomName,
+                roomId = roomId ?? 0
+            });
+        }
+
+        // =========================
+        // REALTIME AJAX: Get Latest Logs (for polling from Access.cshtml)
+        // =========================
+        [HttpGet]
+        public IActionResult GetLatestLogs(int count = 50)
+        {
+            var logs = _context.AccessLogs
+                .Include(x => x.Person)
+                .Include(x => x.RoomEntity)
+                .OrderByDescending(x => x.Timestamp)
+                .Take(count)
+                .ToList();
+
+            var activeSessions = _context.OccupancySessions
+                .Where(s => s.ExitTime == null)
+                .ToList();
+
+            var activePersonIds = activeSessions
+                .Where(s => s.PersonId.HasValue)
+                .Select(s => s.PersonId!.Value)
+                .ToList();
+
+            var result = logs.Select(log => new
+            {
+                fullName = log.Person?.FullName ?? "Unknown User",
+                personnelId = log.PersonId?.ToString() ?? "N/A",
+                department = log.Person?.Department ?? "-",
+                email = log.Person?.Email ?? "-",
+                phone = log.Person?.Phone ?? "-",
+                room = log.RoomEntity?.RoomName ?? "Unknown Room",
+                location = "Unknown Location",
+                imageUrl = "/images/default-user.png",
+                time = log.Timestamp.ToString("hh:mm tt"),
+                videoPath = log.VideoPath ?? "",
+                hasVideo = !string.IsNullOrEmpty(log.VideoPath),
+                riskLevel = log.ComputedRiskLevel,
+                rfidValid = log.RfidValid,
+                faceVerified = log.FaceVerified,
+                personId = log.PersonId ?? 0
+            });
+
+            return Json(new
+            {
+                logs = result,
+                activeSessionCount = activeSessions.Count,
+                activePersonIds
+            });
+        }
+
+        // =========================
         // RISK ENGINE (SESSION-AWARE)
         // =========================
         private string EvaluateRisk(AccessLog log)
@@ -219,6 +328,16 @@ namespace WebApp.Controllers
                 Timestamp = DateTime.UtcNow
             });
 
+            // Also create a CRITICAL alert for the lockdown
+            _context.Alerts.Add(new Alert
+            {
+                Type = AlertType.Intrusion,
+                Description = $"Room lockdown triggered: {req.Room}",
+                Severity = SeverityLevel.CRITICAL,
+                Status = AlertStatus.New,
+                Timestamp = DateTime.UtcNow
+            });
+
             _context.SaveChanges();
             return Ok(new { message = "Lockdown triggered" });
         }
@@ -303,6 +422,91 @@ namespace WebApp.Controllers
 
             return Json(result);
         }
+
+        // =========================
+        // ROOM ACCESS MANAGEMENT API
+        // =========================
+
+        /// <summary>Get rooms assigned to a specific person</summary>
+        [HttpGet]
+        [Route("/api/access/room-list")]
+        public async Task<IActionResult> GetRoomAccess([FromQuery] int personId)
+        {
+            var access = await _context.PersonRoomAccess
+                .Where(pra => pra.PersonId == personId)
+                .Include(pra => pra.Room)
+                .Select(pra => new
+                {
+                    pra.AccessId,
+                    pra.RoomId,
+                    roomName = pra.Room!.RoomName,
+                    pra.AccessLevel,
+                    createdAt = pra.CreatedAt.ToString("MMM dd, yyyy")
+                })
+                .ToListAsync();
+
+            return Json(access);
+        }
+
+        /// <summary>Assign a person to a room</summary>
+        [HttpPost]
+        [Route("/api/access/room-assign")]
+        public async Task<IActionResult> AssignRoom([FromBody] RoomAssignRequest req)
+        {
+            if (req.PersonId <= 0 || req.RoomId <= 0)
+                return BadRequest(new { success = false, message = "Invalid person or room ID" });
+
+            // Check if already assigned
+            var existing = await _context.PersonRoomAccess
+                .FirstOrDefaultAsync(pra => pra.PersonId == req.PersonId && pra.RoomId == req.RoomId);
+
+            if (existing != null)
+                return Ok(new { success = false, message = "Already assigned to this room" });
+
+            var entry = new PersonRoomAccess
+            {
+                PersonId = req.PersonId,
+                RoomId = req.RoomId,
+                AccessLevel = "allowed",
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.PersonRoomAccess.Add(entry);
+            await _context.SaveChangesAsync();
+
+            var room = await _context.Rooms.FindAsync(req.RoomId);
+            return Ok(new { success = true, message = $"Assigned to {room?.RoomName ?? "room"}" });
+        }
+
+        /// <summary>Revoke a person's access to a room</summary>
+        [HttpPost]
+        [Route("/api/access/room-revoke")]
+        public async Task<IActionResult> RevokeRoom([FromBody] RoomAssignRequest req)
+        {
+            var entry = await _context.PersonRoomAccess
+                .FirstOrDefaultAsync(pra => pra.PersonId == req.PersonId && pra.RoomId == req.RoomId);
+
+            if (entry == null)
+                return Ok(new { success = false, message = "No access record found" });
+
+            _context.PersonRoomAccess.Remove(entry);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { success = true, message = "Access revoked" });
+        }
+
+        /// <summary>Get all rooms for dropdown selection</summary>
+        [HttpGet]
+        [Route("/api/access/rooms")]
+        public async Task<IActionResult> GetAllRooms()
+        {
+            var rooms = await _context.Rooms
+                .Select(r => new { r.RoomId, r.RoomName })
+                .OrderBy(r => r.RoomName)
+                .ToListAsync();
+
+            return Json(rooms);
+        }
     }
 
     // =========================
@@ -316,6 +520,13 @@ namespace WebApp.Controllers
 
     public class LockdownRequest
     {
-        public string Room { get; set; }
+        public string Room { get; set; } = string.Empty;
+        public string Reason { get; set; } = string.Empty;
+    }
+
+    public class RoomAssignRequest
+    {
+        public int PersonId { get; set; }
+        public int RoomId { get; set; }
     }
 }

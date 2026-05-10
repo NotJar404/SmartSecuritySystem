@@ -178,9 +178,9 @@ namespace WebApp.Controllers
                 .Take(10)
                 .ToListAsync();
 
-            auditLogs.AddRange(recentAlerts.Select(a => new AuditLogViewModel { Action = a.Type.ToString(), Description = $"Severity: {a.Severity} | {a.Status}", Timestamp = a.Timestamp }));
-            auditLogs.AddRange(recentDetections.Select(d => new AuditLogViewModel { Action = "Detection", Description = $"Detected: {d.DetectedCount} at {d.Confidence}%", Timestamp = d.Timestamp }));
-            auditLogs.AddRange(recentAccess.Select(a => new AuditLogViewModel { Action = a.AccessResult == "granted" ? "Access Granted" : "Access Denied", Description = $"RFID/Face check via Local Device", Timestamp = a.Timestamp }));
+            auditLogs.AddRange(recentAlerts.Select(a => new AuditLogViewModel { Action = a.Type.ToString(), Description = $"Severity: {a.Severity} | {a.Status}", User = "System", Timestamp = a.Timestamp }));
+            auditLogs.AddRange(recentDetections.Select(d => new AuditLogViewModel { Action = "Detection", Description = $"Detected: {d.DetectedCount} at {d.Confidence}%", User = "AI Engine", Timestamp = d.Timestamp }));
+            auditLogs.AddRange(recentAccess.Select(a => new AuditLogViewModel { Action = a.AccessResult == "granted" ? "Access Granted" : "Access Denied", Description = $"RFID/Face check via Local Device", User = "Access Control", Timestamp = a.Timestamp }));
 
             // Add Admin-only logs
             if (isAdmin)
@@ -191,7 +191,7 @@ namespace WebApp.Controllers
                     .Take(10)
                     .ToListAsync();
                     
-                auditLogs.AddRange(recentLogins.Select(u => new AuditLogViewModel { Action = "User Login", Description = $"{u.Username} signed in securely", Timestamp = u.LastLogin ?? DateTime.UtcNow }));
+                auditLogs.AddRange(recentLogins.Select(u => new AuditLogViewModel { Action = "User Login", Description = $"{u.Username} signed in securely", User = u.Username, Timestamp = u.LastLogin ?? DateTime.UtcNow }));
             }
 
             // Final sort and take top 15
@@ -487,8 +487,40 @@ namespace WebApp.Controllers
         private static SystemStatus systemStatus = new SystemStatus();
 
         [Authorize(Roles = "Admin")]
-        public IActionResult System()
+        public async Task<IActionResult> System()
         {
+            // =========================
+            // AUTO-SEED: Ensure the 4 alarm protocols exist
+            // =========================
+            if (!await _context.AlarmSettings.AnyAsync())
+            {
+                _context.AlarmSettings.AddRange(
+                    new AlarmSetting { Name = "Intruder Alert", Type = "Intrusion", IsEnabled = true },
+                    new AlarmSetting { Name = "Fire Protocol", Type = "Fire", IsEnabled = true },
+                    new AlarmSetting { Name = "Earthquake Mode", Type = "Earthquake", IsEnabled = true },
+                    new AlarmSetting { Name = "Medical Emergency", Type = "ForcedEntry", IsEnabled = true }
+                );
+                await _context.SaveChangesAsync();
+            }
+
+            var settings = await _context.AlarmSettings
+                .OrderBy(s => s.SettingId)
+                .ToListAsync();
+
+            ViewBag.Alarms = settings;
+
+            // Pass system config so toggles render with real state
+            ViewBag.Config = new {
+                ArmSystem = true,
+                AutoMaintenance = true,
+                MotionSensitivity = 2,
+                FaceAccuracy = 80,
+                EmailReports = true,
+                HardwareSiren = true,
+                GateHoldOpen = 5,
+                BiometricLock = true
+            };
+
             return View(systemStatus);
         }
 

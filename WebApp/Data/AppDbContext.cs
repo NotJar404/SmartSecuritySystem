@@ -27,6 +27,7 @@ namespace WebApp.Data
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<OccupancySession> OccupancySessions { get; set; }
         public DbSet<Recording> Recordings { get; set; }
+        public DbSet<PersonRoomAccess> PersonRoomAccess { get; set; }
 
         // =========================
         // CONFIGURATION
@@ -184,6 +185,28 @@ namespace WebApp.Data
                 .HasOne(r => r.Camera)
                 .WithMany()
                 .HasForeignKey(r => r.CameraId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // =========================
+            // PERSON ROOM ACCESS (ROOM-BASED ACCESS CONTROL)
+            // =========================
+            modelBuilder.Entity<PersonRoomAccess>()
+                .ToTable("person_room_access");
+
+            modelBuilder.Entity<PersonRoomAccess>()
+                .HasIndex(pra => new { pra.PersonId, pra.RoomId })
+                .IsUnique();
+
+            modelBuilder.Entity<PersonRoomAccess>()
+                .HasOne(pra => pra.Person)
+                .WithMany(p => p.RoomAccess)
+                .HasForeignKey(pra => pra.PersonId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<PersonRoomAccess>()
+                .HasOne(pra => pra.Room)
+                .WithMany(r => r.PersonAccess)
+                .HasForeignKey(pra => pra.RoomId)
                 .OnDelete(DeleteBehavior.Cascade);
         }
 

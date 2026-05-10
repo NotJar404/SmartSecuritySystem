@@ -274,20 +274,30 @@ function initializeVideoElements(selector = '.grid-preview, .cctv-video') {
     const videos = document.querySelectorAll(selector);
     console.log(`[StreamLoader] Initializing ${videos.length} video elements`);
 
-    videos.forEach((video) => {
-        const url = video.getAttribute('data-src');
-        loadVideoStream(video, url, {
-            // IMPORTANT: Card previews must NOT grab the webcam via getUserMedia.
-            // If they do, main.py's OpenCV can't access the webcam → black stream in focus view.
-            // Cards show camera icon placeholder if MJPEG isn't available.
-            fallbackToWebcam: false,
-            onSuccess: (info) => {
-                console.log('[StreamLoader] Video loaded:', info);
-            },
-            onError: (error) => {
-                console.log('[StreamLoader] Card preview not available (normal if main.py not running)');
-            }
+    if (videos.length === 0) return;
+
+    // =================================================================
+    // CARD PREVIEWS: Show raw webcam feed (no overlays).
+    // All cards share ONE getUserMedia stream (efficient — single webcam access).
+    // When user clicks a card → selectCamera() → stopAllWebcamStreams()
+    // releases this stream before opening the focus view.
+    // =================================================================
+    navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 640 }, height: { ideal: 360 }, facingMode: 'user' },
+        audio: false
+    })
+    .then(stream => {
+        webcamStream = stream;
+        videos.forEach(vid => {
+            vid.srcObject = stream;
+            vid.play().catch(() => {});
+            activeWebcamVideos.add(vid);
         });
+        console.log(`[StreamLoader] Webcam feed loaded into ${videos.length} card previews`);
+    })
+    .catch(err => {
+        console.log('[StreamLoader] Webcam not available for card previews:', err.message);
+        // Cards will show the camera icon placeholder (already in HTML)
     });
 }
 

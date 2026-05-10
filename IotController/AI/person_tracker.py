@@ -89,7 +89,7 @@ class CentroidTracker:
     """
 
     # Tuning parameters
-    BBOX_SMOOTH = 0.55          # EMA factor: higher = smoother (more lag)
+    BBOX_SMOOTH = 0.65          # EMA factor: higher = smoother (more lag)
     VELOCITY_SMOOTH = 0.4       # Velocity averaging factor
     ACCEL_SMOOTH = 0.3          # Acceleration averaging factor
     IOU_THRESHOLD = 0.15        # Minimum IoU to consider a match
@@ -97,7 +97,7 @@ class CentroidTracker:
     PREDICTION_FRAMES = 15      # How many frames to predict position after disappearance
     HISTOGRAM_WEIGHT = 0.2      # Weight of appearance similarity in matching
 
-    def __init__(self, max_disappeared=50, max_distance=100):
+    def __init__(self, max_disappeared=60, max_distance=100):
         """
         Args:
             max_disappeared: Frames before a lost person is deregistered.

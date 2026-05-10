@@ -361,7 +361,141 @@ namespace WebApp.Controllers
 
             return Json(new { active = false });
         }
+
+        // =========================
+        // LOCKDOWN STATE MANAGEMENT
+        // =========================
+        private static bool _lockdownActive = false;
+        private static string _lockdownReason = "";
+        private static DateTime? _lockdownTimestamp = null;
+        private static readonly object _lockdownLock = new object();
+
+        [HttpPost]
+        [Route("/api/system/lockdown")]
+        public IActionResult ActivateLockdown([FromBody] LockdownRequest? request)
+        {
+            lock (_lockdownLock)
+            {
+                if (_lockdownActive)
+                    return Ok(new { success = true, duplicate = true, message = "Lockdown already active." });
+
+                _lockdownActive = true;
+                _lockdownReason = request?.Reason ?? "Manual lockdown activated";
+                _lockdownTimestamp = System.DateTime.UtcNow;
+            }
+
+            // Create alert
+            _context.Alerts.Add(new Alert
+            {
+                Type = AlertType.Intrusion,
+                Description = $"LOCKDOWN: {_lockdownReason}",
+                Severity = SeverityLevel.CRITICAL,
+                Status = AlertStatus.New,
+                Timestamp = System.DateTime.UtcNow
+            });
+
+            _context.Notifications.Add(new Notification
+            {
+                TargetRole = "Security",
+                Message = $"🔒 LOCKDOWN ACTIVATED: {_lockdownReason}",
+                IsRead = false,
+                Timestamp = System.DateTime.UtcNow
+            });
+
+            _context.SaveChanges();
+
+            return Ok(new { success = true, message = "Lockdown activated." });
+        }
+
+        [HttpPost]
+        [Route("/api/system/lockdown/resolve")]
+        public IActionResult ResolveLockdown()
+        {
+            lock (_lockdownLock)
+            {
+                _lockdownActive = false;
+                _lockdownReason = "";
+                _lockdownTimestamp = null;
+            }
+
+            _context.Notifications.Add(new Notification
+            {
+                TargetRole = "Security",
+                Message = "🔓 Lockdown resolved by administrator.",
+                IsRead = false,
+                Timestamp = System.DateTime.UtcNow
+            });
+            _context.SaveChanges();
+
+            return Ok(new { success = true, message = "Lockdown resolved." });
+        }
+
+        [HttpGet]
+        [AllowAnonymous]
+        [Route("/api/system/lockdown")]
+        public IActionResult GetLockdownStatus()
+        {
+            lock (_lockdownLock)
+            {
+                return Json(new
+                {
+                    active = _lockdownActive,
+                    reason = _lockdownReason,
+                    timestamp = _lockdownTimestamp?.ToString("o")
+                });
+            }
+        }
+
+        // =========================
+        // UNIFIED SYSTEM STATUS (for frontend polling)
+        // Returns lockdown, alarm, Pi status in one call
+        // =========================
+        [HttpGet]
+        [AllowAnonymous]
+        [Route("/api/system/status")]
+        public IActionResult GetSystemStatus()
+        {
+            bool lockdown;
+            string lockdownReason;
+            lock (_lockdownLock)
+            {
+                lockdown = _lockdownActive;
+                lockdownReason = _lockdownReason;
+            }
+
+            bool alarmActive = false;
+            string alarmType = "";
+            lock (_alarmLock)
+            {
+                if (_activeAlarm != null)
+                {
+                    alarmActive = true;
+                    alarmType = _activeAlarm.Type;
+                }
+            }
+
+            bool armed;
+            lock (_configLock)
+            {
+                armed = _systemConfig.ArmSystem;
+            }
+
+            var activeAlertCount = _context.Alerts
+                .Count(a => a.Status == AlertStatus.New || a.Status == AlertStatus.Acknowledged);
+
+            return Json(new
+            {
+                armed,
+                lockdown,
+                lockdownReason,
+                alarmActive,
+                alarmType,
+                activeAlertCount
+            });
+        }
     }
+
+    // LockdownRequest is defined in AccessController.cs
 
     // =========================
     // REQUEST MODELS

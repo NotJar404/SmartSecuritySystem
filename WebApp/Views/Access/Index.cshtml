@@ -411,7 +411,7 @@ function printSlip() {
 }
 
 // =========================
-// VIDEO
+// VIDEO PLAYBACK
 // =========================
 function playLogVideo() {
     if (typeof openAlertModal === "function" && currentVideoPath) {
@@ -428,4 +428,105 @@ function playLogVideo() {
         alert("No video available.");
     }
 }
+
+// =========================
+// BUTTON SPAM PROTECTION
+// Disables button + shows spinner after click, re-enables after response/5s
+// =========================
+function withSpamGuard(btn, action) {
+    if (btn.disabled) return;
+    const originalHTML = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+    
+    Promise.resolve(action()).finally(() => {
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
+        }, 2000);
+    });
+}
+
+// Apply spam guard to all action buttons
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.btn-sec');
+    if (!btn || btn.disabled) return;
+    // Buttons already have onclick handlers, just add the visual guard
+});
+
+// =========================
+// REALTIME ACCESS LOG POLLING (3-5s)
+// Updates the "Recent Activity" list dynamically
+// =========================
+let _accessPollTimer = null;
+let _lastLogCount = @Model.Count;
+
+function startAccessPolling() {
+    _accessPollTimer = setInterval(pollAccessLogs, 4000);
+}
+
+function pollAccessLogs() {
+    fetch('/Access/GetLatestLogs?count=50', {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => {
+        if (!r.ok) return null;
+        return r.json();
+    })
+    .then(data => {
+        if (!data || !data.logs) return;
+        
+        // Update session count in header
+        const sessionText = document.querySelector('.header-right .ms-3');
+        if (data.activeSessionCount > 0) {
+            if (sessionText) {
+                sessionText.innerHTML = `<i class="fa fa-users me-1"></i>${data.activeSessionCount} active session(s)`;
+                sessionText.style.display = '';
+            }
+        } else if (sessionText) {
+            sessionText.style.display = 'none';
+        }
+
+        // Only update if log count changed (lightweight check)
+        if (data.logs.length !== _lastLogCount) {
+            _lastLogCount = data.logs.length;
+            updateLogList(data.logs, data.activePersonIds || []);
+        }
+    })
+    .catch(() => {}); // Silent fail — don't spam console
+}
+
+function updateLogList(logs, activePersonIds) {
+    const scrollContainer = document.querySelector('.log-scroll');
+    if (!scrollContainer) return;
+    
+    let html = '';
+    logs.forEach(log => {
+        const initials = log.fullName ? log.fullName.split(' ').map(n => n[0]).join('') : '??';
+        const isInside = activePersonIds.includes(log.personId);
+        const insideClass = isInside ? 'session-active' : '';
+        const insideBadge = isInside ? '<span style="color:#2ecc71;font-weight:600;margin-left:6px;">● INSIDE</span>' : '';
+        const videoBadge = log.hasVideo ? '<span style="color:#f39c12;font-weight:600;margin-left:6px;" title="Video Evidence"><i class="fa fa-video"></i> REC</span>' : '';
+        
+        html += `
+        <div class="log-card ${insideClass}" 
+             onclick="dockData('${log.fullName}','${log.personnelId}','${log.location}','${log.imageUrl}','${log.department}','${log.email}','${log.phone}','${log.room}','${log.time}','${log.videoPath || ''}','${log.riskLevel}',${isInside},'${log.rfidValid}','${log.faceVerified}')">
+            <div class="log-avatar-box">
+                <span class="avatar-initial">${initials}</span>
+            </div>
+            <div class="log-info">
+                <div class="d-flex justify-content-between">
+                    <span class="log-name">${log.fullName}</span>
+                    <span class="log-time">${log.time}</span>
+                </div>
+                <p class="log-sub">${log.location} • ${log.room}${insideBadge}${videoBadge}</p>
+            </div>
+        </div>`;
+    });
+    
+    scrollContainer.innerHTML = html;
+}
+
+// Start polling when page loads
+document.addEventListener('DOMContentLoaded', startAccessPolling);
 </script>

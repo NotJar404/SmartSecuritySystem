@@ -6,8 +6,9 @@ import os
 import cv2
 import numpy as np
 import json
+import queue
 from datetime import datetime, timedelta
-from collections import defaultdict
+from collections import defaultdict, deque
 from flask import Flask, Response
 
 from Sensors.camera_module import CameraModule
@@ -30,6 +31,8 @@ STATE_ACCESS = "ACCESS"
 STATE_INSIDE = "INSIDE"
 STATE_ALERT = "ALERT"
 STATE_LOITERING = "LOITERING"
+STATE_LOCKDOWN = "LOCKDOWN"
+STATE_EMERGENCY = "EMERGENCY"
 
 
 class SmartSecuritySystem:
@@ -246,7 +249,7 @@ class SmartSecuritySystem:
         self.exit_inference_timeout = 1800  # 30 minutes no activity = soft exit
 
         # =========================
-        # RECORDING SYSTEM
+        # RECORDING SYSTEM (MP4/H.264 + pre-buffer + async writer)
         # =========================
         self._is_recording = False
         self._recording_writer = None
@@ -255,7 +258,42 @@ class SmartSecuritySystem:
         self._recording_alert_id = None
         self._recording_timeout = 60  # seconds max per recording
         self._recording_dir = "recordings"
+        self._recording_post_buffer = 5  # seconds after event ends
+        self._recording_post_deadline = None  # when to stop post-buffer
         os.makedirs(self._recording_dir, exist_ok=True)
+
+        # Circular frame buffer for pre-buffer recording (3-5 seconds)
+        self._frame_buffer_seconds = 3
+        self._frame_buffer_fps = 15
+        self._frame_buffer = deque(maxlen=self._frame_buffer_seconds * self._frame_buffer_fps)
+
+        # Async recording writer queue (non-blocking frame writes)
+        self._recording_queue = queue.Queue(maxsize=300)
+        self._recording_writer_thread = None
+
+        # Recording cleanup config
+        self._recording_max_age_days = 7        # Normal recordings
+        self._recording_critical_age_days = 30  # Critical alert recordings
+
+        # =========================
+        # PIR INTELLIGENCE (CPU optimization)
+        # =========================
+        self._pir_idle_skip_threshold = 30   # seconds of PIR inactivity before reducing FPS
+        self._pir_reduced_fps_sleep = 0.2    # 5 FPS during PIR-idle mode
+        self._pir_idle_mode = False           # Current PIR-idle state
+
+        # =========================
+        # UNKNOWN RFID ESCALATION TRACKER
+        # =========================
+        self._unknown_rfid_tracker = {}  # {uid: {count, last_tap, first_tap, locked_out_until}}
+        self._unknown_rfid_cooldown = 3  # seconds between same UID taps
+        self._unknown_rfid_lockout = 300  # 5 min lockout after alarm
+
+        # =========================
+        # PER-UID RFID COOLDOWN (anti-spam)
+        # =========================
+        self._rfid_per_uid_cooldown = {}  # {uid: last_tap_time}
+        self._rfid_per_uid_cooldown_sec = 3  # seconds
 
         # =========================
         # FACE BUFFER (existing behavior preserved)
@@ -369,6 +407,10 @@ class SmartSecuritySystem:
                     self.rgb_led.status_alert()
                 elif new_state == STATE_LOITERING:
                     self.rgb_led.status_loitering()
+                elif new_state == STATE_LOCKDOWN:
+                    self.rgb_led.status_alert()  # Red blinking
+                elif new_state == STATE_EMERGENCY:
+                    self.rgb_led.status_alert()  # Red blinking
 
     def get_state(self):
         with self.state_lock:
@@ -425,6 +467,12 @@ class SmartSecuritySystem:
                     self._first_frame_logged = True
 
                 # =========================
+                # POPULATE FRAME BUFFER (for pre-buffer recording)
+                # O(1) deque append — zero CPU impact
+                # =========================
+                self._frame_buffer.append(frame.copy())
+
+                # =========================
                 # MASTER ARM CHECK — skip detection if disarmed
                 # Still streams video but no AI processing
                 # =========================
@@ -435,6 +483,28 @@ class SmartSecuritySystem:
                     self.camera.set_processed_frame(frame)
                     time.sleep(0.1)
                     continue
+
+                # =========================
+                # PIR-ASSISTED INFERENCE SKIPPING (CPU optimization)
+                # In IDLE with no PIR motion for 30+s: reduce to ~5 FPS
+                # Instant wake when PIR detects motion
+                # =========================
+                current_state_check = self.get_state()
+                if current_state_check == STATE_IDLE and not self.pir_sensor.is_motion_detected():
+                    if self.pir_sensor.get_inactivity_duration() > self._pir_idle_skip_threshold:
+                        if not self._pir_idle_mode:
+                            self._pir_idle_mode = True
+                            print("[PIR] Idle mode — reducing inference to ~5 FPS")
+                        # Still render HUD but skip heavy detection
+                        frame, _ = render_full_frame(
+                            frame, state='IDLE', occupancy=0, armed=self._master_armed
+                        )
+                        self.camera.set_processed_frame(frame)
+                        time.sleep(self._pir_reduced_fps_sleep)
+                        continue
+                elif self._pir_idle_mode:
+                    self._pir_idle_mode = False
+                    print("[PIR] Motion detected — resuming full inference")
 
                 # =========================
                 # DUAL-MODE DETECTION
@@ -794,13 +864,12 @@ class SmartSecuritySystem:
         - Auto-clear after timeout if no presence
         - DO NOT block main loop (overlays must render in real-time)
         """
-        # Write to recording ASYNCHRONOUSLY to prevent blocking overlay rendering
-        if self._is_recording and self._recording_writer is not None:
-            # Non-blocking frame write to prevent main loop lag
+        # Write to recording via async queue (non-blocking)
+        if self._is_recording:
             try:
-                self._recording_writer.write(frame.copy())
-            except Exception as e:
-                print(f"[RECORDING] Write error: {e}")
+                self._recording_queue.put_nowait(frame.copy())
+            except queue.Full:
+                pass  # Drop frame rather than block main loop
 
             # Check recording timeout
             if (now - self._recording_start_time) > self._recording_timeout:
@@ -961,40 +1030,108 @@ class SmartSecuritySystem:
         elif detection_state == "no_face":
             self.push_detection("no_face", 0, 0.0)
 
-    # =========================
-    # RFID EVENT (FSM: IDLE â†’ ACCESS â†’ INSIDE)
-    # =========================
     def on_rfid_tapped(self, user_id):
         """
         RFID tap handler with full FSM integration.
 
         Flow:
-        1. Cooldown check (prevent double-swipe)
-        2. Already-inside check (prevent duplicate session)
-        3. Face verification with confidence threshold
-        4. Session creation + state transition
+        1. Per-UID cooldown check (3s anti-spam)
+        2. Global cooldown check (prevent double-swipe)
+        3. Unknown RFID escalation (graduated response)
+        4. Already-inside check (prevent duplicate session)
+        5. Face verification with confidence threshold
+        6. Session creation + state transition
         """
         now = time.time()
+        uid_str = str(user_id)
 
         # =========================
-        # RFID COOLDOWN (prevent double-swipe spam)
+        # PER-UID RFID COOLDOWN (3s anti-spam)
+        # Same card tapped rapidly = ignore completely
+        # =========================
+        last_uid_tap = self._rfid_per_uid_cooldown.get(uid_str, 0)
+        if (now - last_uid_tap) < self._rfid_per_uid_cooldown_sec:
+            return  # Silent ignore
+        self._rfid_per_uid_cooldown[uid_str] = now
+
+        # =========================
+        # GLOBAL RFID COOLDOWN (prevent double-swipe spam)
         # =========================
         if self.last_rfid_time and (now - self.last_rfid_time) < self.rfid_cooldown:
-            print(f"[RFID] Cooldown active â€” ignoring tap for {user_id}")
+            print(f"[RFID] Cooldown active - ignoring tap for {user_id}")
             return
 
         self.last_rfid_time = now
+
+        # Short buzzer feedback on every RFID tap
+        self.buzzer.beep(duration=0.1)
+
+        # =========================
+        # UNKNOWN RFID CHECK + ROOM ACCESS CHECK
+        # Query backend to see if UID is registered AND allowed in this room
+        # =========================
+        room_allowed = False
+        try:
+            resp = requests.get(
+                f"{self.base_url}/api/access/rfid?uid={uid_str}&roomId={self.room_id}",
+                timeout=2
+            )
+            data = resp.json() if resp.status_code == 200 else {}
+
+            if resp.status_code == 404 or not data.get("found", False):
+                self._handle_unknown_rfid(uid_str, now)
+                return
+
+            # ROOM-BASED ACCESS CHECK (fail-secure)
+            room_allowed = data.get("roomAllowed", False)
+            room_name = data.get("roomName", "Unknown")
+
+            if not room_allowed:
+                print(f"[ACCESS] DENIED — {data.get('fullName', uid_str)} not authorized for {room_name}")
+                # Yellow LED flash to indicate room denial
+                self.hardware.show_rfid_verifying()
+                time.sleep(0.3)
+                self.buzzer.beep(duration=0.3)
+                time.sleep(0.2)
+                self.buzzer.beep(duration=0.3)
+                self.hardware.all_leds_off()
+
+                # Log denied access
+                try:
+                    requests.post(
+                        f"{self.base_url}/api/access/log",
+                        json={
+                            "rfid_uid": uid_str,
+                            "person_id": data.get("personId"),
+                            "room_id": self.room_id,
+                            "access_result": "denied",
+                            "rfid_valid": True,
+                            "face_verified": False,
+                            "description": f"Room access denied: not assigned to {room_name}"
+                        },
+                        timeout=2
+                    )
+                except Exception:
+                    pass
+
+                self.set_state(STATE_IDLE)
+                return
+
+        except requests.exceptions.ConnectionError:
+            pass  # Backend offline - proceed with local logic
+        except Exception as e:
+            print(f"[RFID] Backend lookup failed: {e}")
 
         # =========================
         # ALREADY INSIDE CHECK (per-person session tracking)
         # =========================
         with self.session_lock:
-            if str(user_id) in self.active_sessions:
-                print(f"[FSM] User {user_id} already inside â€” ignoring RFID re-tap")
+            if uid_str in self.active_sessions:
+                print(f"[FSM] User {user_id} already inside - ignoring RFID re-tap")
                 return
 
         # =========================
-        # TRANSITION: â†’ ACCESS MODE
+        # TRANSITION: -> ACCESS MODE
         # =========================
         self.set_state(STATE_ACCESS)
 
@@ -1551,30 +1688,128 @@ class SmartSecuritySystem:
         print(f"[ACCESS GRANTED] Door unlocked for {self._gate_hold_open}s")
 
     # =========================
-    # RECORDING SYSTEM
+    # UNKNOWN RFID ESCALATION HANDLER
     # =========================
+    def _handle_unknown_rfid(self, uid, now):
+        """
+        Graduated response for unknown RFID cards:
+        1st tap: capture face, deny, log
+        2nd tap: update face, deny
+        3rd tap: mark suspicious, notify admin
+        5th tap: trigger alarm, buzzer, RED LED, lockout
+        """
+        tracker = self._unknown_rfid_tracker.get(uid)
+
+        # Check lockout
+        if tracker and tracker.get("locked_out_until", 0) > now:
+            print(f"[RFID] Unknown UID {uid} locked out for {tracker['locked_out_until'] - now:.0f}s")
+            return
+
+        # Initialize or update tracker
+        if tracker is None:
+            tracker = {"count": 0, "first_tap": now, "last_tap": now, "locked_out_until": 0}
+            self._unknown_rfid_tracker[uid] = tracker
+
+        tracker["count"] += 1
+        tracker["last_tap"] = now
+        count = tracker["count"]
+
+        print(f"[RFID] Unknown UID {uid} - tap #{count}")
+
+        # DENY ACCESS always for unknown UIDs
+        self.rgb_led.status_denied()
+
+        if count == 1:
+            # 1st tap: capture + deny + log
+            self.buzzer.beep(duration=0.3)
+            self.push_state_transition(
+                event="ALERT",
+                session_id=str(uuid.uuid4()),
+                rfid_uid=uid,
+                alert_type="AccessDenied",
+                description=f"Unknown RFID card detected (UID: {uid})",
+                severity="WARNING"
+            )
+
+        elif count == 2:
+            # 2nd tap: update face + deny
+            self.buzzer.pattern_beep(times=2, interval=0.2)
+
+        elif count == 3:
+            # 3rd tap: suspicious - notify admin
+            self.buzzer.pattern_beep(times=3, interval=0.2)
+            self.push_state_transition(
+                event="ALERT",
+                session_id=str(uuid.uuid4()),
+                rfid_uid=uid,
+                alert_type="SuspiciousActivity",
+                description=f"Suspicious RFID activity: unknown card {uid} tapped {count} times",
+                severity="HIGH"
+            )
+
+        elif count >= 5:
+            # 5th tap: ALARM + lockout
+            session_id = str(uuid.uuid4())
+            self.push_state_transition(
+                event="ALERT",
+                session_id=session_id,
+                rfid_uid=uid,
+                alert_type="BruteForceAttempt",
+                description=f"Brute force RFID: unknown card {uid} tapped {count} times",
+                severity="CRITICAL"
+            )
+            self._start_recording(session_id)
+            self.trigger_emergency(
+                "intrusion", duration=10,
+                session_id=session_id,
+                description=f"Brute force RFID: unknown card {uid} tapped {count} times"
+            )
+            # Lockout this UID for 5 minutes
+            tracker["locked_out_until"] = now + self._unknown_rfid_lockout
+            tracker["count"] = 0  # Reset count after lockout
+            print(f"[RFID] UID {uid} LOCKED OUT for {self._unknown_rfid_lockout}s")
+
+    # =========================
+    # RECORDING SYSTEM (MP4/H.264 + pre-buffer + async writer)
+    # =========================
+    def _recording_writer_loop(self):
+        """Async recording writer thread - drains frame queue without blocking main loop."""
+        while self._is_recording or not self._recording_queue.empty():
+            try:
+                frame = self._recording_queue.get(timeout=1)
+                if self._recording_writer is not None:
+                    self._recording_writer.write(frame)
+            except queue.Empty:
+                continue
+            except Exception as e:
+                print(f"[RECORDING] Async write error: {e}")
+                break
+
     def _start_recording(self, session_id):
         """
         Start recording video when ALERT is triggered.
-        Saves as .avi file linked to the alert session.
+        Uses MP4/H.264 for browser-compatible playback.
+        Writes pre-buffer frames first (3-5 seconds before event).
+        Uses async writer thread to prevent blocking the main loop.
         """
         if self._is_recording:
             return  # Already recording
 
         try:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"alert_{timestamp}_{session_id[:8]}.avi"
+            filename = f"alert_{timestamp}_{session_id[:8]}.mp4"
             self._recording_path = os.path.join(self._recording_dir, filename)
             self._recording_alert_id = session_id
 
             # Get frame dimensions from camera
             frame = self.camera.get_frame()
             if frame is None:
-                print("[RECORDING] Cannot start â€” no frame available")
+                print("[RECORDING] Cannot start - no frame available")
                 return
 
             h, w = frame.shape[:2]
-            fourcc = cv2.VideoWriter_fourcc(*'XVID')
+            # Use mp4v codec (H.264 compatible, works on Pi + browsers)
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
             self._recording_writer = cv2.VideoWriter(
                 self._recording_path, fourcc, 15.0, (w, h)
             )
@@ -1586,7 +1821,28 @@ class SmartSecuritySystem:
 
             self._is_recording = True
             self._recording_start_time = time.time()
-            print(f"[RECORDING] Started: {filename}")
+            self._recording_post_deadline = None
+
+            # Clear queue and start async writer thread
+            while not self._recording_queue.empty():
+                try:
+                    self._recording_queue.get_nowait()
+                except queue.Empty:
+                    break
+            self._recording_writer_thread = threading.Thread(
+                target=self._recording_writer_loop, daemon=True
+            )
+            self._recording_writer_thread.start()
+
+            # Write pre-buffer frames (captured before the event)
+            pre_frames = list(self._frame_buffer)
+            for pf in pre_frames:
+                try:
+                    self._recording_queue.put_nowait(pf)
+                except queue.Full:
+                    break
+
+            print(f"[RECORDING] Started: {filename} (pre-buffer: {len(pre_frames)} frames)")
 
         except Exception as e:
             print(f"[RECORDING ERROR] Start failed: {e}")
@@ -1792,7 +2048,7 @@ def main():
                     "diskTotalGb": total_gb,
                     "diskUsedGb": used_gb,
                     "diskFreeGb": free_gb,
-                    "recordingsCount": len([f for f in os.listdir(system._recording_dir) if f.endswith('.avi')]) if os.path.isdir(system._recording_dir) else 0
+                    "recordingsCount": len([f for f in os.listdir(system._recording_dir) if f.endswith('.mp4')]) if os.path.isdir(system._recording_dir) else 0
                 }), 200, {'Content-Type': 'application/json'}
             except Exception as e:
                 return json.dumps({"error": str(e)}), 500, {'Content-Type': 'application/json'}
@@ -1835,7 +2091,7 @@ def main():
                     "message": "No recordings directory found."
                 }), 200, {'Content-Type': 'application/json'}
 
-            files = glob.glob(os.path.join(rec_dir, "*.avi"))
+            files = glob.glob(os.path.join(rec_dir, "*.mp4"))
             if not files:
                 return json.dumps({
                     "success": True,

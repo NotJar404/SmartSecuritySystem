@@ -5,6 +5,7 @@
 }
 
 <link rel="stylesheet" href="~/css/dashboard.css" />
+<link rel="stylesheet" href="~/css/logs.css" />
 
 <!-- LIBRARIES -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -113,73 +114,63 @@
     </section>
 
     <!-- ===================== -->
-    <!-- MAIN GRID -->
+    <!-- CRITICAL AUDIT STREAM -->
     <!-- ===================== -->
-    <section class="admin-main-grid">
+    <section class="panel">
+        <div class="panel-header">
+            <h5>Critical Audit Stream</h5>
+            <small>Recent system and admin activity</small>
+            <a href="/Logs/Index?filter=@(ViewBag.IsAdmin == true ? "all" : "alert")" class="view-more-link">View More <i class="fas fa-arrow-right"></i></a>
+        </div>
 
-        <!-- AUDIT STREAM -->
-        <div class="audit-column">
-            <div class="panel full-height">
-                <div class="panel-header">
-                    <h5>Critical Audit Stream</h5>
-                    <small>Recent system and admin activity</small>
-                    <a href="/Logs/Index?filter=@(ViewBag.IsAdmin == true ? "all" : "alert")" class="view-more-link">View More <i class="fas fa-arrow-right"></i></a>
-                </div>
+        <div class="logs-container" style="max-height: 360px;">
 
-                <div class="audit-feed">
+            @if (Model.AuditLogs?.Any() == true)
+            {
+                foreach (var log in Model.AuditLogs)
+                {
+                    var actionName = log.Action?.ToLower() ?? "";
+                    var iconClass = "fa-history";
 
-                    @if (Model.AuditLogs?.Any() == true)
-                    {
-                        foreach (var log in Model.AuditLogs)
-                        {
-                            var actionName = log.Action?.ToLower() ?? "";
-                            var iconColor = "blue";
-                            var iconClass = "fa-history";
+                    if (actionName.Contains("alert")) { iconClass = "fa-exclamation-triangle"; }
+                    else if (actionName.Contains("detection")) { iconClass = "fa-eye"; }
+                    else if (actionName.Contains("access")) { iconClass = "fa-id-badge"; }
+                    else if (actionName.Contains("login")) { iconClass = "fa-sign-in-alt"; }
 
-                            if (actionName.Contains("alert")) { iconColor = "red"; iconClass = "fa-exclamation-triangle"; }
-                            else if (actionName.Contains("detection")) { iconColor = "yellow"; iconClass = "fa-eye"; }
-                            else if (actionName.Contains("access")) { iconColor = "green"; iconClass = "fa-id-badge"; }
-                            else if (actionName.Contains("login")) { iconColor = "blue"; iconClass = "fa-sign-in-alt"; }
-
-                            <div class="audit-item">
-                                <i class="fa @iconClass audit-icon @iconColor"></i>
-                                <div class="audit-details">
-                                    <strong>@log.Action</strong>
-                                    <p>@log.Description</p>
-                                    <small>@log.Timestamp.ToString("hh:mm tt")</small>
-                                </div>
-                            </div>
-                        }
-                    }
-                    else
-                    {
-                        <div class="audit-item">
-                            <i class="fa fa-info-circle audit-icon blue"></i>
-                            <div class="audit-details">
-                                <strong>No audit data</strong>
-                                <p>System activity will appear here</p>
-                                <small>—</small>
+                    <div class="log-card">
+                        <div class="log-icon">
+                            <i class="fa @iconClass"></i>
+                        </div>
+                        <div class="log-content">
+                            <h3>@log.Action</h3>
+                            <p>@log.Description</p>
+                            <div class="log-meta">
+                                <span><i class="fa fa-clock"></i> @log.Timestamp.ToString("MMM dd, yyyy")</span>
+                                @if (!string.IsNullOrEmpty(log.User))
+                                {
+                                    <span><i class="fa fa-user"></i> @log.User</span>
+                                }
                             </div>
                         </div>
-                    }
-
+                        <div class="log-time">@log.Timestamp.ToString("hh:mm tt")</div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="log-card">
+                    <div class="log-icon">
+                        <i class="fa fa-info-circle"></i>
+                    </div>
+                    <div class="log-content">
+                        <h3>No audit data</h3>
+                        <p>System activity will appear here once actions are logged.</p>
+                    </div>
+                    <div class="log-time">—</div>
                 </div>
-            </div>
+            }
+
         </div>
-
-        <!-- OCCUPANCY -->
-        <div class="occupancy-column">
-            <div class="panel chart-panel">
-                <div class="panel-header">
-                    <h5>Facility Occupancy by Room</h5>
-                    <small>Total occupancy count per room</small>
-                </div>
-                <div class="chart-wrapper">
-                    <canvas id="occupancyChart"></canvas>
-                </div>
-            </div>
-        </div>
-
     </section>
 
     <!-- ===================== -->

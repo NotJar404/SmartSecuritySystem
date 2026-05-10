@@ -235,6 +235,30 @@ small { color: var(--text-muted); font-size: var(--font-small); }
    TABLES (NOT TOO TALL) - BREATHABLE SPACING
    ========================================= */
 
+/* Premium scrollable table wrapper — matches operator dashboard */
+.table-scroll-wrap {
+    max-height: 420px;
+    overflow-y: auto;
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.table-scroll-wrap::-webkit-scrollbar {
+    width: 6px;
+}
+
+.table-scroll-wrap::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.table-scroll-wrap::-webkit-scrollbar-thumb {
+    background: rgba(212, 163, 115, 0.35);
+    border-radius: 6px;
+}
+
+.table-scroll-wrap::-webkit-scrollbar-thumb:hover {
+    background: rgba(212, 163, 115, 0.6);
+}
+
 .row > .col-xl-6 {
     margin-bottom: 30px;
 }

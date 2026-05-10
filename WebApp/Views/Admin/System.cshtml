@@ -1,7 +1,7 @@
 @using WebApp.Models
 @{
     ViewData["Title"] = "AI Assisted Smart Security and Intrusion Detection System";
-    var alarmSettings = ViewBag.Alarms as List<WebApp.Models.AlarmSetting> ?? new List<WebApp.Models.AlarmSetting>();
+    var alarmSettings = (ViewBag.Alarms as IEnumerable<WebApp.Models.AlarmSetting>) ?? Enumerable.Empty<WebApp.Models.AlarmSetting>();
     
     // System config — drives ALL toggle/input states (not static)
     var cfg = ViewBag.Config;
@@ -176,43 +176,59 @@
                 </button>
             </div>
 
-            <div class="system-card control-card">
+            <!-- EMERGENCY PROTOCOLS -->
+            <div class="control-card">
                 <div class="card-title-area">
-                    <h5><i class="fa fa-exclamation-triangle text-danger me-3"></i>Emergency Alarm</h5>
+                    <h5><i class="fa fa-exclamation-triangle text-danger me-3"></i>Emergency Protocols</h5>
+                    <span class="status-indicator-dot" id="alarmStatusDot"></span>
                 </div>
 
-                <div class="alarm-list mt-3">
-                    @if (alarmSettings != null && alarmSettings.Any())
-                    {
-                        @foreach (var setting in alarmSettings)
-                        {
-                            <div class="alarm-item @(setting.IsEnabled ? "active" : "") d-flex justify-content-between align-items-center mb-3">
-                                <div class="alarm-info d-flex align-items-center">
-                                    <div class="alarm-icon me-3 @setting.Type.ToLower()">
-                                        <i class="fa @(setting.Type.ToLower() == "intrusion" ? "fa-user-secret" :
-                                                      setting.Type.ToLower() == "fire" ? "fa-fire" :
-                                                      setting.Type.ToLower() == "earthquake" ? "fa-globe" :
-                                                      "fa-ambulance")"></i>
-                                    </div>
-                                    <div>
-                                        <strong class="d-block">@setting.Name</strong>
-                                        <p class="alarm-desc text-muted mb-0 extra-small">Hardware trigger for @setting.Type protocol.</p>
-                                    </div>
-                                </div>
-                                <label class="switch">
-                                    <input type="checkbox" @(setting.IsEnabled ? "checked" : "") 
-                                           onchange="confirmToggle(this, '@setting.Name', @setting.SettingId)">
-                                    <span class="slider round"></span>
-                                </label>
-                            </div>
-                        }
-                    }
-                    else
-                    {
-                        <p class="text-muted small text-center">No alarm protocols found in database.</p>
-                    }
+                <div class="setting-row" id="alarmRow-intruder">
+                    <div class="label-desc">
+                        <label><i class="fa fa-user-secret" style="color:#dc2626; margin-right:6px;"></i>Intruder Alert</label>
+                        <small>Lockdown — Lock all, Red LED, Buzzer</small>
+                    </div>
+                    <button class="btn-alarm intruder" onclick="activateAlarm('intruder', 'Intruder Alert')">
+                        <i class="fa fa-shield-alt"></i> ACTIVATE
+                    </button>
                 </div>
+
+                <div class="setting-row" id="alarmRow-fire">
+                    <div class="label-desc">
+                        <label><i class="fa fa-fire" style="color:#ea580c; margin-right:6px;"></i>Fire Alarm</label>
+                        <small>Evacuate — Unlock all, Red LED, Siren</small>
+                    </div>
+                    <button class="btn-alarm fire" onclick="activateAlarm('fire', 'Fire Alarm')">
+                        <i class="fa fa-fire-extinguisher"></i> ACTIVATE
+                    </button>
+                </div>
+
+                <div class="setting-row" id="alarmRow-earthquake">
+                    <div class="label-desc">
+                        <label><i class="fa fa-house-damage" style="color:#2563eb; margin-right:6px;"></i>Earthquake Drill</label>
+                        <small>Drill — Unlock all, Red+Blue LED, Buzzer</small>
+                    </div>
+                    <button class="btn-alarm earthquake" onclick="activateAlarm('earthquake', 'Earthquake Drill')">
+                        <i class="fa fa-globe"></i> ACTIVATE
+                    </button>
+                </div>
+
+                <div class="setting-row" id="alarmRow-emergency">
+                    <div class="label-desc">
+                        <label><i class="fa fa-bullhorn" style="color:#d97706; margin-right:6px;"></i>Emergency Drill</label>
+                        <small>Drill — Unlock all, Red+Yellow LED, Buzzer</small>
+                    </div>
+                    <button class="btn-alarm emergency" onclick="activateAlarm('emergency', 'Emergency Drill')">
+                        <i class="fa fa-bullhorn"></i> ACTIVATE
+                    </button>
+                </div>
+
+                <!-- DEACTIVATE (shown only when alarm is active) -->
+                <button class="btn-alarm-deactivate" id="alarmDeactivateBtn" style="display:none;" onclick="deactivateAlarm()">
+                    <i class="fa fa-stop-circle"></i> DEACTIVATE ALL ALARMS
+                </button>
             </div>
+
 
         </div>
 
@@ -228,6 +244,9 @@
 
     </div>
 </div>
+
+<!-- FULLSCREEN ALARM OVERLAY (transparent blinking — outside all containers) -->
+<div id="alarmOverlay" class="alarm-overlay" style="display:none;"></div>
 
 @section Scripts {
 <script>
@@ -264,39 +283,100 @@
     }
 
     // =========================
-    // ALARM PROTOCOL TOGGLE (REAL DB UPDATE)
+    // ALARM PROTOCOL — ACTIVATE (calls hardware via API)
     // =========================
-    function confirmToggle(checkbox, alarmName, settingId) {
-        const isChecked = checkbox.checked;
-        const action = isChecked ? "ACTIVATE" : "DEACTIVATE";
-        
-        if (confirm(`HCI SAFETY CHECK: Are you sure you want to ${action} the ${alarmName}?`)) {
-            fetch('/System/UpdateAlarmStatus', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `id=${settingId}&isEnabled=${isChecked}`
-            })
-            .then(response => {
-                if (!response.ok) throw new Error('Database Sync Failed');
-                return response.json();
-            })
-            .then(data => {
-                if (data.success) {
-                    showToast(`${alarmName} ${isChecked ? 'Armed' : 'Disarmed'}`, 'success');
-                    // Update visual state
-                    const item = checkbox.closest('.alarm-item');
-                    if (item) {
-                        item.classList.toggle('active', isChecked);
-                    }
-                }
-            })
-            .catch(error => {
-                showToast('Hardware Sync Error: Could not reach the database.', 'error');
-                checkbox.checked = !isChecked;
+    let activeAlarmType = null;
+
+    function activateAlarm(type, label) {
+        // Confirmation modal like lockdown
+        if (!confirm(`⚠️ SAFETY CHECK: Are you sure you want to activate ${label}?\n\nThis will trigger hardware on the Raspberry Pi.`)) return;
+
+        const btn = document.querySelector(`#alarmRow-${type} .btn-alarm`);
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> ...'; }
+
+        fetch('/api/system/lockdown', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason: label, alarmType: type })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.duplicate) {
+                showToast('Alarm already active.', 'error');
+                if (btn) { btn.disabled = false; btn.innerHTML = `<i class="fa fa-shield-alt"></i> ACTIVATE`; }
+                return;
+            }
+
+            activeAlarmType = type;
+
+            // Highlight the active row
+            document.querySelectorAll('.setting-row[id^="alarmRow"]').forEach(r => r.classList.remove('alarm-active', 'fire-active', 'earthquake-active', 'emergency-active'));
+            const row = document.getElementById(`alarmRow-${type}`);
+            if (row) { row.classList.add('alarm-active'); if (type !== 'intruder') row.classList.add(`${type}-active`); }
+
+            // Show fullscreen blinking overlay
+            const overlay = document.getElementById('alarmOverlay');
+            if (overlay) { overlay.className = 'alarm-overlay ' + type; overlay.style.display = 'block'; }
+
+            // Show deactivate button
+            document.getElementById('alarmDeactivateBtn').style.display = 'flex';
+
+            // Disable all activate buttons
+            document.querySelectorAll('.btn-alarm').forEach(b => { b.disabled = true; });
+
+            // Update alarm status dot
+            const dot = document.getElementById('alarmStatusDot');
+            if (dot) { dot.classList.add('online'); dot.style.background = '#dc2626'; dot.style.boxShadow = '0 0 8px rgba(220,38,38,0.6)'; }
+
+            showToast(`${label} ACTIVATED — Hardware triggered`, 'success');
+        })
+        .catch(err => {
+            showToast('Failed to activate alarm: ' + err.message, 'error');
+            if (btn) { btn.disabled = false; btn.innerHTML = `<i class="fa fa-shield-alt"></i> ACTIVATE`; }
+        });
+    }
+
+    // =========================
+    // ALARM PROTOCOL — DEACTIVATE
+    // =========================
+    function deactivateAlarm() {
+        if (!confirm('Are you sure you want to DEACTIVATE all alarms?')) return;
+
+        fetch('/api/system/lockdown', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason: 'Alarm deactivated', alarmType: 'clear' })
+        })
+        .then(r => r.json())
+        .then(data => {
+            activeAlarmType = null;
+
+            // Clear all row states
+            document.querySelectorAll('.setting-row[id^="alarmRow"]').forEach(r => r.classList.remove('alarm-active', 'fire-active', 'earthquake-active', 'emergency-active'));
+
+            // Hide overlay
+            const overlay = document.getElementById('alarmOverlay');
+            if (overlay) { overlay.style.display = 'none'; overlay.className = 'alarm-overlay'; }
+
+            // Hide deactivate button
+            document.getElementById('alarmDeactivateBtn').style.display = 'none';
+
+            // Re-enable all activate buttons
+            document.querySelectorAll('.btn-alarm').forEach(b => {
+                b.disabled = false;
+                const type = b.classList.contains('intruder') ? 'shield-alt' :
+                             b.classList.contains('fire') ? 'fire-extinguisher' :
+                             b.classList.contains('earthquake') ? 'globe' : 'bullhorn';
+                b.innerHTML = `<i class="fa fa-${type}"></i> ACTIVATE`;
             });
-        } else {
-            checkbox.checked = !isChecked;
-        }
+
+            // Reset status dot
+            const dot = document.getElementById('alarmStatusDot');
+            if (dot) { dot.style.background = ''; dot.style.boxShadow = ''; dot.classList.remove('online'); }
+
+            showToast('All alarms deactivated', 'success');
+        })
+        .catch(err => showToast('Failed to deactivate: ' + err.message, 'error'));
     }
 
     // =========================
@@ -511,65 +591,45 @@
         fetch('/api/system/alarm-status')
         .then(r => r.json())
         .then(data => {
-            const banner = document.getElementById('emergencyBanner');
+            if (data.active && data.type) {
+                activeAlarmType = data.type;
 
-            if (data.active) {
-                // Show emergency banner
-                if (!banner) {
-                    const b = document.createElement('div');
-                    b.id = 'emergencyBanner';
-                    b.style.cssText = `
-                        position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
-                        padding: 12px 20px; text-align: center; font-weight: 700;
-                        font-size: 0.95rem; letter-spacing: 1px;
-                        animation: emergencyPulse 0.6s ease infinite alternate;
-                    `;
+                // Highlight matching row
+                document.querySelectorAll('.setting-row[id^="alarmRow"]').forEach(r => r.classList.remove('alarm-active', 'fire-active', 'earthquake-active', 'emergency-active'));
+                const row = document.getElementById(`alarmRow-${data.type}`);
+                if (row) { row.classList.add('alarm-active'); if (data.type !== 'intruder') row.classList.add(`${data.type}-active`); }
 
-                    // Type-specific visual
-                    const typeStyles = {
-                        'intrusion': { bg: '#dc2626', text: '🚨 INTRUSION ALERT' },
-                        'fire':      { bg: '#dc2626', text: '🔥 FIRE PROTOCOL ACTIVE' },
-                        'earthquake':{ bg: '#2563eb', text: '🌍 EARTHQUAKE MODE ACTIVE' },
-                        'forcedentry':{ bg: '#7c3aed', text: '🚑 MEDICAL EMERGENCY' }
-                    };
-                    const style = typeStyles[data.type] || typeStyles['intrusion'];
-                    b.style.background = style.bg;
-                    b.style.color = '#ffffff';
-                    b.innerHTML = `${style.text} — ${data.description || 'Active'}`;
-                    document.body.prepend(b);
-                }
+                // Show overlay
+                const overlay = document.getElementById('alarmOverlay');
+                if (overlay) { overlay.className = 'alarm-overlay ' + data.type; overlay.style.display = 'block'; }
 
-                // Highlight matching alarm item
-                document.querySelectorAll('.alarm-item').forEach(item => {
-                    item.classList.remove('alarm-firing');
-                });
-                const alarmIcons = document.querySelectorAll('.alarm-icon');
-                alarmIcons.forEach(icon => {
-                    if (icon.classList.contains(data.type)) {
-                        icon.closest('.alarm-item')?.classList.add('alarm-firing');
-                    }
-                });
+                // Show deactivate + disable activate buttons
+                document.getElementById('alarmDeactivateBtn').style.display = 'flex';
+                document.querySelectorAll('.btn-alarm').forEach(b => { b.disabled = true; });
+
+                // Status dot
+                const dot = document.getElementById('alarmStatusDot');
+                if (dot) { dot.classList.add('online'); dot.style.background = '#dc2626'; dot.style.boxShadow = '0 0 8px rgba(220,38,38,0.6)'; }
             } else {
-                // Remove emergency banner
-                if (banner) banner.remove();
-                document.querySelectorAll('.alarm-item').forEach(item => {
-                    item.classList.remove('alarm-firing');
-                });
+                if (activeAlarmType) {
+                    activeAlarmType = null;
+                    document.querySelectorAll('.setting-row[id^="alarmRow"]').forEach(r => r.classList.remove('alarm-active', 'fire-active', 'earthquake-active', 'emergency-active'));
+                    const overlay = document.getElementById('alarmOverlay');
+                    if (overlay) { overlay.style.display = 'none'; overlay.className = 'alarm-overlay'; }
+                    document.getElementById('alarmDeactivateBtn').style.display = 'none';
+                    document.querySelectorAll('.btn-alarm').forEach(b => {
+                        b.disabled = false;
+                        const type = b.classList.contains('intruder') ? 'shield-alt' :
+                                     b.classList.contains('fire') ? 'fire-extinguisher' :
+                                     b.classList.contains('earthquake') ? 'globe' : 'bullhorn';
+                        b.innerHTML = `<i class="fa fa-${type}"></i> ACTIVATE`;
+                    });
+                    const dot = document.getElementById('alarmStatusDot');
+                    if (dot) { dot.style.background = ''; dot.style.boxShadow = ''; dot.classList.remove('online'); }
+                }
             }
         })
         .catch(() => {});
     }
 </script>
-
-<style>
-    /* Emergency alarm pulse — minimal addition, no layout change */
-    @@keyframes emergencyPulse {
-        from { opacity: 1; }
-        to { opacity: 0.7; }
-    }
-    .alarm-firing {
-        box-shadow: 0 0 0 2px #dc2626, 0 0 12px rgba(220, 38, 38, 0.4);
-        border-radius: 8px;
-    }
-</style>
 }

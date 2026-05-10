@@ -1,8 +1,8 @@
 [Unit]
 Description=Smart Security System - FSM Controller
 Documentation=https://github.com/NotJar404/SmartSecuritySystem
-After=network.target
-Wants=network-online.target
+After=network.target webapp.service
+Wants=network-online.target webapp.service
 
 [Service]
 Type=simple
@@ -15,7 +15,7 @@ RestartSec=10
 StandardOutput=journal
 StandardError=journal
 
-# Environment (adjust BASE_URL to your ASP.NET server IP)
+# Environment
 Environment=PYTHONUNBUFFERED=1
 
 # GPIO permissions

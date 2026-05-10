@@ -302,6 +302,145 @@
                 closeAlertModal();
             }
         });
+
+        // Start real-time polling
+        startAlertPolling();
     });
+
+    // =========================
+    // REALTIME ALERT POLLING (2s)
+    // =========================
+    let _alertPollTimer = null;
+
+    function startAlertPolling() {
+        _alertPollTimer = setInterval(pollAlertStatus, 2000);
+    }
+
+    function pollAlertStatus() {
+        fetch('/api/system/status')
+        .then(r => r.json())
+        .then(data => {
+            // Update active alert count in header
+            const liveBadge = document.querySelector('.live-badge');
+            if (liveBadge && data.activeAlertCount !== undefined) {
+                liveBadge.innerHTML = `● ${data.activeAlertCount} ACTIVE`;
+            }
+
+            // Show/hide lockdown banner
+            const banner = document.getElementById('lockdownBanner');
+            if (banner) {
+                if (data.lockdown) {
+                    banner.style.display = 'flex';
+                    document.getElementById('lockdownReasonText').innerText = data.lockdownReason || 'Lockdown active';
+                } else {
+                    banner.style.display = 'none';
+                }
+            }
+
+            // Show/hide alarm banner
+            const alarmBanner = document.getElementById('alarmBanner');
+            if (alarmBanner) {
+                if (data.alarmActive) {
+                    alarmBanner.style.display = 'flex';
+                    document.getElementById('alarmTypeText').innerText = data.alarmType || 'Alarm';
+                } else {
+                    alarmBanner.style.display = 'none';
+                }
+            }
+        })
+        .catch(() => {});
+    }
+
+    // =========================
+    // RESOLVE LOCKDOWN
+    // =========================
+    function resolveLockdown() {
+        if (!confirm('🔓 Confirm: Resolve the active lockdown?')) return;
+
+        const btn = event.target.closest('button');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Resolving...';
+        }
+
+        fetch('/api/system/lockdown/resolve', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                const banner = document.getElementById('lockdownBanner');
+                if (banner) banner.style.display = 'none';
+            }
+        })
+        .finally(() => {
+            if (btn) {
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa fa-unlock me-2"></i>Resolve Lockdown';
+                }, 2000);
+            }
+        });
+    }
     </script>
+
+    <!-- Lockdown Banner (hidden by default, shown by polling) -->
+    <div id="lockdownBanner" class="lockdown-banner" style="display:none;">
+        <div class="lockdown-icon">🔒</div>
+        <div class="lockdown-text">
+            <strong>LOCKDOWN ACTIVE</strong>
+            <span id="lockdownReasonText"></span>
+        </div>
+        <button class="btn-resolve-lockdown" onclick="resolveLockdown()">
+            <i class="fa fa-unlock me-2"></i>Resolve Lockdown
+        </button>
+    </div>
+
+    <!-- Alarm Banner (hidden by default, shown by polling) -->
+    <div id="alarmBanner" class="alarm-banner" style="display:none;">
+        <div class="lockdown-icon">🚨</div>
+        <div class="lockdown-text">
+            <strong>ALARM ACTIVE</strong>
+            <span id="alarmTypeText"></span>
+        </div>
+    </div>
 </div>
+
+<style>
+    .lockdown-banner, .alarm-banner {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 12px 20px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        animation: pulse-border 2s ease-in-out infinite;
+    }
+    .lockdown-banner {
+        background: rgba(200, 0, 0, 0.15);
+        border: 2px solid #c00;
+    }
+    .alarm-banner {
+        background: rgba(255, 100, 0, 0.15);
+        border: 2px solid #f60;
+    }
+    .lockdown-icon { font-size: 1.5rem; }
+    .lockdown-text { flex: 1; color: #fff; }
+    .lockdown-text strong { display: block; font-size: 0.95rem; color: #ff4444; }
+    .lockdown-text span { font-size: 0.8rem; color: #ccc; }
+    .btn-resolve-lockdown {
+        background: #28a745;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 0.85rem;
+        transition: opacity 0.2s;
+    }
+    .btn-resolve-lockdown:hover { opacity: 0.85; }
+    .btn-resolve-lockdown:disabled { opacity: 0.5; cursor: not-allowed; }
+    @@keyframes pulse-border {
+        0%, 100% { border-color: rgba(200, 0, 0, 0.8); }
+        50% { border-color: rgba(200, 0, 0, 0.3); }
+    }
+</style>

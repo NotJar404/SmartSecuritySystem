@@ -86,6 +86,7 @@ namespace WebApp.Models
     {
         public string Action { get; set; } = "";
         public string Description { get; set; } = "";
+        public string User { get; set; } = "";
         public DateTime Timestamp { get; set; }
     }
 }

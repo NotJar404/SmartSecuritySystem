@@ -346,8 +346,20 @@ function triggerLockdown() {
             { label: 'Severity', value: 'CRITICAL' }
         ],
         onConfirm: function() {
-            console.log('Lockdown activated');
-            alert('Lockdown protocol initiated.');
+            fetch('/api/system/lockdown', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reason: 'Manual lockdown from dashboard' })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.duplicate) {
+                    alert('⚠️ Lockdown already active.');
+                } else {
+                    alert('🔒 Lockdown protocol initiated.');
+                }
+            })
+            .catch(() => alert('❌ Failed to activate lockdown.'));
         }
     });
 }
@@ -364,9 +376,65 @@ function triggerEmergency() {
             { label: 'Response', value: 'Emergency services will be contacted' }
         ],
         onConfirm: function() {
-            console.log('Emergency triggered');
-            alert('Emergency alert dispatched.');
+            fetch('/api/security/alarm', { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.duplicate) {
+                    alert('⚠️ Alarm already active.');
+                } else {
+                    alert('🚨 Emergency alarm triggered!');
+                }
+            })
+            .catch(() => alert('❌ Failed to trigger alarm.'));
         }
     });
 }
+
+// =========================
+// DASHBOARD REALTIME POLLING (5s)
+// Updates stat cards + lockdown/alarm status
+// =========================
+let _dashPollTimer = null;
+
+function startDashboardPolling() {
+    _dashPollTimer = setInterval(pollDashboardStatus, 5000);
+}
+
+function pollDashboardStatus() {
+    fetch('/api/system/status')
+    .then(r => r.json())
+    .then(data => {
+        // Update active alert count
+        const alertStat = document.querySelector('.stat-icon.red')?.closest('.stat-card');
+        if (alertStat && data.activeAlertCount !== undefined) {
+            const h3 = alertStat.querySelector('h3');
+            if (h3) h3.textContent = data.activeAlertCount;
+        }
+
+        // Lockdown indicator on header
+        const lockdownBtn = document.querySelector('.btn-lockdown');
+        if (lockdownBtn) {
+            if (data.lockdown) {
+                lockdownBtn.innerHTML = '<i class="fas fa-lock"></i> LOCKDOWN ACTIVE';
+                lockdownBtn.style.background = '#c00';
+                lockdownBtn.style.animation = 'pulse-btn 1.5s ease-in-out infinite';
+            } else {
+                lockdownBtn.innerHTML = '<i class="fas fa-lock"></i> LOCKDOWN';
+                lockdownBtn.style.background = '';
+                lockdownBtn.style.animation = '';
+            }
+        }
+    })
+    .catch(() => {});
+}
+
+// Start polling on page load
+document.addEventListener('DOMContentLoaded', startDashboardPolling);
 </script>
+
+<style>
+@@keyframes pulse-btn {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+</style>

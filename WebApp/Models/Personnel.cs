@@ -26,5 +26,6 @@ namespace SmartSecuritySystem.ViewModels
         public bool HasFaceData { get; set; }
         public DateTime? CreatedAt { get; set; } // Added for "Joined Date"
         public DateTime? LastAccess { get; set; }
+        public int RoomCount { get; set; } // Room access assignments count
     }
 }
