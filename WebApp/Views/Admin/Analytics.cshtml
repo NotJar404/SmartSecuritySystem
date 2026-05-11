@@ -7,10 +7,10 @@
 
 <link rel="stylesheet" href="~/css/analytics.css" />
 
-<!-- LIBRARIES -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<!-- LIBRARIES (local — offline-safe for Pi deployment) -->
+<script src="~/lib/js/chart.umd.min.js"></script>
+<script src="~/lib/js/jspdf.umd.min.js"></script>
+<script src="~/lib/js/html2canvas.min.js"></script>
 
 <div class="dashboard-container">
 
@@ -58,7 +58,7 @@
             <div class="stat-icon yellow"><i class="fa fa-user-shield"></i></div>
             <div class="stat-content">
                 <span>Personnel</span>
-                <h3>@Model.ActivePersonnelCount</h3>
+                <h3 id="statPersonnel">@Model.ActivePersonnelCount</h3>
             </div>
         </div>
     </section>
@@ -829,17 +829,48 @@ function scheduleReport() {
     const btn = document.querySelector('[onclick="scheduleReport()"]');
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Scheduling...'; }
 
-    setTimeout(() => {
+    fetch('/Admin/ScheduleReport', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, frequency: freqLabel })
+    })
+    .then(r => r.json())
+    .then(data => {
         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa fa-paper-plane"></i> Schedule Report'; }
 
         const statusEl = document.getElementById('scheduleStatus');
         const statusText = document.getElementById('scheduleStatusText');
         if (statusEl && statusText) {
             statusEl.style.display = 'block';
-            statusText.textContent = freqLabel + ' report scheduled for ' + email;
+            statusText.textContent = data.message || (freqLabel + ' report scheduled for ' + email);
         }
 
-        if (typeof showToast === 'function') showToast(freqLabel + ' report scheduled for ' + email, 'success');
-    }, 900);
+        if (typeof showToast === 'function') showToast(data.message || 'Report scheduled', data.success ? 'success' : 'error');
+    })
+    .catch(err => {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa fa-paper-plane"></i> Schedule Report'; }
+        if (typeof showToast === 'function') showToast('Failed to schedule report: ' + err.message, 'error');
+    });
 }
+
+// =============================================
+// REAL-TIME STAT CARD POLLING (30s)
+// =============================================
+function refreshAnalyticsStats() {
+    fetch('/Admin/AnalyticsData')
+    .then(r => r.json())
+    .then(data => {
+        const sa = document.getElementById('statAlerts');
+        const sl = document.getElementById('statAccess');
+        const sd = document.getElementById('statDetections');
+        const sp = document.getElementById('statPersonnel');
+        if (sa) sa.textContent = data.activeAlerts;
+        if (sl) sl.textContent = data.accessLogs;
+        if (sd) sd.textContent = data.detections;
+        if (sp) sp.textContent = data.personnel;
+    })
+    .catch(() => {});
+}
+
+setInterval(refreshAnalyticsStats, 30000);
 </script>

@@ -290,25 +290,45 @@ window.addEventListener("DOMContentLoaded", async function () {
         const url = video.getAttribute("data-src");
 
         if (url && url.trim() !== '') {
+            const isLocal = (() => {
+                try {
+                    const parsedUrl = new URL(url);
+                    const h = parsedUrl.hostname.toLowerCase();
+                    return h === 'localhost' || h === '127.0.0.1' || h === '::1';
+                } catch { return true; }
+            })();
+
             // Real camera stream (Pi / IP camera)
             loadVideoStream(video, url, {
                 onSuccess: (info) => {
                     console.log('[DASHBOARD] Camera loaded:', info.type, info.isBackendProcessed ? '(backend processed)' : '');
+                    video.style.background = 'transparent'; // clear offline black bg if any
                 },
                 onError: (error) => {
                     console.error('[DASHBOARD] Camera error:', error);
-                    // Fallback to Python backend if provided stream fails
-                    console.log('[DASHBOARD] Falling back to Python backend at http://localhost:5050/video');
-                    loadVideoStream(video, '', {
-                        onSuccess: (info) => {
-                            console.log('[DASHBOARD] Fallback to backend successful');
-                        },
-                        onError: () => {
-                            console.error('[DASHBOARD] Backend fallback also failed');
-                        },
-                        enableHLS: false,
-                        fallbackToWebcam: false
-                    });
+                    if (isLocal) {
+                        // Only fallback to local backend if the stream was local
+                        console.log('[DASHBOARD] Falling back to Python backend at http://localhost:5050/video');
+                        loadVideoStream(video, '', {
+                            onSuccess: () => { console.log('[DASHBOARD] Fallback to backend successful'); },
+                            onError: () => { console.error('[DASHBOARD] Backend fallback also failed'); },
+                            enableHLS: false,
+                            fallbackToWebcam: false
+                        });
+                    } else {
+                        // Remote stream failed - ensure card goes black
+                        console.log('[DASHBOARD] Remote stream failed - showing black card');
+                        video.style.background = '#000';
+                        // Add an offline text/icon overlay if needed
+                        const parent = video.parentElement;
+                        if (!parent.querySelector('.offline-badge')) {
+                            const badge = document.createElement('div');
+                            badge.className = 'offline-badge';
+                            badge.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#888;font-size:0.8rem;text-align:center;z-index:2;';
+                            badge.innerHTML = '<i class="fas fa-video-slash" style="font-size:1.5rem;margin-bottom:4px;display:block;"></i>OFFLINE';
+                            parent.appendChild(badge);
+                        }
+                    }
                 },
                 enableHLS: true,
                 fallbackToWebcam: false

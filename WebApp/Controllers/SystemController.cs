@@ -134,6 +134,25 @@ namespace WebApp.Controllers
         };
         private static readonly object _configLock = new object();
 
+        // Public accessor for AdminController to read shared config state
+        public static SystemSettingsRequest GetSharedConfig()
+        {
+            lock (_configLock)
+            {
+                return new SystemSettingsRequest
+                {
+                    ArmSystem = _systemConfig.ArmSystem,
+                    AutoMaintenance = _systemConfig.AutoMaintenance,
+                    MotionSensitivity = _systemConfig.MotionSensitivity,
+                    FaceAccuracy = _systemConfig.FaceAccuracy,
+                    EmailReports = _systemConfig.EmailReports,
+                    HardwareSiren = _systemConfig.HardwareSiren,
+                    GateHoldOpen = _systemConfig.GateHoldOpen,
+                    BiometricLock = _systemConfig.BiometricLock
+                };
+            }
+        }
+
         [HttpPost]
         public async Task<IActionResult> SaveSettings([FromBody] SystemSettingsRequest request)
         {

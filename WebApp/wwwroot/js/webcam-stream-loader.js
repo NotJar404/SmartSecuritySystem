@@ -102,14 +102,28 @@ async function loadStream(videoElement, streamUrl, options = {}) {
                     if (onSuccess) onSuccess({ type: 'mjpeg', url: streamUrl, isBackendProcessed: true });
                 };
 
-                mjpegImg.onerror = function() {
+    mjpegImg.onerror = function() {
                     clearTimeout(loadTimeout);
                     console.warn('[StreamLoader] MJPEG stream failed at:', streamUrl);
                     mjpegImg.style.display = 'none';
                     videoElement.style.display = 'block';
-                    if (fallbackToWebcam) {
-                        console.log('[StreamLoader] Falling back to webcam');
+
+                    // Only fall back to webcam for localhost streams
+                    const isLocal = (() => {
+                        try {
+                            const url = new URL(streamUrl);
+                            const h = url.hostname.toLowerCase();
+                            return h === 'localhost' || h === '127.0.0.1' || h === '::1';
+                        } catch { return true; }
+                    })();
+
+                    if (fallbackToWebcam && isLocal) {
+                        console.log('[StreamLoader] Falling back to webcam (localhost)');
                         loadWebcam(videoElement, { onSuccess, onError });
+                    } else if (!isLocal) {
+                        console.log('[StreamLoader] Remote stream failed — showing black (no webcam fallback)');
+                        videoElement.style.background = '#000';
+                        if (onError) onError('Remote MJPEG stream unavailable');
                     } else if (onError) {
                         onError('MJPEG stream unavailable');
                     }
@@ -120,8 +134,20 @@ async function loadStream(videoElement, streamUrl, options = {}) {
                     console.warn('[StreamLoader] MJPEG stream timeout at:', streamUrl);
                     mjpegImg.style.display = 'none';
                     videoElement.style.display = 'block';
-                    if (fallbackToWebcam) {
+
+                    const isLocalTimeout = (() => {
+                        try {
+                            const url = new URL(streamUrl);
+                            const h = url.hostname.toLowerCase();
+                            return h === 'localhost' || h === '127.0.0.1' || h === '::1';
+                        } catch { return true; }
+                    })();
+
+                    if (fallbackToWebcam && isLocalTimeout) {
                         loadWebcam(videoElement, { onSuccess, onError });
+                    } else if (!isLocalTimeout) {
+                        videoElement.style.background = '#000';
+                        if (onError) onError('Remote MJPEG stream timeout');
                     } else if (onError) {
                         onError('MJPEG stream timeout');
                     }

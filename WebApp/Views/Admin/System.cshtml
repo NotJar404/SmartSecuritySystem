@@ -342,10 +342,10 @@
     function deactivateAlarm() {
         if (!confirm('Are you sure you want to DEACTIVATE all alarms?')) return;
 
-        fetch('/api/system/lockdown', {
+        // Use the dedicated resolve endpoint (not lockdown POST which creates new entries)
+        fetch('/api/system/lockdown/resolve', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ reason: 'Alarm deactivated', alarmType: 'clear' })
+            headers: { 'Content-Type': 'application/json' }
         })
         .then(r => r.json())
         .then(data => {
@@ -577,12 +577,56 @@
         checkAlarmStatus();
         setInterval(checkAlarmStatus, 3000);
 
+        // Real-time config sync (every 30 seconds)
+        setInterval(syncConfigFromServer, 30000);
+
         // Restore theme preference
         const warmPref = localStorage.getItem('warmTheme');
         if (warmPref === 'true') {
             document.body.classList.add('warm-theme-mode');
         }
     });
+
+    // =========================
+    // REAL-TIME CONFIG SYNC (keeps toggles in sync across tabs/devices)
+    // =========================
+    function syncConfigFromServer() {
+        fetch('/api/system/config')
+        .then(r => r.json())
+        .then(cfg => {
+            // Sync toggles
+            const arm = document.getElementById('armSystem');
+            if (arm && arm.checked !== cfg.armSystem) arm.checked = cfg.armSystem;
+
+            const autoMaint = document.getElementById('autoMaintenance');
+            if (autoMaint && autoMaint.checked !== cfg.autoMaintenance) autoMaint.checked = cfg.autoMaintenance;
+
+            const emailRep = document.getElementById('emailReports');
+            if (emailRep && emailRep.checked !== cfg.emailReports) emailRep.checked = cfg.emailReports;
+
+            const hwSiren = document.getElementById('hardwareSiren');
+            if (hwSiren && hwSiren.checked !== cfg.hardwareSiren) hwSiren.checked = cfg.hardwareSiren;
+
+            const bioLock = document.getElementById('biometricLock');
+            if (bioLock && bioLock.checked !== cfg.biometricLock) bioLock.checked = cfg.biometricLock;
+
+            // Sync numeric inputs
+            const motSens = document.getElementById('motionSensitivity');
+            if (motSens && motSens.value !== String(cfg.motionSensitivity)) motSens.value = cfg.motionSensitivity;
+
+            const faceAcc = document.getElementById('faceAccuracy');
+            if (faceAcc && faceAcc.value !== String(cfg.faceAccuracy)) {
+                faceAcc.value = cfg.faceAccuracy;
+                // Update display label if exists
+                const accLabel = document.getElementById('accuracyLabel');
+                if (accLabel) accLabel.textContent = cfg.faceAccuracy + '%';
+            }
+
+            const gateHold = document.getElementById('gateHoldOpen');
+            if (gateHold && gateHold.value !== String(cfg.gateHoldOpen)) gateHold.value = cfg.gateHoldOpen;
+        })
+        .catch(() => {});
+    }
 
     // =========================
     // REAL-TIME ALARM STATUS (from Python IoT)

@@ -69,9 +69,7 @@ var app = builder.Build();
 // CONFIGURE URLS / PORTS
 // =========================
 var httpPort = Environment.GetEnvironmentVariable("ASPNETCORE_HTTP_PORT") ?? "5145";
-var httpsPort = Environment.GetEnvironmentVariable("ASPNETCORE_HTTPS_PORT") ?? "7229";
-app.Urls.Add($"http://localhost:{httpPort}");
-app.Urls.Add($"https://localhost:{httpsPort}");
+app.Urls.Add($"http://0.0.0.0:{httpPort}");
 
 // =========================
 // MIDDLEWARE
@@ -82,7 +80,7 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
+//app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();

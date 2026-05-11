@@ -422,6 +422,19 @@ function selectCamera(cam) {
         ? cam.StreamUrl
         : STREAM_BASE + '/video';
 
+    // =================================================================
+    // STREAM SOURCE CLASSIFICATION
+    // Localhost streams = webcam fallback allowed (laptop testing)
+    // Remote streams (Pi IP) = black screen on failure (no webcam fallback)
+    // =================================================================
+    const _isLocalStream = (() => {
+        try {
+            const url = new URL(streamUrl);
+            const host = url.hostname.toLowerCase();
+            return host === 'localhost' || host === '127.0.0.1' || host === '::1';
+        } catch { return true; } // Invalid URL → assume local
+    })();
+
     // Get or create the MJPEG <img> element
     let mjpegImg = document.getElementById('mjpegTestStream');
     if (!mjpegImg) {
@@ -440,6 +453,10 @@ function selectCamera(cam) {
     const detectCanvas = document.getElementById('detectOverlay');
     if (detectCanvas) detectCanvas.style.display = 'none';
 
+    // Remove any previous "no camera" overlay
+    const existingOffline = video.parentElement.querySelector('.camera-offline-overlay');
+    if (existingOffline) existingOffline.remove();
+
     // =================================================================
     // TRY MJPEG FIRST (works when main.py is running)
     // =================================================================
@@ -451,7 +468,7 @@ function selectCamera(cam) {
         if (_mjpegFallbackTimer) { clearTimeout(_mjpegFallbackTimer); _mjpegFallbackTimer = null; }
         overlaySource.innerText = "AI Pipeline Stream (HD \u2022 Bounding Boxes Active)";
         console.log('[CAMERA] MJPEG stream connected — AI overlays active');
-        _startStreamHealthMonitor(mjpegImg, streamUrl);
+        _startStreamHealthMonitor(mjpegImg, streamUrl, _isLocalStream, cam);
     };
 
     mjpegImg.onerror = function() {
@@ -463,21 +480,67 @@ function selectCamera(cam) {
     mjpegImg.src = streamUrl + (streamUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
 
     // =================================================================
-    // FALLBACK: After 2 seconds, if MJPEG didn't connect,
-    // open the webcam directly via getUserMedia.
-    // This guarantees the user ALWAYS sees their camera feed.
+    // FALLBACK: After 2 seconds, if MJPEG didn't connect:
+    //   - LOCALHOST: open webcam directly via getUserMedia (laptop testing)
+    //   - REMOTE: show black screen with "No Camera Module" message
     // =================================================================
     _mjpegFallbackTimer = setTimeout(() => {
         if (_mjpegConnected) return;  // MJPEG worked, no fallback needed
 
-        console.log('[CAMERA] MJPEG not available — opening webcam directly');
-        _switchToWebcam(mjpegImg, cam);
+        if (_isLocalStream) {
+            console.log('[CAMERA] MJPEG not available — opening webcam directly');
+            _switchToWebcam(mjpegImg, cam);
+        } else {
+            console.log('[CAMERA] Remote Pi stream unavailable — showing offline placeholder');
+            _showRemoteOffline(mjpegImg, cam, streamUrl);
+        }
     }, 2000);
 }
 
 /**
+ * Show black screen with "No Camera Module Connected" for remote Pi streams.
+ * Does NOT fall back to laptop webcam — prevents cross-camera interference.
+ */
+function _showRemoteOffline(mjpegImg, cam, streamUrl) {
+    // Hide MJPEG and video
+    mjpegImg.src = '';
+    mjpegImg.style.display = 'none';
+    video.style.display = 'none';
+
+    overlaySource.innerText = "Remote Camera — Offline";
+
+    // Create a black placeholder overlay with status message
+    const container = video.parentElement;
+    let offlineEl = container.querySelector('.camera-offline-overlay');
+    if (!offlineEl) {
+        offlineEl = document.createElement('div');
+        offlineEl.className = 'camera-offline-overlay';
+        offlineEl.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;background:#000;z-index:3;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#666;font-family:Inter,sans-serif;';
+        container.appendChild(offlineEl);
+    }
+
+    offlineEl.innerHTML = `
+        <i class="fas fa-video-slash" style="font-size:3rem;margin-bottom:16px;color:#444;"></i>
+        <div style="font-size:1.1rem;font-weight:600;color:#777;margin-bottom:8px;">No Camera Module Connected</div>
+        <div style="font-size:0.8rem;color:#555;">Stream: ${streamUrl}</div>
+        <div style="font-size:0.75rem;color:#444;margin-top:12px;">Ensure the Raspberry Pi camera module is connected and main.py is running</div>
+        <button onclick="_retryRemoteStream('${streamUrl}')" style="margin-top:16px;padding:8px 16px;background:#D4A373;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;">
+            <i class="fa fa-refresh"></i> Retry Connection
+        </button>
+    `;
+}
+
+/**
+ * Retry connecting to a remote MJPEG stream
+ */
+function _retryRemoteStream(streamUrl) {
+    if (!selectedCamera) return;
+    selectCamera(selectedCamera); // Re-triggers the full connection flow
+}
+
+/**
  * Switch from MJPEG to direct browser webcam via getUserMedia.
- * This is the guaranteed fallback — always works as long as the user has a webcam.
+ * This is the guaranteed fallback — ONLY for localhost/laptop streams.
  */
 function _switchToWebcam(mjpegImg, cam) {
     // Hide MJPEG, show video element
@@ -512,7 +575,7 @@ function _switchToWebcam(mjpegImg, cam) {
     });
 }
 
-function _startStreamHealthMonitor(mjpegImg, streamUrl) {
+function _startStreamHealthMonitor(mjpegImg, streamUrl, isLocal, cam) {
     // Clear any existing monitor
     if (_streamHealthTimer) clearInterval(_streamHealthTimer);
 
@@ -523,8 +586,15 @@ function _startStreamHealthMonitor(mjpegImg, streamUrl) {
             return;
         }
 
-        // Ping the /status endpoint to check if backend is alive
-        fetch('http://localhost:5050/status', { mode: 'cors' })
+        // Ping the stream host /status endpoint to check if backend is alive
+        const statusUrl = (() => {
+            try {
+                const url = new URL(streamUrl);
+                return `${url.protocol}//${url.host}/status`;
+            } catch { return 'http://localhost:5050/status'; }
+        })();
+
+        fetch(statusUrl, { mode: 'cors' })
             .then(r => r.json())
             .catch(() => {
                 // Backend unreachable — reconnect stream
@@ -739,11 +809,35 @@ document.addEventListener('DOMContentLoaded', function() {
     // locking the webcam before Python stream_server.py can access it)
     document.querySelectorAll('.grid-preview').forEach(function(video) {
         const url = video.getAttribute('data-src');
+        const isLocal = (() => {
+            try {
+                if (!url) return true;
+                const parsedUrl = new URL(url);
+                const h = parsedUrl.hostname.toLowerCase();
+                return h === 'localhost' || h === '127.0.0.1' || h === '::1';
+            } catch { return true; }
+        })();
+
         loadVideoStream(video, url, {
             enableHLS: true,
             fallbackToWebcam: false,
             onSuccess: (info) => {
                 console.log('[CAMERA GRID] Loaded:', info.type);
+                video.style.background = 'transparent';
+            },
+            onError: (error) => {
+                console.log('[CAMERA GRID] Stream error:', error);
+                if (!isLocal) {
+                    video.style.background = '#000';
+                    const parent = video.parentElement;
+                    if (!parent.querySelector('.offline-badge')) {
+                        const badge = document.createElement('div');
+                        badge.className = 'offline-badge';
+                        badge.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#888;font-size:0.8rem;text-align:center;z-index:2;';
+                        badge.innerHTML = '<i class="fas fa-video-slash" style="font-size:1.5rem;margin-bottom:4px;display:block;"></i>OFFLINE';
+                        parent.appendChild(badge);
+                    }
+                }
             }
         });
     });

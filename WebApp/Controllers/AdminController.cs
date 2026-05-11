@@ -427,7 +427,8 @@ namespace WebApp.Controllers
                 SecurityLevel = m.SecurityLevel,
                 HasFaceData = !string.IsNullOrEmpty(m.FaceEmbedding),
                 CreatedAt = m.CreatedAt,
-                LastAccess = null
+                LastAccess = null,
+                RoomCount = _context.PersonRoomAccess.Count(pra => pra.PersonId == m.PersonId)
             }).ToList();
 
             var viewModel = new PersonnelManagementViewModel
@@ -509,16 +510,17 @@ namespace WebApp.Controllers
 
             ViewBag.Alarms = settings;
 
-            // Pass system config so toggles render with real state
+            // Pass system config so toggles render with REAL shared state (from SystemController)
+            var liveConfig = SystemController.GetSharedConfig();
             ViewBag.Config = new {
-                ArmSystem = true,
-                AutoMaintenance = true,
-                MotionSensitivity = 2,
-                FaceAccuracy = 80,
-                EmailReports = true,
-                HardwareSiren = true,
-                GateHoldOpen = 5,
-                BiometricLock = true
+                ArmSystem = liveConfig.ArmSystem,
+                AutoMaintenance = liveConfig.AutoMaintenance,
+                MotionSensitivity = liveConfig.MotionSensitivity,
+                FaceAccuracy = liveConfig.FaceAccuracy,
+                EmailReports = liveConfig.EmailReports,
+                HardwareSiren = liveConfig.HardwareSiren,
+                GateHoldOpen = liveConfig.GateHoldOpen,
+                BiometricLock = liveConfig.BiometricLock
             };
 
             return View(systemStatus);
@@ -551,5 +553,82 @@ namespace WebApp.Controllers
 
             return Ok(new { success = true });
         }
+
+        // =========================
+        // ANALYTICS DATA API (AJAX REFRESH)
+        // =========================
+        [HttpGet]
+        [Route("/Admin/AnalyticsData")]
+        public async Task<IActionResult> AnalyticsData(DateTime? startDate, DateTime? endDate, string? locationFilter, string? eventFilter)
+        {
+            bool isAdmin = User.IsInRole("Admin");
+            var model = await BuildDashboardModel(startDate, endDate, locationFilter, eventFilter, isAdmin);
+
+            return Json(new
+            {
+                activeAlerts = model.ActiveIncidentCount,
+                accessLogs = model.AccessWeekly.Sum(),
+                detections = model.TodayDetectionCount,
+                personnel = model.ActivePersonnelCount,
+                alertsByType = model.AlertsByType,
+                alertTrendsByDayAndType = model.AlertTrendsByDayAndType,
+                accessByResult = model.AccessByResult,
+                detectionsByType = model.DetectionsByType,
+                occupancyRoomLabels = model.OccupancyRoomLabels,
+                occupancyRoomCounts = model.OccupancyRoomCounts
+            });
+        }
+
+        // =========================
+        // SCHEDULE REPORT (REAL ENDPOINT)
+        // =========================
+        [HttpPost]
+        [Route("/Admin/ScheduleReport")]
+        public IActionResult ScheduleReport([FromBody] ScheduleReportRequest? request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.Email))
+                return BadRequest(new { success = false, message = "Email is required" });
+
+            // Log the schedule request (persists for audit)
+            _context.Notifications.Add(new Notification
+            {
+                UserId = null,
+                TargetRole = "Admin",
+                Message = $"📊 Report scheduled: {request.Frequency} digest → {request.Email}",
+                IsRead = false,
+                Timestamp = DateTime.UtcNow
+            });
+            _context.SaveChanges();
+
+            return Json(new
+            {
+                success = true,
+                message = $"{request.Frequency} report scheduled for {request.Email}"
+            });
+        }
+
+        // =========================
+        // PERSONNEL COUNTS (STAT CARD POLLING)
+        // =========================
+        [HttpGet]
+        [Route("/Admin/PersonnelCounts")]
+        public async Task<IActionResult> PersonnelCounts()
+        {
+            var operators = await _context.Users.CountAsync();
+            var members = await _context.AuthorizedPersonnel.CountAsync();
+            var departments = await _context.AuthorizedPersonnel
+                .Where(m => m.Department != null && m.Department != "")
+                .Select(m => m.Department)
+                .Distinct()
+                .CountAsync();
+
+            return Json(new { operators, members, departments });
+        }
+    }
+
+    public class ScheduleReportRequest
+    {
+        public string Email { get; set; } = string.Empty;
+        public string Frequency { get; set; } = "weekly";
     }
 }

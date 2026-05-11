@@ -51,7 +51,7 @@
                     <i class="fas fa-users-cog"></i>
                 </div>
                 <div>
-                    <h3>@Model.SystemUsers.Count()</h3>
+                    <h3 id="statOperators">@Model.SystemUsers.Count()</h3>
                     <small>System Operators</small>
                 </div>
             </div>
@@ -62,7 +62,7 @@
                     <i class="fas fa-id-badge"></i>
                 </div>
                 <div>
-                    <h3>@Model.CampusMembers.Count()</h3>
+                    <h3 id="statMembers">@Model.CampusMembers.Count()</h3>
                     <small>Authorized Members</small>
                 </div>
             </div>
@@ -73,7 +73,7 @@
                     <i class="fas fa-check-circle"></i>
                 </div>
                 <div>
-                    <h3>@Model.CampusMembers.Count(m => m.Department != null)</h3>
+                    <h3 id="statDepartments">@Model.CampusMembers.Select(m => m.Department).Where(d => !string.IsNullOrEmpty(d)).Distinct().Count()</h3>
                     <small>Departments Active</small>
                 </div>
             </div>
@@ -623,6 +623,11 @@ function loadRoomAssignments(personId) {
 function assignRoom() {
     const personId = document.getElementById('roomPersonId').value;
     const roomId = document.getElementById('roomSelect').value;
+    const btn = document.querySelector('[onclick="assignRoom()"]');
+
+    // Anti-dedup: disable button during request
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin me-1"></i>Assigning...'; }
+
     fetch('/api/access/room-assign', {
         method: 'POST',
         headers: {'Content-Type':'application/json'},
@@ -632,8 +637,13 @@ function assignRoom() {
     .then(data => {
         if (data.success) {
             loadRoomAssignments(personId);
+            refreshPersonnelCounts();
         }
         alert(data.message);
+    })
+    .catch(err => alert('Assignment failed: ' + err.message))
+    .finally(() => {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa fa-plus me-1"></i>Assign Room Access'; }
     });
 }
 
@@ -648,9 +658,30 @@ function revokeRoom(personId, roomId) {
     .then(data => {
         if (data.success) {
             loadRoomAssignments(personId);
+            refreshPersonnelCounts();
         }
         alert(data.message);
     });
 }
+
+// ==============================================
+// REAL-TIME STAT CARD POLLING (30s)
+// ==============================================
+function refreshPersonnelCounts() {
+    fetch('/Admin/PersonnelCounts')
+        .then(r => r.json())
+        .then(data => {
+            const ops = document.getElementById('statOperators');
+            const mem = document.getElementById('statMembers');
+            const dep = document.getElementById('statDepartments');
+            if (ops) ops.textContent = data.operators;
+            if (mem) mem.textContent = data.members;
+            if (dep) dep.textContent = data.departments;
+        })
+        .catch(() => {});
+}
+
+// Poll every 30 seconds
+setInterval(refreshPersonnelCounts, 30000);
 </script>
 }
