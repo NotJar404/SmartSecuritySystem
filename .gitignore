@@ -4,6 +4,7 @@
 # Build folders
 bin/
 obj/
+publish/
 
 # User-specific files
 *.suo
@@ -16,3 +17,39 @@ obj/
 
 # ASP.NET
 *.cache
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+*.egg-info/
+
+# Environment & Secrets
+.env
+
+# Raspberry Pi local data
+face_data/
+recordings/
+*.mp4
+*.avi
+*.h264
+events_fallback.log
+
+# AI Model weights (large binary files)
+IotController/models/*.caffemodel
+IotController/models/*.prototxt
+
+# Node
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temp audit scripts
+_audit_*.py
+_fix_*.py
+_audit_*.txt

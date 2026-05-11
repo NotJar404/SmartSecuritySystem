@@ -511,13 +511,22 @@ server {
     }
 
     # MJPEG Camera Stream (proxied from Python Flask)
-    location /stream {
-        proxy_pass http://127.0.0.1:5050;
+    location /video {
+        proxy_pass http://127.0.0.1:5050/video;
         proxy_http_version 1.1;
         proxy_set_header Connection "";
         proxy_buffering off;
         proxy_cache off;
         chunked_transfer_encoding off;
+    }
+
+    # Python Flask status/health API proxy
+    location /status {
+        proxy_pass http://127.0.0.1:5050/status;
+    }
+
+    location /health {
+        proxy_pass http://127.0.0.1:5050/health;
     }
 }
 ```
@@ -678,7 +687,7 @@ curl http://localhost:5000/api/system/status
 curl http://localhost:5000/api/system/pi-health
 
 # Camera stream
-curl -I http://localhost:5050/stream
+curl -I http://localhost:5050/video
 ```
 
 ### 8.3 Full Integration Test

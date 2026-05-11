@@ -132,7 +132,11 @@ class PIRSensor:
         """Seconds since last motion — used by loitering algorithm"""
         with self.lock:
             if self.last_motion_time == 0:
-                return float('inf')
+                # Return 0 on startup (no motion seen yet) so the FSM
+                # does NOT skip detection.  float('inf') would trigger
+                # PIR-idle mode immediately, producing a plain stream
+                # with no bounding boxes until the first PIR event.
+                return 0
             return time.time() - self.last_motion_time
 
     # =========================

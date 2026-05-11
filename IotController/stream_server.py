@@ -1,20 +1,20 @@
 """
 MJPEG Stream Server for Desktop/Laptop Testing
 
-UNIFIED PIPELINE: Same as main.py on the Pi
-  Capture → Detection → Tracking → Overlay Rendering → MJPEG Stream
+UNIFIED PIPELINE: Uses the EXACT SAME AI modules as main.py on the Pi
+  PersonDetector → CentroidTracker → FaceDetector → render_full_frame → MJPEG
 
 ON-DEMAND webcam lifecycle:
   /start  -> opens laptop webcam via OpenCV
   /video  -> serves PROCESSED MJPEG stream with bounding boxes
   /stop   -> releases webcam, turns off camera light
   /health -> real disk usage
-  /status -> whether webcam is currently active
+  /status -> whether webcam is currently active + FSM state
 
 Camera.cshtml calls /start when page opens, /stop when page closes.
 Webcam is NEVER held open permanently.
 
-On Raspberry Pi, use main.py instead (full AI pipeline).
+On Raspberry Pi, use main.py instead (full AI pipeline + real sensors).
 This script is for LAPTOP TESTING ONLY.
 
 Usage:
@@ -30,8 +30,13 @@ import os
 import json
 from flask import Flask, Response, request
 
-# Import the unified overlay renderer (same as main.py uses)
+# =========================
+# SAME PRODUCTION AI MODULES AS main.py
+# =========================
 from AI.overlay_renderer import render_full_frame
+from AI.face_detection import FaceDetector
+from AI.person_detector import PersonDetector
+from AI.person_tracker import CentroidTracker
 
 app = Flask(__name__)
 
@@ -53,279 +58,61 @@ capture_thread_ref = None
 active_viewers = 0
 viewers_lock = threading.Lock()
 
+# =========================
+# AI MODULE INSTANCES (SAME AS main.py)
+# =========================
+face_detector = FaceDetector()
+person_detector = PersonDetector(
+    confidence_threshold=0.5,
+    model_dir=os.path.join(os.path.dirname(__file__), "models")
+)
+person_tracker = CentroidTracker(
+    max_disappeared=30,
+    max_distance=80
+)
 
 # =========================
-# DETECTION ENGINE (HOG + Tracking)
-# Same pipeline as main.py on Pi
+# SIMULATED FSM STATE (mirrors main.py states for demo)
 # =========================
-class TestModeDetector:
-    """
-    Person detector + face identifier for test mode (laptop).
-    
-    Pipeline:
-    1. HOG+SVM detects person bodies (always running)
-    2. Haar cascade detects faces WITHIN person bounding boxes
-    3. Once a face is seen for a tracked person, their status becomes PERMANENT
-       (authorized/unauthorized/unknown) — even when face turns away
-    4. Body tracking maintains the bounding box via centroid matching
-    
-    Status Rules (mirrors main.py _update_person_authorization):
-    - Face detected + in session list -> 'authorized' (GREEN)
-    - Face detected + NOT in session list -> 'unauthorized' (RED)
-    - No face detected yet -> 'unknown' (YELLOW)
-    - Status is STICKY: once set by face detection, it NEVER resets
-      as long as the person remains tracked
-    """
+STATE_IDLE = "IDLE"
+STATE_ACCESS = "ACCESS"
+STATE_INSIDE = "INSIDE"
+STATE_ALERT = "ALERT"
+STATE_LOITERING = "LOITERING"
 
-    def __init__(self, confidence=0.4):
-        self.confidence = confidence
+demo_state = STATE_IDLE
+demo_state_lock = threading.Lock()
+tracked_persons_ref = {}       # Reference to current tracked persons
+current_occupancy = 0
+current_faces = []
+face_images_ref = []
+last_face_update = 0
 
-        # Person body detector (HOG+SVM, built into OpenCV)
-        self.hog = cv2.HOGDescriptor()
-        self.hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
+# Face debounce for demo state transitions
+_idle_face_counter = 0
+_idle_grace_threshold = 5      # Same as main.py
+_alert_start_time = None
+_alert_auto_clear_timeout = 30  # Same as main.py
+_empty_frame_counter = 0
+_empty_frame_threshold = 10    # Same as main.py
 
-        # Face detector (Haar cascade, built into OpenCV)
-        cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-        self.face_cascade = cv2.CascadeClassifier(cascade_path)
-
-        # Centroid tracker with persistent status
-        # tracked[id] = {cx, cy, bbox, smooth_bbox, conf, status, disappeared,
-        #                face_seen, face_check_count}
-        self.tracked = {}
-        self.next_id = 1
-        self.max_disappeared = 60   # ~6 sec @ 10fps (stable tracking)
-        self.max_match_distance = 150
-
-        # Bbox smoothing factor (0=no smoothing, 1=frozen)
-        self.bbox_smooth = 0.65
-
-        # Detection intervals
-        self.frame_count = 0
-        self.detect_every = 3       # HOG every 3rd frame
-        self.face_detect_every = 6  # Face every 6th frame (lighter)
-        self.last_detections = []
-
-        print("[DETECT] HOG+SVM person detector initialized (test mode)")
-        print("[DETECT] Haar cascade face detector loaded")
-        print("[DETECT] Persistent status tracking enabled")
-
-    def detect(self, frame):
-        """Run person detection on frame."""
-        self.frame_count += 1
-
-        if self.frame_count % self.detect_every != 0:
-            return self.last_detections
-
-        try:
-            small = cv2.resize(frame, (640, 480))
-            scale_x = frame.shape[1] / 640
-            scale_y = frame.shape[0] / 480
-
-            boxes, weights = self.hog.detectMultiScale(
-                small,
-                winStride=(8, 8),
-                padding=(4, 4),
-                scale=1.05
-            )
-
-            detections = []
-            for (x, y, w, h), weight in zip(boxes, weights):
-                if weight < self.confidence:
-                    continue
-                ox = int(x * scale_x)
-                oy = int(y * scale_y)
-                ow = int(w * scale_x)
-                oh = int(h * scale_y)
-                detections.append((ox, oy, ow, oh, float(weight)))
-
-            # NMS to remove duplicates
-            if len(detections) > 1:
-                boxes_nms = [[d[0], d[1], d[2], d[3]] for d in detections]
-                scores = [d[4] for d in detections]
-                indices = cv2.dnn.NMSBoxes(boxes_nms, scores, self.confidence, 0.4)
-                if len(indices) > 0:
-                    if isinstance(indices[0], (list, np.ndarray)):
-                        indices = [i[0] for i in indices]
-                    detections = [detections[i] for i in indices]
-
-            self.last_detections = detections
-            return detections
-
-        except Exception as e:
-            print(f"[DETECT ERROR] {e}")
-            return self.last_detections
-
-    def detect_faces_in_bbox(self, frame, bbox):
-        """
-        Detect faces within a person's bounding box.
-        Returns True if at least one face is found.
-        """
-        x, y, w, h = bbox
-        fh, fw = frame.shape[:2]
-
-        # Clamp to frame bounds
-        x1 = max(0, x)
-        y1 = max(0, y)
-        x2 = min(fw, x + w)
-        y2 = min(fh, y + h)
-
-        if x2 - x1 < 30 or y2 - y1 < 30:
-            return False
-
-        # Crop the person region (upper portion where face would be)
-        face_region_h = int((y2 - y1) * 0.5)  # Top 50% of person bbox
-        roi = frame[y1:y1 + face_region_h, x1:x2]
-
-        if roi.size == 0:
-            return False
-
-        gray_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-        faces = self.face_cascade.detectMultiScale(
-            gray_roi,
-            scaleFactor=1.1,
-            minNeighbors=4,
-            minSize=(20, 20)
-        )
-
-        return len(faces) > 0
-
-    def update_tracking(self, detections):
-        """
-        Centroid tracking with PERSISTENT status.
-        Once a person's face is detected, their status sticks forever
-        (until they leave the room / disappear from tracking).
-        """
-        current_centroids = {}
-        for (x, y, w, h, conf) in detections:
-            cx = x + w // 2
-            cy = y + h // 2
-            current_centroids[(cx, cy)] = (x, y, w, h, conf)
-
-        if len(current_centroids) == 0:
-            for tid in list(self.tracked.keys()):
-                self.tracked[tid]['disappeared'] += 1
-                if self.tracked[tid]['disappeared'] > self.max_disappeared:
-                    del self.tracked[tid]
-            return self.tracked
-
-        if len(self.tracked) == 0:
-            for (cx, cy), (x, y, w, h, conf) in current_centroids.items():
-                self.tracked[self.next_id] = {
-                    'cx': cx, 'cy': cy,
-                    'bbox': (x, y, w, h),
-                    'smooth_bbox': [float(x), float(y), float(w), float(h)],
-                    'conf': conf,
-                    'status': 'unknown',
-                    'disappeared': 0,
-                    'face_seen': False,
-                    'face_check_count': 0
-                }
-                self.next_id += 1
-            return self.tracked
-
-        # Match existing tracks to new detections
-        track_ids = list(self.tracked.keys())
-        track_centers = [(self.tracked[tid]['cx'], self.tracked[tid]['cy'])
-                         for tid in track_ids]
-        det_centers = list(current_centroids.keys())
-
-        used_tracks = set()
-        used_dets = set()
-
-        pairs = []
-        for di, dc in enumerate(det_centers):
-            for ti, tc in enumerate(track_centers):
-                dist = np.sqrt((dc[0] - tc[0])**2 + (dc[1] - tc[1])**2)
-                pairs.append((dist, ti, di))
-        pairs.sort()
-
-        for dist, ti, di in pairs:
-            if ti in used_tracks or di in used_dets:
-                continue
-            if dist > self.max_match_distance:
-                continue
-
-            tid = track_ids[ti]
-            dc = det_centers[di]
-            x, y, w, h, conf = current_centroids[dc]
-
-            # Update centroid
-            self.tracked[tid]['cx'] = dc[0]
-            self.tracked[tid]['cy'] = dc[1]
-            self.tracked[tid]['conf'] = conf
-            self.tracked[tid]['disappeared'] = 0
-
-            # Raw bbox update
-            self.tracked[tid]['bbox'] = (x, y, w, h)
-
-            # Smooth bbox (exponential moving average)
-            sb = self.tracked[tid]['smooth_bbox']
-            a = self.bbox_smooth
-            sb[0] = a * sb[0] + (1 - a) * x
-            sb[1] = a * sb[1] + (1 - a) * y
-            sb[2] = a * sb[2] + (1 - a) * w
-            sb[3] = a * sb[3] + (1 - a) * h
-
-            used_tracks.add(ti)
-            used_dets.add(di)
-
-        # Register new detections
-        for di, dc in enumerate(det_centers):
-            if di not in used_dets:
-                x, y, w, h, conf = current_centroids[dc]
-                self.tracked[self.next_id] = {
-                    'cx': dc[0], 'cy': dc[1],
-                    'bbox': (x, y, w, h),
-                    'smooth_bbox': [float(x), float(y), float(w), float(h)],
-                    'conf': conf,
-                    'status': 'unknown',
-                    'disappeared': 0,
-                    'face_seen': False,
-                    'face_check_count': 0
-                }
-                self.next_id += 1
-
-        # Increment disappeared for unmatched tracks
-        for ti, tid in enumerate(track_ids):
-            if ti not in used_tracks:
-                self.tracked[tid]['disappeared'] += 1
-                if self.tracked[tid]['disappeared'] > self.max_disappeared:
-                    del self.tracked[tid]
-
-        return self.tracked
-
-    def update_face_status(self, frame):
-        """
-        Run face detection on tracked persons.
-        PERSISTENT STATUS: once face is detected, status sticks.
-        """
-        if self.frame_count % self.face_detect_every != 0:
-            return
-
-        for tid, info in self.tracked.items():
-            if info['disappeared'] > 0:
-                continue
-
-            # Skip if face was already permanently identified
-            if info['face_seen']:
-                continue
-
-            # Try to detect face inside this person's bounding box
-            bbox = info['bbox']
-            has_face = self.detect_faces_in_bbox(frame, bbox)
-
-            info['face_check_count'] += 1
-
-            if has_face:
-                info['face_seen'] = True
-                info['status'] = 'unknown'
-                print(f"[FACE] Track ID:{tid} - Face detected, status locked: {info['status']}")
-            elif info['face_check_count'] > 30:
-                pass
+# Occupancy smoothing (same as main.py BUG-9 fix)
+_occupancy_buffer = []
+_occupancy_buffer_size = 5
 
 
-# Global detector instance
-detector = TestModeDetector()
+def _get_demo_state():
+    with demo_state_lock:
+        return demo_state
+
+
+def _set_demo_state(new_state):
+    global demo_state
+    with demo_state_lock:
+        if demo_state != new_state:
+            old = demo_state
+            demo_state = new_state
+            print(f"[DEMO FSM] {old} → {new_state}")
 
 
 _start_lock = threading.Lock()
@@ -376,11 +163,14 @@ def stop_capture():
 
 def _capture_loop():
     """
-    Background thread: capture -> detect -> track -> face ID -> overlay -> store frame.
-    SAME pipeline as main.py on the Pi.
-    Uses the UNIFIED overlay renderer for identical visual output.
+    Background thread: capture → detect → track → face ID → overlay → store frame.
+    Uses the EXACT SAME production AI modules as main.py on the Pi.
     """
     global cap, current_frame, capture_running
+    global tracked_persons_ref, current_occupancy, current_faces, face_images_ref
+    global last_face_update
+    global _idle_face_counter, _alert_start_time, _empty_frame_counter
+    global _occupancy_buffer
     import platform
 
     # Use DirectShow on Windows for faster init + lower latency
@@ -414,7 +204,20 @@ def _capture_loop():
     actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     print(f"[STREAM] Webcam opened - {actual_w}x{actual_h} (HD) - camera ON")
-    print("[STREAM] Pipeline: HOG+SVM -> Tracking -> Face ID -> Overlays -> MJPEG")
+    print("[STREAM] Pipeline: PersonDetector → CentroidTracker → FaceDetector → Overlay → MJPEG")
+    print("[STREAM] Using SAME AI modules as main.py (production parity)")
+
+    # Reset demo state on capture start
+    _set_demo_state(STATE_IDLE)
+    _idle_face_counter = 0
+    _alert_start_time = None
+    _empty_frame_counter = 0
+    _occupancy_buffer.clear()
+
+    # Render debug counters
+    _render_debug_time = 0
+    _render_box_total = 0
+    _render_frame_total = 0
 
     while capture_running:
         ret, frame = cap.read()
@@ -425,33 +228,114 @@ def _capture_loop():
         # Mirror for selfie-view on webcam (matches camera_module.py behavior)
         frame = cv2.flip(frame, 1)
 
-        # === UNIFIED PIPELINE (matches main.py) ===
-        # Step 1: Person Detection (HOG+SVM body detector)
-        detections = detector.detect(frame)
+        now = time.time()
+        current_state = _get_demo_state()
+        faces = []
+        face_imgs = []
 
-        # Step 2: Centroid Tracking (persistent IDs)
-        tracked = detector.update_tracking(detections)
+        # =========================
+        # DUAL-MODE DETECTION (SAME AS main.py)
+        # IDLE/ACCESS: Face detection (entrance monitoring)
+        # INSIDE/LOITERING/ALERT: Person detection + tracking (room monitoring)
+        # =========================
+        if current_state in (STATE_INSIDE, STATE_LOITERING, STATE_ALERT):
+            # INSIDE/LOITERING/ALERT: Person detection + tracking
+            person_detections = person_detector.detect_persons(frame)
+            tracked_persons_ref = person_tracker.update(person_detections, frame)
 
-        # Step 3: Face Detection + Status Lock
-        detector.update_face_status(frame)
+            # Update authorization status (simplified for demo)
+            for person in tracked_persons_ref.values():
+                if person.disappeared == 0 and not person.status_locked:
+                    person.status = 'authorized'  # Demo: all persons shown as authorized
 
-        # Step 4: UNIFIED Overlay Rendering (same renderer as main.py)
-        # Count visible persons
-        visible = sum(1 for t in tracked.values() if t['disappeared'] == 0)
+            raw_occupancy = person_tracker.get_active_count()
 
+            # Still run face detection at reduced rate (same as main.py line 534)
+            if now - last_face_update > 2:
+                faces, face_imgs = face_detector.detect_faces(frame)
+                last_face_update = now
+        else:
+            # IDLE/ACCESS: Face detection
+            faces, face_imgs = face_detector.detect_faces(frame)
+            raw_occupancy = len(faces)
+
+        # Store for status endpoint
+        current_faces = faces
+        face_images_ref = face_imgs
+
+        # =========================
+        # OCCUPANCY SMOOTHING (same as main.py BUG-9 fix)
+        # =========================
+        _occupancy_buffer.append(raw_occupancy)
+        if len(_occupancy_buffer) > _occupancy_buffer_size:
+            _occupancy_buffer.pop(0)
+        current_occupancy = sorted(_occupancy_buffer)[len(_occupancy_buffer) // 2]
+
+        # =========================
+        # DEMO FSM STATE TRANSITIONS (mirrors main.py logic)
+        # =========================
+        if current_state == STATE_IDLE:
+            if current_occupancy > 0:
+                _idle_face_counter += 1
+                if _idle_face_counter >= _idle_grace_threshold:
+                    # Sustained face → simulate RFID tap → INSIDE
+                    _set_demo_state(STATE_INSIDE)
+                    _idle_face_counter = 0
+                    print("[DEMO] Person detected → transitioning to INSIDE")
+            else:
+                _idle_face_counter = 0
+
+        elif current_state == STATE_INSIDE:
+            if current_occupancy == 0:
+                _empty_frame_counter += 1
+                if _empty_frame_counter >= _empty_frame_threshold:
+                    _set_demo_state(STATE_IDLE)
+                    _empty_frame_counter = 0
+                    # Reset tracker for clean slate
+                    person_tracker.objects = {}
+                    tracked_persons_ref = {}
+                    print("[DEMO] Room empty → transitioning to IDLE")
+            else:
+                _empty_frame_counter = 0
+
+        elif current_state == STATE_ALERT:
+            if _alert_start_time and (now - _alert_start_time) > _alert_auto_clear_timeout:
+                if current_occupancy == 0:
+                    _set_demo_state(STATE_IDLE)
+                    _alert_start_time = None
+                    print("[DEMO] ALERT auto-cleared (no presence)")
+
+        # =========================
+        # UNIFIED OVERLAY RENDERING (SAME render_full_frame as main.py)
+        # =========================
         frame, boxes = render_full_frame(
             frame,
-            state='MONITORING',
-            occupancy=visible,
+            state=current_state,
+            occupancy=current_occupancy,
             sessions=0,
-            tracked_persons=tracked,
-            faces=None,
+            tracked_persons=tracked_persons_ref if current_state in (STATE_INSIDE, STATE_LOITERING, STATE_ALERT) else None,
+            faces=faces if current_state in (STATE_IDLE, STATE_ACCESS) else None,
             is_recording=False,
             armed=True,
             extra_info="AI Pipeline Active (Test Mode)"
         )
 
-        # Step 5: Store processed frame for MJPEG streaming
+        # Render debug logging (every 5 seconds)
+        _render_frame_total += 1
+        _render_box_total += boxes
+        if now - _render_debug_time > 5:
+            avg_boxes = _render_box_total / max(1, _render_frame_total)
+            tracked_count = len(tracked_persons_ref)
+            print(f"[RENDER] State: {current_state} | "
+                  f"Boxes/frame: {avg_boxes:.1f} | "
+                  f"Tracked: {tracked_count} | "
+                  f"Faces: {len(faces)} | "
+                  f"FPS: {_render_frame_total / 5:.1f}")
+            _render_debug_time = now
+            _render_box_total = 0
+            _render_frame_total = 0
+
+        # Store processed frame for MJPEG streaming
         with frame_lock:
             current_frame = frame.copy()
 
@@ -533,20 +417,41 @@ def video_feed():
     )
 
 
+@app.route('/ready', methods=['GET'])
+def stream_ready():
+    """Instant health check — frontend pings this before loading /video."""
+    return json.dumps({
+        'ready': capture_running and cap is not None and cap.isOpened(),
+        'state': _get_demo_state(),
+        'armed': True
+    }), 200, {'Content-Type': 'application/json'}
+
+
 @app.route('/status')
 def webcam_status():
-    """Return stream status with tracked person info for AI panel."""
-    visible = sum(1 for t in detector.tracked.values() if t.get('disappeared', 0) == 0)
+    """Return stream status with tracked person info for AI panel.
+    SAME format as main.py /status — camera.cshtml polls this."""
+    state = _get_demo_state()
+    visible = sum(1 for p in tracked_persons_ref.values()
+                  if hasattr(p, 'disappeared') and p.disappeared == 0) if tracked_persons_ref else 0
+    face_detected = current_occupancy > 0 and state in (STATE_IDLE, STATE_ACCESS)
+
+    # Threat level (same logic as main.py)
+    threat = 'SAFE'
+    if state == STATE_ALERT:
+        threat = 'ALERT'
+    elif state == STATE_LOITERING:
+        threat = 'WARNING'
+
     return json.dumps({
         "active": capture_running,
-        "viewers": active_viewers,
         "mode": "TEST",
-        "state": "MONITORING" if capture_running else "OFFLINE",
-        "occupancy": visible,
+        "state": state,
+        "occupancy": current_occupancy,
         "sessions": 0,
         "tracked_persons": visible,
-        "face_detected": any(t.get('face_seen', False) for t in detector.tracked.values()),
-        "threat_level": "SAFE",
+        "face_detected": face_detected,
+        "threat_level": threat,
         "recording": False,
         "pir_motion": False,
         "armed": True
@@ -604,17 +509,21 @@ if __name__ == '__main__':
     signal.signal(signal.SIGINT, _signal_handler)
     signal.signal(signal.SIGTERM, _signal_handler)
 
-    print("=" * 55)
+    print("=" * 60)
     print("  MJPEG Stream Server - Laptop Test Mode")
-    print("  WITH Detection + Tracking + Face ID + Bounding Boxes")
+    print("  PRODUCTION PARITY: Same AI modules as main.py")
+    print("")
+    print("  Modules: PersonDetector + CentroidTracker + FaceDetector")
+    print("  Renderer: render_full_frame (shared with main.py)")
     print("")
     print("  Stream:  http://localhost:5050/video")
     print("  Start:   http://localhost:5050/start")
     print("  Stop:    http://localhost:5050/stop")
+    print("  Status:  http://localhost:5050/status")
     print("  Health:  http://localhost:5050/health")
     print("")
-    print("  Pipeline: HOG -> Tracking -> Face ID -> Overlays -> MJPEG")
+    print("  Pipeline: PersonDetector → CentroidTracker → FaceDetector → Overlay → MJPEG")
     print("  Webcam opens ON-DEMAND (not at startup)")
-    print("=" * 55)
+    print("=" * 60)
 
     app.run(host='0.0.0.0', port=5050, debug=False, threaded=True)

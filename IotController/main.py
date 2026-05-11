@@ -52,8 +52,8 @@ class SmartSecuritySystem:
     """
 
     def __init__(self, use_simulated_rfid=False,
-                 api_url="http://localhost:5000/api/access/rfid",
-                 base_url="http://localhost:5000",
+                 api_url="http://localhost:5145/api/access/rfid",
+                 base_url="http://localhost:5145",
                  camera_id=1,
                  room_id=1,
                  max_stay_minutes=20,
@@ -1071,6 +1071,7 @@ class SmartSecuritySystem:
         # Query backend to see if UID is registered AND allowed in this room
         # =========================
         room_allowed = False
+        person_id = None  # Resolved from backend for DB linkage
         try:
             resp = requests.get(
                 f"{self.base_url}/api/access/rfid?uid={uid_str}&roomId={self.room_id}",
@@ -1082,6 +1083,10 @@ class SmartSecuritySystem:
                 self._handle_unknown_rfid(uid_str, now)
                 return
 
+            # Capture personId for database linkage
+            person_id = data.get("personId")
+            face_embedding_str = data.get("faceEmbedding")  # Base64 encoding from database
+
             # ROOM-BASED ACCESS CHECK (fail-secure)
             room_allowed = data.get("roomAllowed", False)
             room_name = data.get("roomName", "Unknown")
@@ -1089,27 +1094,23 @@ class SmartSecuritySystem:
             if not room_allowed:
                 print(f"[ACCESS] DENIED — {data.get('fullName', uid_str)} not authorized for {room_name}")
                 # Yellow LED flash to indicate room denial
-                self.hardware.show_rfid_verifying()
+                self.rgb_led.status_access()
                 time.sleep(0.3)
                 self.buzzer.beep(duration=0.3)
                 time.sleep(0.2)
                 self.buzzer.beep(duration=0.3)
-                self.hardware.all_leds_off()
+                self.rgb_led.off()
 
-                # Log denied access
+                # Log denied access via PushStateTransition (unified pipeline)
                 try:
-                    requests.post(
-                        f"{self.base_url}/api/access/log",
-                        json={
-                            "rfid_uid": uid_str,
-                            "person_id": data.get("personId"),
-                            "room_id": self.room_id,
-                            "access_result": "denied",
-                            "rfid_valid": True,
-                            "face_verified": False,
-                            "description": f"Room access denied: not assigned to {room_name}"
-                        },
-                        timeout=2
+                    self.push_state_transition(
+                        event="ALERT",
+                        session_id=str(uuid.uuid4()),
+                        rfid_uid=uid_str,
+                        person_id=data.get("personId"),
+                        alert_type="RoomAccessDenied",
+                        description=f"Room access denied: {data.get('fullName', uid_str)} not assigned to {room_name}",
+                        severity="WARNING"
                     )
                 except Exception:
                     pass
@@ -1138,12 +1139,16 @@ class SmartSecuritySystem:
         # =========================
         # FACE VERIFICATION (with confidence threshold)
         # Biometric Lock OFF = skip face check, grant access on RFID alone
+        # Compares live camera face against face_embedding from the database.
+        # The faceEmbedding is fetched from ASP.NET RFID lookup response.
+        # Falls back to local .pkl file if database embedding unavailable.
         # =========================
+        face_lookup_id = str(person_id) if person_id else uid_str
         if not self._biometric_lock_enabled:
             print(f"[ACCESS] Biometric Lock DISABLED â€” granting access on RFID alone for {user_id}")
             result = {"verified": True, "confidence": 100, "failure_type": None}
         else:
-            result = self.face_verifier.verify_rfid_with_face(user_id)
+            result = self.face_verifier.verify_rfid_with_face(face_lookup_id, db_embedding_str=face_embedding_str)
 
         if result["verified"] and result["confidence"] >= self.face_confidence_threshold * 100:
             # =========================
@@ -1157,7 +1162,8 @@ class SmartSecuritySystem:
                     "entry_time": now,
                     "last_active": now,
                     "status": "INSIDE",
-                    "rfid_uid": str(user_id)
+                    "rfid_uid": str(user_id),
+                    "person_id": person_id
                 }
 
             # =========================
@@ -1170,6 +1176,7 @@ class SmartSecuritySystem:
                 event="ENTRY",
                 session_id=session_id,
                 rfid_uid=str(user_id),
+                person_id=person_id,
                 confidence=result["confidence"] / 100.0
             )
 
@@ -1202,6 +1209,7 @@ class SmartSecuritySystem:
                     event="ALERT",
                     session_id=session_id,
                     rfid_uid=str(user_id),
+                    person_id=person_id,
                     alert_type="UnauthorizedAccess",
                     description=f"RFID {user_id} face MISMATCH (confidence: {result['confidence']}%)",
                     severity="HIGH"
@@ -1579,7 +1587,7 @@ class SmartSecuritySystem:
     # STATE TRANSITION API (â†’ ASP.NET Backend)
     # =========================
     def push_state_transition(self, event, session_id,
-                               rfid_uid=None, confidence=0,
+                               rfid_uid=None, person_id=None, confidence=0,
                                exit_reason=None, alert_type=None,
                                description=None, severity=None):
         """
@@ -1593,6 +1601,7 @@ class SmartSecuritySystem:
                 "Event": event,
                 "CameraId": self.camera_id,
                 "RoomId": self.room_id,
+                "PersonId": person_id,
                 "RfidUid": rfid_uid,
                 "Confidence": confidence,
                 "ExitReason": exit_reason,
@@ -1967,7 +1976,7 @@ def main():
 
     system = SmartSecuritySystem(
         use_simulated_rfid=not is_pi,  # Auto: real RFID on Pi, simulated on laptop
-        base_url="http://localhost:5000",
+        base_url=os.environ.get("ASPNET_URL", "http://localhost:5145"),
         camera_id=1,
         room_id=1,
         # =============================================
@@ -2120,15 +2129,11 @@ def main():
 
 
         # =========================
-        # CORS + COMPATIBILITY ROUTES
+        # COMPATIBILITY ROUTES
         # Camera is always running via CameraModule while main.py runs.
         # /start and /stop exist for frontend compatibility (sendBeacon).
+        # CORS already applied by @after_request at line 1999.
         # =========================
-        @stream_app.after_request
-        def add_cors(response):
-            response.headers['Access-Control-Allow-Origin'] = '*'
-            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
-            return response
 
         @stream_app.route('/start', methods=['POST', 'GET'])
         def stream_start():

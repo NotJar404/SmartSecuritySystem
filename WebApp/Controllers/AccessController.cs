@@ -147,7 +147,10 @@ namespace WebApp.Controllers
                 department = person.Department,
                 roomAllowed,
                 roomName,
-                roomId = roomId ?? 0
+                roomId = roomId ?? 0,
+                // Face embedding for Python edge controller verification
+                // Returns the stored encoding so verify can compare against live camera face
+                faceEmbedding = person.FaceEmbedding
             });
         }
 

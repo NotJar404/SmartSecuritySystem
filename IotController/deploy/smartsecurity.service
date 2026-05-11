@@ -17,6 +17,7 @@ StandardError=journal
 
 # Environment
 Environment=PYTHONUNBUFFERED=1
+Environment=ASPNET_URL=http://localhost:5000
 
 # GPIO permissions
 SupplementaryGroups=gpio spi i2c video

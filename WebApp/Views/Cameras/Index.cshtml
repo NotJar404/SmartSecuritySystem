@@ -417,7 +417,13 @@ function selectCamera(cam) {
     if (_mjpegFallbackTimer) { clearTimeout(_mjpegFallbackTimer); _mjpegFallbackTimer = null; }
 
     // Stream URL: database value or default localhost:5050/video
-    const STREAM_BASE = 'http://localhost:5050';
+    // STREAM_BASE auto-derives from cam.StreamUrl so it works across machines
+    const STREAM_BASE = (() => {
+        if (cam.StreamUrl && cam.StreamUrl.trim() !== '') {
+            try { const u = new URL(cam.StreamUrl); return u.protocol + '//' + u.host; } catch {}
+        }
+        return 'http://localhost:5050';
+    })();
     const streamUrl = (cam.StreamUrl && cam.StreamUrl.trim() !== '')
         ? cam.StreamUrl
         : STREAM_BASE + '/video';
@@ -849,7 +855,17 @@ document.addEventListener('DOMContentLoaded', function() {
     // REAL-TIME AI PANEL — polls Python FSM directly (1s)
     // Updates: Occupancy, Face Status, Threat Level, Alerts
     // =====================================================
-    const PYTHON_STATUS_URL = 'http://localhost:5050/status';
+    // Derive from active camera's StreamUrl if available, fallback to localhost
+    const PYTHON_STATUS_URL = (() => {
+        try {
+            const activeCam = _cameras && _cameras.length > 0 ? _cameras[0] : null;
+            if (activeCam && activeCam.StreamUrl && activeCam.StreamUrl.trim() !== '') {
+                const u = new URL(activeCam.StreamUrl);
+                return u.protocol + '//' + u.host + '/status';
+            }
+        } catch {}
+        return 'http://localhost:5050/status';
+    })();
     let aiPollInterval = null;
 
     function startAIPanelPolling() {
@@ -960,10 +976,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // sendBeacon is GUARANTEED to complete even during page close
         // (unlike fetch which browsers cancel on unload)
+        // Derive stop URL from active stream (supports cross-machine Architecture A)
+        const stopUrl = (() => {
+            try {
+                const activeCam = _cameras && _cameras.length > 0 ? _cameras[0] : null;
+                if (activeCam && activeCam.StreamUrl && activeCam.StreamUrl.trim() !== '') {
+                    const u = new URL(activeCam.StreamUrl);
+                    return u.protocol + '//' + u.host + '/stop';
+                }
+            } catch {}
+            return 'http://localhost:5050/stop';
+        })();
         if (navigator.sendBeacon) {
-            navigator.sendBeacon('http://localhost:5050/stop');
+            navigator.sendBeacon(stopUrl);
         } else {
-            fetch('http://localhost:5050/stop', { mode: 'no-cors', keepalive: true }).catch(() => {});
+            fetch(stopUrl, { mode: 'no-cors', keepalive: true }).catch(() => {});
         }
     }
 
