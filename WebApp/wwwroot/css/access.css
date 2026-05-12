@@ -115,9 +115,9 @@
     text-transform: uppercase;
 }
 
-.status-badge.authorized { background: #D8F3DC; color: var(--clr-auth); }
-.status-badge.suspicious { background: #FFF3E0; color: var(--clr-susp); }
-.status-badge.unauthorized { background: #FFE5E5; color: var(--clr-unauth); }
+.status-badge.authorized { background: rgba(45, 122, 86, 0.1); color: var(--status-active); border: 1px solid rgba(45, 122, 86, 0.2); }
+.status-badge.suspicious { background: rgba(212, 163, 115, 0.1); color: var(--btn-flag-gold); border: 1px solid rgba(212, 163, 115, 0.2); }
+.status-badge.unauthorized { background: rgba(224, 122, 95, 0.1); color: var(--alert); border: 1px solid rgba(224, 122, 95, 0.2); }
 
 /* ============================= */
 /* INFORMATION GRID              */

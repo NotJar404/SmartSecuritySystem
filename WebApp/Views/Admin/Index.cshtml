@@ -182,7 +182,7 @@
                 <h5>Alert Trends by Type</h5>
                 <small>Alerts by day of week stacked by type</small>
             </div>
-            <div class="chart-wrapper">
+            <div class="chart-wrapper" style="position:relative; height:300px;">
                 <canvas id="alertTypeChart"></canvas>
             </div>
         </div>
@@ -192,7 +192,7 @@
                 <h5>Access Security Posture</h5>
                 <small>Access results: Authorized, Suspicious, Unauthorized</small>
             </div>
-            <div class="chart-wrapper">
+            <div class="chart-wrapper" style="position:relative; height:300px;">
                 <canvas id="accessResultChart"></canvas>
             </div>
         </div>
@@ -204,7 +204,7 @@
                 <h5>Detection Type Distribution</h5>
                 <small>Detections by type — Person, Face, Motion, etc.</small>
             </div>
-            <div class="chart-wrapper">
+            <div class="chart-wrapper" style="position:relative; height:300px;">
                 <canvas id="detectionTypeChart"></canvas>
             </div>
         </div>
@@ -214,7 +214,7 @@
                 <h5>Facility Occupancy by Room</h5>
                 <small>Total occupancy count per room</small>
             </div>
-            <div class="chart-wrapper">
+            <div class="chart-wrapper" style="position:relative; height:300px;">
                 <canvas id="occupancyRoomChart"></canvas>
             </div>
         </div>
@@ -515,19 +515,14 @@
 <script>
 const { jsPDF } = window.jspdf;
 
-/* ============================= */
-/* DATA — ENHANCED CHART DATA */
-/* ============================= */
-const alertsByType = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AlertsByType ?? new Dictionary<string, int>()));
-const alertTrendsByDayAndType = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AlertTrendsByDayAndType ?? new Dictionary<string, Dictionary<string, int>>()));
-const accessByResult = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AccessByResult ?? new Dictionary<string, int>()));
-const detectionsByType = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.DetectionsByType ?? new Dictionary<string, int>()));
-const occupancyRoomLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.OccupancyRoomLabels ?? new List<string>()));
-const occupancyRoomCounts = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.OccupancyRoomCounts ?? new List<int>()));
+// ENSURE THIS IS ADMIN DASHBOARD PAGE ONLY
+const isDashboardPage = !window.location.pathname.includes('/Admin/Analytics');
 
-const colorPalette = [
-    '#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'
-];
+if (!isDashboardPage) {
+    console.warn('Dashboard script loaded on wrong page');
+} else {
+    console.log('✓ Admin Dashboard page initialized');
+}
 
 /* ============================= */
 /* MODAL FUNCTIONS (STANDARDIZED) */
@@ -642,12 +637,25 @@ function notifyFeature(feature) {
 }
 
 /* ============================= */
-/* CHARTS — ENHANCED */
+/* CHARTS — ENHANCED (DASHBOARD ONLY) */
 /* ============================= */
+if (isDashboardPage) {
+
+// DATA VARIABLES (DASHBOARD PAGE ONLY)
+const alertsByType = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AlertsByType ?? new Dictionary<string, int>()));
+const alertTrendsByDayAndType = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AlertTrendsByDayAndType ?? new Dictionary<string, Dictionary<string, int>>()));
+const accessByResult = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AccessByResult ?? new Dictionary<string, int>()));
+const detectionsByType = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.DetectionsByType ?? new Dictionary<string, int>()));
+const occupancyRoomLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.OccupancyRoomLabels ?? new List<string>()));
+const occupancyRoomCounts = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.OccupancyRoomCounts ?? new List<int>()));
+
+const colorPalette = [
+    '#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'
+];
 
 // 1. ALERT TRENDS BY DAY AND TYPE (Stacked Bar Chart)
 const alertTypeCtx = document.getElementById('alertTypeChart');
-if (alertTypeCtx) {
+if (alertTypeCtx && Object.keys(alertTrendsByDayAndType).length > 0) {
     // Get all unique alert types
     const allAlertTypes = new Set();
     Object.values(alertTrendsByDayAndType).forEach(dayData => {
@@ -688,7 +696,7 @@ if (alertTypeCtx) {
             plugins: {
                 legend: {
                     position: 'bottom',
-                    labels: { font: { size: 11 }, padding: 15 }
+                    labels: { font: { size: 11, weight: 'bold' }, padding: 15 }
                 }
             }
         }
@@ -697,25 +705,31 @@ if (alertTypeCtx) {
 
 // 2. ACCESS RESULT BREAKDOWN (Doughnut Chart)
 const accessResultCtx = document.getElementById('accessResultChart');
-if (accessResultCtx) {
-    const accessColors = {
+if (accessResultCtx && Object.keys(accessByResult).length > 0) {
+    const accessLabels = Object.keys(accessByResult);
+    const accessData = Object.values(accessByResult);
+    
+    // Ensure each label gets a distinct color
+    const accessColorMap = {
         'AUTHORIZED': '#22c55e',
+        'Authorized': '#22c55e',
         'SUSPICIOUS': '#f97316',
-        'UNAUTHORIZED': '#ef4444'
+        'Suspicious': '#f97316',
+        'UNAUTHORIZED': '#ef4444',
+        'Unauthorized': '#ef4444'
     };
-    const accessBgColors = Object.keys(accessByResult).map(key =>
-        accessColors[key] || '#95a5a6'
-    );
+    
+    const accessBgColors = accessLabels.map(label => accessColorMap[label] || '#95a5a6');
 
     new Chart(accessResultCtx, {
         type: 'doughnut',
         data: {
-            labels: Object.keys(accessByResult),
+            labels: accessLabels,
             datasets: [{
-                data: Object.values(accessByResult),
+                data: accessData,
                 backgroundColor: accessBgColors,
                 borderColor: '#fff',
-                borderWidth: 2
+                borderWidth: 3
             }]
         },
         options: {
@@ -724,7 +738,12 @@ if (accessResultCtx) {
             plugins: {
                 legend: {
                     position: 'bottom',
-                    labels: { font: { size: 11 }, padding: 12 }
+                    labels: { 
+                        font: { size: 11, weight: 'bold' }, 
+                        padding: 15,
+                        usePointStyle: true,
+                        pointStyle: 'circle'
+                    }
                 }
             }
         }
@@ -733,15 +752,18 @@ if (accessResultCtx) {
 
 // 3. DETECTION TYPE BREAKDOWN (Polar Area Chart)
 const detectionTypeCtx = document.getElementById('detectionTypeChart');
-if (detectionTypeCtx) {
+if (detectionTypeCtx && Object.keys(detectionsByType).length > 0) {
+    const detectionLabels = Object.keys(detectionsByType);
+    const detectionData = Object.values(detectionsByType);
+    
     new Chart(detectionTypeCtx, {
         type: 'polarArea',
         data: {
-            labels: Object.keys(detectionsByType),
+            labels: detectionLabels,
             datasets: [{
-                data: Object.values(detectionsByType),
-                backgroundColor: colorPalette.slice(0, Object.keys(detectionsByType).length).map(c => c + '40'),
-                borderColor: colorPalette.slice(0, Object.keys(detectionsByType).length),
+                data: detectionData,
+                backgroundColor: colorPalette.slice(0, detectionLabels.length).map(c => c + '66'),
+                borderColor: colorPalette.slice(0, detectionLabels.length),
                 borderWidth: 2
             }]
         },
@@ -751,12 +773,13 @@ if (detectionTypeCtx) {
             plugins: {
                 legend: {
                     position: 'bottom',
-                    labels: { font: { size: 11 }, padding: 15 }
+                    labels: { font: { size: 11, weight: 'bold' }, padding: 15 }
                 }
             },
             scales: {
                 r: {
-                    ticks: { font: { size: 9 } }
+                    ticks: { font: { size: 9 } },
+                    beginAtZero: true
                 }
             }
         }
@@ -765,17 +788,17 @@ if (detectionTypeCtx) {
 
 // 4. OCCUPANCY BY ROOM (Horizontal Bar Chart)
 const occupancyRoomCtx = document.getElementById('occupancyRoomChart');
-if (occupancyRoomCtx) {
+if (occupancyRoomCtx && occupancyRoomLabels.length > 0) {
     new Chart(occupancyRoomCtx, {
         type: "bar",
         data: {
-            labels: occupancyRoomLabels.length ? occupancyRoomLabels : ['No Data'],
+            labels: occupancyRoomLabels,
             datasets: [{
                 label: "People Count",
-                data: occupancyRoomCounts.length ? occupancyRoomCounts : [0],
+                data: occupancyRoomCounts,
                 backgroundColor: "#d4a373",
                 borderColor: "#8b6f47",
-                borderWidth: 1,
+                borderWidth: 2,
                 borderRadius: 4
             }]
         },
@@ -786,16 +809,23 @@ if (occupancyRoomCtx) {
             plugins: {
                 legend: {
                     position: 'bottom',
-                    labels: { font: { size: 11 }, padding: 15 }
+                    labels: { font: { size: 11, weight: 'bold' }, padding: 15 }
                 }
             },
             scales: {
-                x: { beginAtZero: true, ticks: { font: { size: 9 } } },
-                y: { ticks: { font: { size: 10 } } }
+                x: {
+                    beginAtZero: true,
+                    ticks: { font: { size: 9 } }
+                },
+                y: {
+                    ticks: { font: { size: 10 } }
+                }
             }
         }
     });
 }
+
+} // End of isDashboardPage check
 
 /* ============================= */
 /* EXPORT PDF — QCU LETTERHEAD   */

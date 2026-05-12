@@ -58,7 +58,7 @@
 │                    RASPBERRY PI 5                            │
 │                                                              │
 │  ┌─────────────────┐    ┌──────────────────────────────────┐ │
-│  │  Python IoT      │    │  ASP.NET MVC (Kestrel :5000)     │ │
+│  │  Python IoT      │    │  ASP.NET MVC (Kestrel :5145)     │ │
 │  │  Controller      │───►│  - Dashboard                     │ │
 │  │  (main.py)       │    │  - Access Control                │ │
 │  │                   │    │  - Personnel Management          │ │
@@ -73,7 +73,7 @@
 │            │              └──────────────────────────────────┘ │
 │  ┌─────────▼────────┐    ┌──────────────────────────────────┐ │
 │  │  Flask MJPEG      │    │  NGINX (port 80/443)             │ │
-│  │  Stream (:5050)   │    │  Reverse Proxy → Kestrel :5000   │ │
+│  │  Stream (:5050)   │    │  Reverse Proxy → Kestrel :5145   │ │
 │  └──────────────────┘    └──────────────────────────────────┘ │
 └──────────────────────────────────────────────────────────────┘
 ```
@@ -246,10 +246,10 @@ Ensure the connection string matches your Pi's PostgreSQL:
 
 ```bash
 cd /home/pi/SmartSecuritySystem/publish
-dotnet WebApp.dll --urls "http://0.0.0.0:5000"
+dotnet WebApp.dll --urls "http://0.0.0.0:5145"
 ```
 
-Open browser: `http://<PI_IP>:5000` — you should see the login page.
+Open browser: `http://<PI_IP>:5145` — you should see the login page.
 
 ---
 
@@ -324,7 +324,7 @@ Edit `main.py` — find the `main()` function at the bottom and set `base_url`:
 ```python
 system = SmartSecuritySystem(
     use_simulated_rfid=False,
-    base_url="http://localhost:5000",   # ASP.NET on same Pi
+    # base_url="http://localhost:5145" is set automatically from ASPNETCORE_HTTP_PORT env var
     camera_id=1,
     room_id=1,                          # Room this reader is assigned to
     max_stay_minutes=20,
@@ -499,7 +499,7 @@ server {
 
     # ASP.NET MVC Application
     location / {
-        proxy_pass http://127.0.0.1:5000;
+        proxy_pass http://127.0.0.1:5145;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection keep-alive;
@@ -560,7 +560,7 @@ After=network.target postgresql.service
 Type=simple
 User=pi
 WorkingDirectory=/home/pi/SmartSecuritySystem/publish
-ExecStart=/home/pi/.dotnet/dotnet WebApp.dll --urls "http://0.0.0.0:5000"
+ExecStart=/home/pi/.dotnet/dotnet WebApp.dll --urls "http://0.0.0.0:5145"
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -672,19 +672,19 @@ python -c "from Sensors.lock_sensor import SolenoidLock; s = SolenoidLock(); s.i
 
 ```bash
 # RFID lookup with room access check
-curl http://localhost:5000/api/access/rfid?uid=TEST123&roomId=1
+curl http://localhost:5145/api/access/rfid?uid=TEST123&roomId=1
 
 # Room list for a person
-curl http://localhost:5000/api/access/room-list?personId=1
+curl http://localhost:5145/api/access/room-list?personId=1
 
 # Available rooms
-curl http://localhost:5000/api/access/rooms
+curl http://localhost:5145/api/access/rooms
 
 # System status
-curl http://localhost:5000/api/system/status
+curl http://localhost:5145/api/system/status
 
 # Pi health
-curl http://localhost:5000/api/system/pi-health
+curl http://localhost:5145/api/system/pi-health
 
 # Camera stream
 curl -I http://localhost:5050/video
@@ -781,7 +781,7 @@ while True:
 | Service | URL | Port |
 |---------|-----|------|
 | Web Dashboard | `http://<PI_IP>/` | 80 (NGINX) |
-| ASP.NET Direct | `http://<PI_IP>:5000` | 5000 |
+| ASP.NET Direct | `http://<PI_IP>:5145` | 5145 |
 | Camera Stream | `http://<PI_IP>:5050/stream` | 5050 |
 | PostgreSQL | `localhost` | 5432 |
 
