@@ -69,14 +69,9 @@ var app = builder.Build();
 // CONFIGURE URLS / PORTS
 // =========================
 var httpPort = Environment.GetEnvironmentVariable("ASPNETCORE_HTTP_PORT") ?? "5145";
-// Clear default URLs and bind to both localhost AND all interfaces
-app.Urls.Clear();
-app.Urls.Add($"http://127.0.0.1:{httpPort}");      // For localhost connections
-app.Urls.Add($"http://0.0.0.0:{httpPort}");        // For network connections
-Console.WriteLine($"\n🚀 ASP.NET Server listening on:");
-Console.WriteLine($"   - http://localhost:{httpPort} (local)");
-Console.WriteLine($"   - http://127.0.0.1:{httpPort} (localhost)");
-Console.WriteLine($"   - http://0.0.0.0:{httpPort} (all interfaces)\n");
+var httpsPort = Environment.GetEnvironmentVariable("ASPNETCORE_HTTPS_PORT") ?? "7229";
+app.Urls.Add($"http://localhost:{httpPort}");
+app.Urls.Add($"https://localhost:{httpsPort}");
 
 // =========================
 // MIDDLEWARE
@@ -87,7 +82,7 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-//app.UseHttpsRedirection();
+app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();

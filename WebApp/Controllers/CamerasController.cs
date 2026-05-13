@@ -483,12 +483,13 @@ namespace WebApp.Controllers
                     _context.OccupancySessions.Add(session);
 
                     // Single access log for the entry event
+                    // Uses actual verification flags from Python edge controller
                     _context.AccessLogs.Add(new AccessLog
                     {
                         PersonId = data.PersonId,
                         RoomId = roomId,
-                        RfidValid = true,
-                        FaceVerified = true,
+                        RfidValid = data.RfidValid,
+                        FaceVerified = data.FaceVerified,
                         AccessResult = "granted",
                         Timestamp = DateTime.UtcNow
                     });
@@ -1169,6 +1170,8 @@ namespace WebApp.Controllers
 
         // Verification data
         public float Confidence { get; set; }
+        public bool RfidValid { get; set; }
+        public bool FaceVerified { get; set; }
 
         // Exit info
         public string? ExitReason { get; set; }  // DOOR_SENSOR, RFID_EXIT, INFERENCE

@@ -321,6 +321,14 @@ class SmartSecuritySystem:
         self._biometric_lock_enabled = True    # Access Control â†’ Biometric Lock
         self._active_alarm_priority = 0        # Emergency trigger priority tracker
 
+        # =========================
+        # API RETRY QUEUE (guaranteed delivery for critical events)
+        # =========================
+        self._enable_api_retry = os.environ.get("ENABLE_API_RETRY", "true").lower() == "true"
+        self._api_retry_queue = queue.Queue()
+        self._api_retry_max_attempts = 3
+        self._api_retry_delay = 5  # seconds between retries
+
     # =========================
     # INIT SYSTEM
     # =========================
@@ -380,6 +388,11 @@ class SmartSecuritySystem:
         # Start alarm settings polling (checks DB every 60s)
         threading.Thread(target=self._alarm_settings_poller, daemon=True).start()
         print("[SYSTEM] Alarm settings poller started")
+
+        # Start API retry worker (guaranteed delivery for critical events)
+        if self._enable_api_retry:
+            threading.Thread(target=self._api_retry_worker, daemon=True).start()
+            print("[SYSTEM] API retry worker started")
 
     # =========================
     # FSM STATE TRANSITION (THREAD-SAFE)
@@ -1172,12 +1185,16 @@ class SmartSecuritySystem:
             self.set_state(STATE_INSIDE)
 
             # Push to backend (single ENTRY event)
+            # rfid_valid=True because RFID was verified by backend lookup
+            # face_verified depends on whether biometric lock was enabled and passed
             self.push_state_transition(
                 event="ENTRY",
                 session_id=session_id,
                 rfid_uid=str(user_id),
                 person_id=person_id,
-                confidence=result["confidence"] / 100.0
+                confidence=result["confidence"] / 100.0,
+                rfid_valid=True,
+                face_verified=self._biometric_lock_enabled
             )
 
             # Unlock door + track entry window for tailgating
@@ -1584,87 +1601,139 @@ class SmartSecuritySystem:
             time.sleep(30)
 
     # =========================
-    # STATE TRANSITION API (â†’ ASP.NET Backend)
+    # CENTRALIZED API POST (with retry queue for critical events)
+    # =========================
+    def post_to_dashboard(self, endpoint, payload, critical=False):
+        """
+        Centralized POST to ASP.NET backend.
+        - critical=True: ENTRY, EXIT, ALERT -- queued for retry on failure
+        - critical=False: occupancy, detection -- fire-and-forget
+        """
+        url = f"{self.base_url}{endpoint}"
+        try:
+            response = requests.post(url, json=payload, timeout=3)
+            return response
+        except Exception as e:
+            if critical and self._enable_api_retry:
+                self._api_retry_queue.put({
+                    "url": url,
+                    "payload": payload,
+                    "attempts": 0,
+                    "timestamp": time.time()
+                })
+                print(f"[API RETRY] Queued critical POST to {endpoint} ({e})")
+            else:
+                print(f"[API] Non-critical POST failed: {endpoint} ({e})")
+            return None
+
+    def _api_retry_worker(self):
+        """Background thread: retries failed critical API calls (max 3 attempts, 5s delay)."""
+        print("[API RETRY] Worker started")
+        while self.is_running:
+            try:
+                item = self._api_retry_queue.get(timeout=2)
+            except queue.Empty:
+                continue
+
+            url = item["url"]
+            payload = item["payload"]
+            attempts = item["attempts"]
+
+            if attempts >= self._api_retry_max_attempts:
+                print(f"[API RETRY] GAVE UP after {attempts} attempts: {url}")
+                print(f"[API RETRY] Lost payload: {json.dumps(payload)[:200]}")
+                continue
+
+            time.sleep(self._api_retry_delay)
+
+            try:
+                response = requests.post(url, json=payload, timeout=5)
+                if response.status_code == 200:
+                    print(f"[API RETRY] SUCCESS on attempt {attempts + 1}: {url}")
+                else:
+                    raise Exception(f"HTTP {response.status_code}")
+            except Exception as e:
+                item["attempts"] = attempts + 1
+                self._api_retry_queue.put(item)
+                print(f"[API RETRY] Attempt {attempts + 1}/{self._api_retry_max_attempts} failed: {e}")
+
+    # =========================
+    # STATE TRANSITION API (-> ASP.NET Backend)
     # =========================
     def push_state_transition(self, event, session_id,
                                rfid_uid=None, person_id=None, confidence=0,
                                exit_reason=None, alert_type=None,
-                               description=None, severity=None):
+                               description=None, severity=None,
+                               rfid_valid=False, face_verified=False):
         """
         Push a state transition to the ASP.NET backend.
         This is the ONLY way the Python controller writes to the database.
         Each call represents a meaningful state change, NOT a frame event.
+        Uses retry queue for guaranteed delivery (critical=True).
         """
-        try:
-            payload = {
-                "SessionId": session_id,
-                "Event": event,
-                "CameraId": self.camera_id,
-                "RoomId": self.room_id,
-                "PersonId": person_id,
-                "RfidUid": rfid_uid,
-                "Confidence": confidence,
-                "ExitReason": exit_reason,
-                "AlertType": alert_type,
-                "Description": description,
-                "Severity": severity
-            }
+        payload = {
+            "SessionId": session_id,
+            "Event": event,
+            "CameraId": self.camera_id,
+            "RoomId": self.room_id,
+            "PersonId": person_id,
+            "RfidUid": rfid_uid,
+            "Confidence": confidence,
+            "RfidValid": rfid_valid,
+            "FaceVerified": face_verified,
+            "ExitReason": exit_reason,
+            "AlertType": alert_type,
+            "Description": description,
+            "Severity": severity
+        }
 
-            response = requests.post(
-                f"{self.base_url}/Cameras/PushStateTransition",
-                json=payload,
-                timeout=3
-            )
+        # ENTRY, EXIT, ALERT are critical -- must reach the database
+        is_critical = event in ("ENTRY", "EXIT", "ALERT")
 
-            if response.status_code == 200:
-                result = response.json()
-                if result.get("duplicate"):
-                    print(f"[API] Duplicate prevented: {result.get('message')}")
-                else:
-                    print(f"[API] State transition: {event} â†’ OK")
+        response = self.post_to_dashboard(
+            "/Cameras/PushStateTransition", payload, critical=is_critical
+        )
+
+        if response and response.status_code == 200:
+            result = response.json()
+            if result.get("duplicate"):
+                print(f"[API] Duplicate prevented: {result.get('message')}")
             else:
-                print(f"[API] State transition failed: {response.status_code}")
-
-        except Exception as e:
-            print(f"[API ERROR] State transition: {e}")
+                print(f"[API] State transition: {event} -> OK")
+        elif response:
+            print(f"[API] State transition failed: {response.status_code}")
 
     # =========================
-    # OCCUPANCY PUSH (preserved from original)
+    # OCCUPANCY PUSH (non-critical, fire-and-forget)
     # =========================
     def push_occupancy(self):
-        try:
-            requests.post(
-                f"{self.base_url}/Cameras/UpdateOccupancy",
-                json={
-                    "CameraId": self.camera_id,
-                    "PeopleCount": self.current_occupancy
-                },
-                timeout=2
-            )
-        except:
-            pass
+        self.post_to_dashboard(
+            "/Cameras/UpdateOccupancy",
+            {
+                "CameraId": self.camera_id,
+                "PeopleCount": self.current_occupancy
+            },
+            critical=False
+        )
 
     # =========================
-    # DETECTION PUSH (preserved from original, with debounce)
+    # DETECTION PUSH (non-critical, fire-and-forget)
     # =========================
     def push_detection(self, detection_type, count, confidence, triggered_alert=False):
-        try:
-            requests.post(
-                f"{self.base_url}/Cameras/PushDetection",
-                json={
-                    "CameraId": self.camera_id,
-                    "DetectionType": detection_type,
-                    "DetectedCount": count,
-                    "Confidence": confidence,
-                    "TriggeredAlert": triggered_alert
-                },
-                timeout=2
-            )
-        except:
-            pass
+        self.post_to_dashboard(
+            "/Cameras/PushDetection",
+            {
+                "CameraId": self.camera_id,
+                "DetectionType": detection_type,
+                "DetectedCount": count,
+                "Confidence": confidence,
+                "TriggeredAlert": triggered_alert
+            },
+            critical=False
+        )
 
     # =========================
-    # ALERT SYSTEM (preserved from original)
+    # ALERT SYSTEM (critical, uses retry queue)
     # =========================
     def send_alert(self, alert_type, description, severity="WARNING"):
         now = time.time()
@@ -1674,19 +1743,16 @@ class SmartSecuritySystem:
 
         self.last_alert_push = now
 
-        try:
-            requests.post(
-                f"{self.base_url}/Cameras/PushAlert",
-                json={
-                    "Type": alert_type,
-                    "Description": description,
-                    "Severity": severity,
-                    "RoomId": self.room_id
-                },
-                timeout=2
-            )
-        except:
-            pass
+        self.post_to_dashboard(
+            "/Cameras/PushAlert",
+            {
+                "Type": alert_type,
+                "Description": description,
+                "Severity": severity,
+                "RoomId": self.room_id
+            },
+            critical=True
+        )
 
     # =========================
     # UNLOCK (preserved from original, now uses SolenoidLock module)
@@ -1925,6 +1991,21 @@ class SmartSecuritySystem:
                     exit_reason="INFERENCE"
                 )
             self.active_sessions.clear()
+
+        # Drain API retry queue before shutdown
+        if self._enable_api_retry:
+            remaining = self._api_retry_queue.qsize()
+            if remaining > 0:
+                print(f"[API RETRY] Draining {remaining} queued items before shutdown...")
+                deadline = time.time() + 15  # Max 15s drain time
+                while not self._api_retry_queue.empty() and time.time() < deadline:
+                    try:
+                        item = self._api_retry_queue.get_nowait()
+                        requests.post(item["url"], json=item["payload"], timeout=3)
+                        print(f"[API RETRY] Drained: {item['url']}")
+                    except Exception:
+                        pass
+                print("[API RETRY] Queue drained")
 
         self.camera.stop()
         self.pir_sensor.cleanup()
