@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using WebApp.Data;
@@ -517,8 +517,8 @@ namespace WebApp.Controllers
     // =========================
     public class FlagRequest
     {
-        public string Name { get; set; }
-        public string Room { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Room { get; set; } = string.Empty;
     }
 
     public class LockdownRequest
