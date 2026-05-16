@@ -68,10 +68,23 @@ var app = builder.Build();
 // =========================
 // CONFIGURE URLS / PORTS
 // =========================
-var httpPort = Environment.GetEnvironmentVariable("ASPNETCORE_HTTP_PORT") ?? "5145";
-var httpsPort = Environment.GetEnvironmentVariable("ASPNETCORE_HTTPS_PORT") ?? "7229";
-app.Urls.Add($"http://localhost:{httpPort}");
-app.Urls.Add($"https://localhost:{httpsPort}");
+// ✅ Using port 5145 (HTTP only) — matches IotController configuration
+var httpPort = "5145";
+
+// ✅ BIND TO BOTH LOCALHOST (development) AND ALL INTERFACES (production/remote)
+// Localhost (127.0.0.1) — for laptop/local development
+app.Urls.Add($"http://127.0.0.1:{httpPort}");
+
+// All Interfaces (0.0.0.0) — for remote access from other machines
+app.Urls.Add($"http://0.0.0.0:{httpPort}");
+
+// 📝 PORT EXPLANATION:
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 5145 (HTTP):  Synchronized across WebApp and IotController
+//               - Both services communicate on this port
+//               - Can be ANY port > 1024 (no admin required)
+//               - Used by both laptop and Raspberry Pi
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 // =========================
 // MIDDLEWARE

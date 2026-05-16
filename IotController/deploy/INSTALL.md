@@ -51,32 +51,32 @@
 
 ---
 
-## Architecture
+## Architecture — Two Deployment Scenarios Supported
+
+### Scenario A: All-in-One Raspberry Pi ✓ RECOMMENDED FOR PRODUCTION
+Everything runs on one Raspberry Pi 5
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                    RASPBERRY PI 5                            │
+│  Main URLs: http://<PI_IP>/ (via NGINX)                      │
+│             http://<PI_IP>:5145/ (direct ASP.NET)            │
 │                                                              │
 │  ┌─────────────────┐    ┌──────────────────────────────────┐ │
 │  │  Python IoT      │    │  ASP.NET MVC (Kestrel :5145)     │ │
 │  │  Controller      │───►│  - Dashboard                     │ │
-│  │  (main.py)       │    │  - Access Control                │ │
-│  │                   │    │  - Personnel Management          │ │
-│  │  ├─ Camera       │    │  - System Settings               │ │
-│  │  ├─ RFID Reader  │    │  - Alerts                        │ │
-│  │  ├─ PIR Sensor   │    │  - Analytics                     │ │
-│  │  ├─ Solenoid     │    └────────────┬─────────────────────┘ │
-│  │  ├─ Buzzer       │                 │                       │
-│  │  ├─ RGB LED      │    ┌────────────▼─────────────────────┐ │
-│  │  └─ Door Sensor  │    │  PostgreSQL (localhost:5432)      │ │
-│  └─────────┬────────┘    │  Database: SmartSecurityDB        │ │
-│            │              └──────────────────────────────────┘ │
-│  ┌─────────▼────────┐    ┌──────────────────────────────────┐ │
-│  │  Flask MJPEG      │    │  NGINX (port 80/443)             │ │
-│  │  Stream (:5050)   │    │  Reverse Proxy → Kestrel :5145   │ │
-│  └──────────────────┘    └──────────────────────────────────┘ │
-└──────────────────────────────────────────────────────────────┘
-```
+│  │  (main.py)       │ L  │  - Access Control                │ │
+│  │  base_url:       │ O  │  - Personnel Management          │ │
+│  │  localhost:5145  │ C  │  - System Settings               │ │
+│  │  (local API)     │ A  │  - Alerts & Analytics            │ │
+│  │                   │ L  └─────────────┬─────────────────── │
+│  │  ├─ Camera       │                   │                    │
+│  │  ├─ RFID         │    ┌──────────────▼──────────────────┐ │
+│  │  ├─ PIR          │    │  PostgreSQL :5432               │ │
+│  │  ├─ Door         │    │  SmartSecurityDB                │ │
+│  │  ├─ Lock         │    │  (localhost only)               │ │
+│  │  ├─ Buzzer       │    └─────────────────────────────────┘ │
+│  │  └─ LED          │                                        │\n│                   │    ┌──────────────────────────────────┐ │\n│  ┌─────────────────┤    │  NGINX Port 80/443 :            │ │\n│  │ Flask :5050     │    │  External entry point           │ │\n│  │ MJPEG Stream    │    │  Proxies to :5145 + :5050       │ │\n│  └─────────────────┘    └──────────────────────────────────┘ │\n└──────────────────────────────────────────────────────────────┘\n```\n\n### Scenario B: Split Setup (Dashboard on Laptop, Hardware on Raspberry Pi)\nDevelopment/Testing: Dashboard on your laptop, hardware on Pi\n\n```\nLAPTOP (Windows/Mac/Linux)           RASPBERRY PI 5\nMain URL: http://localhost:5145      Hardware only\n                                      ┌──────────────────────┐\n┌────────────────────────────┐        │ Python IoT           │\n│ PostgreSQL :5432           │◄───────┤ (main.py)            │\n│ - SmartSecurityDB          │ HTTP   │ base_url:            │\n│   (all tables)             │        │ <laptop_ip>:5145     │\n│                            │        │                      │\n│ ASP.NET :5145              │        │ ├─ Camera Capture    │\n│ - Dashboard (browser)      │        │ ├─ Sensors I/O       │\n│ - APIs ← RFID calls        │        │ └─ Actuators         │\n│ - Admin Panel              │        │                      │\n│ - Analytics                │        │ Flask :5050          │\n│                            │        │ (MJPEG Stream)       │\n│ Browser Access:            │        └──────────────────────┘\n│ http://localhost:5145      │\n│ OR from Pi:                │\n│ http://<laptop_ip>:5145    │\n└────────────────────────────┘\n```\n\n**Key Differences:**\n\n| Item | Scenario A (Pi) | Scenario B (Split) |\n|------|---|---|\n| **base_url** in main.py | `localhost:5145` | `<laptop_ip>:5145` |\n| **Database location** | Raspberry Pi (local) | Laptop machine |\n| **ASP.NET binding** | `0.0.0.0:5145` (all interfaces) | `0.0.0.0:5145` (all interfaces) |\n| **Access from Pi hardware** | `http://localhost:5145` | `http://<laptop_ip>:5145` |\n| **Access from browser** | `http://<pi_ip>/` or `:5145` | `http://localhost:5145` |\n| **PostgreSQL location** | Pi (localhost:5432) | Laptop (localhost:5432) |\n| **NGINX** | Optional (recommended) | Not needed |\n| **Use case** | Production deployment | Development/testing |\n\n**Choose Scenario A for production. Choose Scenario B for development.**
 
 ---
 
@@ -317,17 +317,79 @@ cd /home/pi/SmartSecuritySystem/IotController
 python models/download_model.py
 ```
 
-### 4.5 Configure Backend URL
+### 4.5 Configure Backend URL — Choose Your Scenario
 
-Edit `main.py` — find the `main()` function at the bottom and set `base_url`:
+#### Option A: All-in-One Raspberry Pi (PRODUCTION)
+
+When everything runs on the Raspberry Pi:
 
 ```python
+# main.py (at the bottom in main() function)
+system = SmartSecuritySystem(
+    use_simulated_rfic=False,
+    # base_url="http://localhost:5145" ✓ DEFAULT (local connection)
+    # NO CHANGE NEEDED — uses localhost by default
+    camera_id=1,
+    room_id=1,
+    max_stay_minutes=20,
+    room_max_capacity=10,
+    operating_hours_start=6,
+    operating_hours_end=22
+)
+```
+
+**Connection Flow:**
+- main.py (IoT) runs on Raspberry Pi
+- ASP.NET runs on Raspberry Pi (same machine)
+- Python connects via `http://localhost:5145` ✓ WORKS
+- Access from browser: `http://<PI_IP>/` (via NGINX)
+
+#### Option B: Split Setup — Dashboard on Laptop (DEVELOPMENT)
+
+When dashboard/database runs on your development laptop:
+
+```python
+# main.py (at the bottom in main() function)
 system = SmartSecuritySystem(
     use_simulated_rfid=False,
-    # base_url="http://localhost:5145" is set automatically from ASPNETCORE_HTTP_PORT env var
+    base_url="http://192.168.1.100:5145",  # ← CHANGE THIS to your laptop IP
     camera_id=1,
-    room_id=1,                          # Room this reader is assigned to
+    room_id=1,
     max_stay_minutes=20,
+    room_max_capacity=10,
+    operating_hours_start=6,
+    operating_hours_end=22
+)
+```
+
+**Connection Flow:**
+- main.py (IoT) runs on Raspberry Pi
+- ASP.NET runs on your laptop
+- Python connects via `http://<LAPTOP_IP>:5145` ✓ WORKS
+- Access from browser: `http://localhost:5145` (on laptop)
+- Access from Pi: `http://<LAPTOP_IP>:5145`
+
+**How to find your laptop IP:**
+- Windows: `ipconfig` → look for "IPv4 Address" (e.g., 192.168.1.100)
+- Mac/Linux: `ifconfig` → look for "inet" (e.g., 192.168.1.100)
+
+**Important: Configure PostgreSQL connection string**
+
+Edit `appsettings.json` (on Pi or laptop, depending on where ASP.NET runs):
+
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=<DATABASE_HOST>;Port=5432;Database=SmartSecurityDB;Username=postgres;Password=1234"
+  }
+}
+```
+
+Replace `<DATABASE_HOST>` with:
+- **Scenario A (all on Pi):** `localhost` or `127.0.0.1`
+- **Scenario B (laptop DB):** `localhost` (if ASP.NET on laptop) or laptop IP (if ASP.NET on Pi)
+
+---
     room_max_capacity=10,
     operating_hours_start=6,
     operating_hours_end=22
@@ -776,14 +838,65 @@ while True:
 
 ---
 
+## 🔄 URL Configuration Summary
+
+### ✓ Scenario A: All-in-One Raspberry Pi (PRODUCTION)
+
+| Component | Binding | URL (from browser) | URL (from main.py) |
+|-----------|---------|-------|-------|
+| **ASP.NET Backend** | `0.0.0.0:5145` | `http://<PI_IP>:5145` | `http://localhost:5145` ✓ |
+| **PostgreSQL** | `localhost:5432` | N/A | `localhost:5432` ✓ |
+| **Flask Stream** | `0.0.0.0:5050` | `http://<PI_IP>:5050/video` | N/A |
+| **NGINX** | `0.0.0.0:80` | `http://<PI_IP>/` | N/A |
+
+**Key Point:** main.py uses `localhost:5145` by default (same machine) ✓
+
+---
+
+### ✓ Scenario B: Split Setup (Dashboard on Laptop)
+
+| Component | Where? | Binding | URL (from browser) | URL (from main.py) |
+|-----------|--------|---------|--------|--------|
+| **ASP.NET Backend** | Laptop | `0.0.0.0:5145` | `http://localhost:5145` | `http://<LAPTOP_IP>:5145` ✓ |
+| **PostgreSQL** | Laptop | `localhost:5432` | N/A | `localhost:5432` ✓ |
+| **Flask Stream** | Raspberry Pi | `0.0.0.0:5050` | `http://<PI_IP>:5050/video` | N/A |
+| **NGINX** | Optional | N/A | N/A | N/A |
+
+**Key Point:** main.py must use `http://<LAPTOP_IP>:5145` to reach dashboard on different machine
+
+```python
+# main.py configuration for Scenario B
+system = SmartSecuritySystem(
+    base_url="http://192.168.1.100:5145",  # Your laptop IP
+    ...
+)
+```
+
+---
+
 ## Quick Reference: System Access Points
 
-| Service | URL | Port |
-|---------|-----|------|
-| Web Dashboard | `http://<PI_IP>/` | 80 (NGINX) |
-| ASP.NET Direct | `http://<PI_IP>:5145` | 5145 |
-| Camera Stream | `http://<PI_IP>:5050/stream` | 5050 |
-| PostgreSQL | `localhost` | 5432 |
+### Scenario A (All-in-One Raspberry Pi):
+
+| Service | URL | Port | Notes |
+|---------|-----|------|-------|
+| **Web Dashboard** | `http://<PI_IP>/` | 80 | Via NGINX reverse proxy |
+| **ASP.NET Direct** | `http://<PI_IP>:5145` | 5145 | Direct access |
+| **Camera Stream** | `http://<PI_IP>:5050/video` | 5050 | Direct Flask endpoint |
+| **PostgreSQL** | `localhost` | 5432 | Local connection only |
+| **main.py uses** | `http://localhost:5145` | N/A | Same machine |
+
+### Scenario B (Split Setup):
+
+| Service | URL | Port | Notes |
+|---------|-----|------|-------|
+| **Web Dashboard** | `http://localhost:5145` | 5145 | Laptop only |
+| **ASP.NET API** | `http://<LAPTOP_IP>:5145` | 5145 | From Raspberry Pi |
+| **Camera Stream** | `http://<PI_IP>:5050/video` | 5050 | Pi's Flask endpoint |
+| **PostgreSQL** | `localhost` | 5432 | Laptop connection |
+| **main.py uses** | `http://<LAPTOP_IP>:5145` | N/A | Points to laptop |
+
+---
 
 ## Quick Reference: Service Commands
 

@@ -1,3 +1,20 @@
+"""
+PIR Motion Sensor Module for Smart Security System
+
+Uses lgpio directly for Pi 5 compatibility.
+No RPi.GPIO. No gpiozero.
+
+GPIO: BCM 17 (Pin 11) — HC-SR501 PIR sensor
+    VCC: 5V (Pin 2)
+    GND: Pin 6
+    OUT: GPIO 17 — reads HIGH on motion, LOW on idle
+
+Role in FSM:
+- Provides motion/inactivity data for loitering detection
+- Does NOT generate database logs directly
+- Updates last_motion_time used by the FSM
+"""
+
 import time
 import threading
 import platform
@@ -5,16 +22,10 @@ import platform
 
 class PIRSensor:
     """
-    PIR Motion Sensor Module for Smart Security System
+    PIR Motion Sensor with debounce and simulation fallback.
 
-    Supports:
-    - Real Raspberry Pi GPIO (BCM pin)
-    - Simulated mode for laptop/desktop testing
-
-    Role in FSM:
-    - Provides motion/inactivity data for loitering detection
-    - Does NOT generate database logs directly
-    - Updates last_motion_time used by the FSM
+    Uses lgpio directly — no RPi.GPIO, no gpiozero.
+    Thread-safe state access for multithreaded FSM.
     """
 
     def __init__(self, pin=17, simulated=None):
@@ -29,6 +40,8 @@ class PIRSensor:
         self.is_running = False
         self.lock = threading.Lock()
         self.callback = None
+        self._initialized = False
+        self._error_logged = False
 
         # Auto-detect: simulate on non-Linux (laptop testing)
         if simulated is None:
@@ -36,23 +49,26 @@ class PIRSensor:
         else:
             self.simulated = simulated
 
-        self._gpio = None
-
     # =========================
     # INITIALIZE
     # =========================
     def initialize(self):
-        """Set up GPIO or simulation mode"""
+        """Set up GPIO or simulation mode."""
         if self.simulated:
             print("[PIR] Running in SIMULATED mode (laptop fallback)")
             return True
 
         try:
-            import RPi.GPIO as GPIO
-            self._gpio = GPIO
-            self._gpio.setmode(GPIO.BCM)
-            self._gpio.setup(self.pin, GPIO.IN)
-            print(f"[PIR] Initialized on GPIO pin {self.pin}")
+            import lgpio
+            from Sensors.hardware import _get_chip
+
+            chip = _get_chip()
+            if chip is None:
+                raise RuntimeError("No GPIO chip available")
+
+            lgpio.gpio_claim_input(chip, self.pin)
+            self._initialized = True
+            print(f"[PIR] Initialized on GPIO {self.pin}")
             return True
         except Exception as e:
             print(f"[PIR ERROR] GPIO init failed: {e}")
@@ -65,7 +81,7 @@ class PIRSensor:
     # =========================
     def start(self, callback=None):
         """
-        Start PIR monitoring loop
+        Start PIR monitoring loop.
 
         callback: function(motion_detected: bool) — called on state change only
         """
@@ -80,7 +96,7 @@ class PIRSensor:
     # MONITOR LOOP
     # =========================
     def _monitor_loop(self):
-        """Continuously poll PIR state — only reports state CHANGES"""
+        """Continuously poll PIR state — only reports state CHANGES."""
         previous_state = False
 
         while self.is_running:
@@ -90,7 +106,16 @@ class PIRSensor:
                     # The FSM can call simulate_motion() to trigger motion
                     current_state = self.motion_detected
                 else:
-                    current_state = self._gpio.input(self.pin) == 1
+                    import lgpio
+                    from Sensors.hardware import _get_chip
+
+                    chip = _get_chip()
+                    if chip is None:
+                        time.sleep(1)
+                        continue
+
+                    val = lgpio.gpio_read(chip, self.pin)
+                    current_state = bool(val)
 
                 # Update last motion time on rising edge
                 if current_state and not previous_state:
@@ -109,9 +134,12 @@ class PIRSensor:
                         self.callback(False)
 
                 previous_state = current_state
+                self._error_logged = False
 
             except Exception as e:
-                print(f"[PIR ERROR] {e}")
+                if not self._error_logged:
+                    print(f"[PIR ERROR] {e}")
+                    self._error_logged = True
 
             time.sleep(0.2)  # 200ms polling — sufficient for PIR
 
@@ -119,17 +147,17 @@ class PIRSensor:
     # STATE ACCESSORS (THREAD-SAFE)
     # =========================
     def is_motion_detected(self):
-        """Current motion state"""
+        """Current motion state."""
         with self.lock:
             return self.motion_detected
 
     def get_last_motion_time(self):
-        """Timestamp of last detected motion"""
+        """Timestamp of last detected motion."""
         with self.lock:
             return self.last_motion_time
 
     def get_inactivity_duration(self):
-        """Seconds since last motion — used by loitering algorithm"""
+        """Seconds since last motion — used by loitering algorithm."""
         with self.lock:
             if self.last_motion_time == 0:
                 # Return 0 on startup (no motion seen yet) so the FSM
@@ -143,7 +171,7 @@ class PIRSensor:
     # SIMULATION HELPERS (LAPTOP TESTING)
     # =========================
     def simulate_motion(self):
-        """Manually trigger motion event for testing"""
+        """Manually trigger motion event for testing."""
         if not self.simulated:
             return
 
@@ -157,7 +185,7 @@ class PIRSensor:
         print("[PIR SIM] Motion triggered")
 
     def simulate_idle(self):
-        """Manually clear motion for testing"""
+        """Manually clear motion for testing."""
         if not self.simulated:
             return
 
@@ -178,9 +206,5 @@ class PIRSensor:
 
     def cleanup(self):
         self.is_running = False
-        if not self.simulated and self._gpio:
-            try:
-                self._gpio.cleanup(self.pin)
-            except:
-                pass
+        self._initialized = False
         print("[PIR] Cleaned up")

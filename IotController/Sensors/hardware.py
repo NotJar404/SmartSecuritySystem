@@ -2,10 +2,8 @@
 Unified Hardware Control Module for Smart Security System
 Combines: Active Buzzer, RGB LED, Magnetic Door Sensor
 
-All components follow the same pattern as pir_sensor.py and lock_sensor.py:
-- Auto-detect Raspberry Pi vs laptop (simulation mode)
-- Thread-safe state access
-- Clean GPIO shutdown
+All components use lgpio directly for Pi 5 compatibility.
+No RPi.GPIO. No gpiozero default backend ambiguity.
 
 GPIO Pin Mapping (BCM):
     Buzzer:         GPIO 24  (Pin 18) — Active buzzer, 3-24V
@@ -21,15 +19,56 @@ import platform
 
 
 # =========================
+# LGPIO CHIP SINGLETON
+# Prevents double-open of /dev/gpiochip4 across modules.
+# =========================
+_lgpio_chip = None
+_lgpio_chip_lock = threading.Lock()
+
+
+def _get_chip():
+    """Get or create the shared lgpio chip handle (Pi 5 = gpiochip4)."""
+    global _lgpio_chip
+    with _lgpio_chip_lock:
+        if _lgpio_chip is not None:
+            return _lgpio_chip
+        try:
+            import lgpio
+            _lgpio_chip = lgpio.gpiochip_open(4)
+            print("[GPIO] lgpio chip 4 opened (Pi 5)")
+            return _lgpio_chip
+        except Exception:
+            try:
+                import lgpio
+                _lgpio_chip = lgpio.gpiochip_open(0)
+                print("[GPIO] lgpio chip 0 opened (Pi 4 / fallback)")
+                return _lgpio_chip
+            except Exception as e:
+                print(f"[GPIO ERROR] Cannot open gpiochip: {e}")
+                return None
+
+
+def _cleanup_chip():
+    """Close the shared lgpio chip handle on system shutdown."""
+    global _lgpio_chip
+    with _lgpio_chip_lock:
+        if _lgpio_chip is not None:
+            try:
+                import lgpio
+                lgpio.gpiochip_close(_lgpio_chip)
+            except Exception:
+                pass
+            _lgpio_chip = None
+
+
+# =========================
 # ACTIVE BUZZER
 # =========================
 class Buzzer:
     """
     Active Buzzer Module for alarm/notification sounds.
 
-    Supports:
-    - Real Raspberry Pi GPIO (BCM pin)
-    - Simulated mode for laptop/desktop testing
+    Uses lgpio directly — no RPi.GPIO, no gpiozero.
 
     Role in FSM:
     - Audible alarm on intrusion/denied access
@@ -44,13 +83,12 @@ class Buzzer:
         self.lock = threading.Lock()
         self._alarm_thread = None
         self._alarm_running = False
+        self._initialized = False
 
         if simulated is None:
             self.simulated = platform.system().lower() != "linux"
         else:
             self.simulated = simulated
-
-        self._gpio = None
 
     def initialize(self):
         if self.simulated:
@@ -58,17 +96,32 @@ class Buzzer:
             return True
 
         try:
-            import RPi.GPIO as GPIO
-            self._gpio = GPIO
-            self._gpio.setmode(GPIO.BCM)
-            self._gpio.setup(self.pin, GPIO.OUT)
-            self._gpio.output(self.pin, GPIO.LOW)  # Start silent
-            print(f"[BUZZER] Initialized on GPIO pin {self.pin}")
+            import lgpio
+            chip = _get_chip()
+            if chip is None:
+                raise RuntimeError("No GPIO chip available")
+
+            lgpio.gpio_claim_output(chip, self.pin, 0)
+            self._initialized = True
+            print(f"[BUZZER] Initialized on GPIO {self.pin}")
             return True
         except Exception as e:
             print(f"[BUZZER ERROR] GPIO init failed: {e}")
+            print("[BUZZER] Falling back to SIMULATED mode")
             self.simulated = True
             return True
+
+    def _gpio_write(self, value):
+        """Safe GPIO write — never raises."""
+        if self.simulated or not self._initialized:
+            return
+        try:
+            import lgpio
+            chip = _get_chip()
+            if chip is not None:
+                lgpio.gpio_write(chip, self.pin, value)
+        except Exception:
+            pass
 
     def beep(self, duration=0.2):
         """Short confirmation beep (access granted)."""
@@ -83,16 +136,15 @@ class Buzzer:
         with self.lock:
             self.is_active = True
             if self.simulated:
-                print(f"[BUZZER SIM] 🔊 Beep ({duration}s)")
+                print(f"[BUZZER SIM] Beep ({duration}s)")
             else:
-                self._gpio.output(self.pin, GPIO.HIGH)
+                self._gpio_write(1)
 
         time.sleep(duration)
 
         with self.lock:
             self.is_active = False
-            if not self.simulated:
-                self._gpio.output(self.pin, GPIO.LOW)
+            self._gpio_write(0)
 
     def pattern_beep(self, times=3, interval=0.3):
         """Warning pattern beep (loitering, extended stay)."""
@@ -123,23 +175,21 @@ class Buzzer:
     def _alarm_sequence(self, duration):
         start = time.time()
         if self.simulated:
-            print(f"[BUZZER SIM] 🚨 ALARM ON ({duration}s)")
+            print(f"[BUZZER SIM] ALARM ON ({duration}s)")
 
         with self.lock:
             self.is_active = True
-            if not self.simulated:
-                self._gpio.output(self.pin, GPIO.HIGH)
+            self._gpio_write(1)
 
         while self._alarm_running and (time.time() - start) < duration:
             time.sleep(0.1)
 
         with self.lock:
             self.is_active = False
-            if not self.simulated:
-                self._gpio.output(self.pin, GPIO.LOW)
+            self._gpio_write(0)
 
         if self.simulated:
-            print("[BUZZER SIM] 🔇 ALARM OFF")
+            print("[BUZZER SIM] ALARM OFF")
 
     def alarm_fire(self, duration=15):
         """Fast intermittent alarm for fire protocol."""
@@ -152,20 +202,18 @@ class Buzzer:
     def _fire_sequence(self, duration):
         start = time.time()
         if self.simulated:
-            print(f"[BUZZER SIM] 🔥 FIRE ALARM ({duration}s)")
+            print(f"[BUZZER SIM] FIRE ALARM ({duration}s)")
         while self._alarm_running and (time.time() - start) < duration:
             with self.lock:
                 self.is_active = True
-                if not self.simulated:
-                    self._gpio.output(self.pin, GPIO.HIGH)
+                self._gpio_write(1)
             time.sleep(0.15)
             with self.lock:
                 self.is_active = False
-                if not self.simulated:
-                    self._gpio.output(self.pin, GPIO.LOW)
+                self._gpio_write(0)
             time.sleep(0.1)
         if self.simulated:
-            print("[BUZZER SIM] 🔇 FIRE ALARM OFF")
+            print("[BUZZER SIM] FIRE ALARM OFF")
 
     def alarm_earthquake(self, duration=20):
         """Slow pulsing alarm for earthquake mode."""
@@ -178,20 +226,18 @@ class Buzzer:
     def _earthquake_sequence(self, duration):
         start = time.time()
         if self.simulated:
-            print(f"[BUZZER SIM] 🌍 EARTHQUAKE ALARM ({duration}s)")
+            print(f"[BUZZER SIM] EARTHQUAKE ALARM ({duration}s)")
         while self._alarm_running and (time.time() - start) < duration:
             with self.lock:
                 self.is_active = True
-                if not self.simulated:
-                    self._gpio.output(self.pin, GPIO.HIGH)
+                self._gpio_write(1)
             time.sleep(0.8)
             with self.lock:
                 self.is_active = False
-                if not self.simulated:
-                    self._gpio.output(self.pin, GPIO.LOW)
+                self._gpio_write(0)
             time.sleep(0.8)
         if self.simulated:
-            print("[BUZZER SIM] 🔇 EARTHQUAKE ALARM OFF")
+            print("[BUZZER SIM] EARTHQUAKE ALARM OFF")
 
     def alarm_medical(self, duration=15):
         """Urgent repeating pattern for medical emergency."""
@@ -204,7 +250,7 @@ class Buzzer:
     def _medical_sequence(self, duration):
         start = time.time()
         if self.simulated:
-            print(f"[BUZZER SIM] 🚑 MEDICAL ALARM ({duration}s)")
+            print(f"[BUZZER SIM] MEDICAL ALARM ({duration}s)")
         while self._alarm_running and (time.time() - start) < duration:
             # 3 rapid beeps then pause
             for _ in range(3):
@@ -212,33 +258,28 @@ class Buzzer:
                     break
                 with self.lock:
                     self.is_active = True
-                    if not self.simulated:
-                        self._gpio.output(self.pin, GPIO.HIGH)
+                    self._gpio_write(1)
                 time.sleep(0.1)
                 with self.lock:
                     self.is_active = False
-                    if not self.simulated:
-                        self._gpio.output(self.pin, GPIO.LOW)
+                    self._gpio_write(0)
                 time.sleep(0.1)
             time.sleep(0.5)
         if self.simulated:
-            print("[BUZZER SIM] 🔇 MEDICAL ALARM OFF")
+            print("[BUZZER SIM] MEDICAL ALARM OFF")
 
     def stop(self):
         """Immediately silence the buzzer."""
         self._alarm_running = False
         with self.lock:
             self.is_active = False
-            if not self.simulated and self._gpio:
-                self._gpio.output(self.pin, GPIO.LOW)
+            self._gpio_write(0)
 
     def cleanup(self):
         self.stop()
-        if not self.simulated and self._gpio:
-            try:
-                self._gpio.cleanup(self.pin)
-            except:
-                pass
+        # Pin is released when chip is closed at system shutdown.
+        # No per-pin close needed with lgpio.
+        self._initialized = False
         print("[BUZZER] Cleaned up")
 
 
@@ -248,6 +289,8 @@ class Buzzer:
 class RGBLed:
     """
     RGB LED Module for visual system status indication.
+
+    Uses lgpio directly — no RPi.GPIO, no gpiozero.
 
     Colors:
         IDLE:       Blue        (0, 0, 1)
@@ -266,13 +309,12 @@ class RGBLed:
         self.current_color = "OFF"
         self.lock = threading.Lock()
         self._blink_running = False
+        self._initialized = False
 
         if simulated is None:
             self.simulated = platform.system().lower() != "linux"
         else:
             self.simulated = simulated
-
-        self._gpio = None
 
     def initialize(self):
         if self.simulated:
@@ -280,18 +322,33 @@ class RGBLed:
             return True
 
         try:
-            import RPi.GPIO as GPIO
-            self._gpio = GPIO
-            self._gpio.setmode(GPIO.BCM)
-            for pin in [self.pin_r, self.pin_g, self.pin_b]:
-                self._gpio.setup(pin, GPIO.OUT)
-                self._gpio.output(pin, GPIO.LOW)
-            print(f"[RGB LED] Initialized on GPIO pins R={self.pin_r}, G={self.pin_g}, B={self.pin_b}")
+            import lgpio
+            chip = _get_chip()
+            if chip is None:
+                raise RuntimeError("No GPIO chip available")
+
+            for pin in (self.pin_r, self.pin_g, self.pin_b):
+                lgpio.gpio_claim_output(chip, pin, 0)
+
+            self._initialized = True
+            print(f"[RGB LED] Initialized on GPIO R={self.pin_r}, G={self.pin_g}, B={self.pin_b}")
             return True
         except Exception as e:
             print(f"[RGB LED ERROR] GPIO init failed: {e}")
             self.simulated = True
             return True
+
+    def _gpio_write(self, pin, value):
+        """Safe GPIO write — never raises."""
+        if self.simulated or not self._initialized:
+            return
+        try:
+            import lgpio
+            chip = _get_chip()
+            if chip is not None:
+                lgpio.gpio_write(chip, pin, value)
+        except Exception:
+            pass
 
     def set_color(self, r, g, b, label="custom"):
         """Set LED color. Values: 0 (off) or 1 (on) per channel."""
@@ -302,9 +359,9 @@ class RGBLed:
                 if r or g or b:
                     print(f"[RGB LED SIM] Color: {label} (R={r}, G={g}, B={b})")
             else:
-                self._gpio.output(self.pin_r, GPIO.HIGH if r else GPIO.LOW)
-                self._gpio.output(self.pin_g, GPIO.HIGH if g else GPIO.LOW)
-                self._gpio.output(self.pin_b, GPIO.HIGH if b else GPIO.LOW)
+                self._gpio_write(self.pin_r, int(r))
+                self._gpio_write(self.pin_g, int(g))
+                self._gpio_write(self.pin_b, int(b))
 
     def status_idle(self):
         """Blue — system idle, monitoring entrance."""
@@ -384,7 +441,7 @@ class RGBLed:
     def _blink_alternate(self):
         """Red-blue alternating pattern (medical emergency)."""
         if self.simulated:
-            print("[RGB LED SIM] Alternate: MEDICAL (Red ↔ Blue)")
+            print("[RGB LED SIM] Alternate: MEDICAL (Red / Blue)")
         while self._blink_running:
             self.set_color(1, 0, 0, "MEDICAL/Red")
             time.sleep(0.3)
@@ -414,9 +471,10 @@ class RGBLed:
     def off(self):
         with self.lock:
             self.current_color = "OFF"
-            if not self.simulated and self._gpio:
-                for pin in [self.pin_r, self.pin_g, self.pin_b]:
-                    self._gpio.output(pin, GPIO.LOW)
+            if not self.simulated and self._initialized:
+                self._gpio_write(self.pin_r, 0)
+                self._gpio_write(self.pin_g, 0)
+                self._gpio_write(self.pin_b, 0)
 
     def get_status(self):
         with self.lock:
@@ -425,12 +483,7 @@ class RGBLed:
     def cleanup(self):
         self._blink_running = False
         self.off()
-        if not self.simulated and self._gpio:
-            try:
-                for pin in [self.pin_r, self.pin_g, self.pin_b]:
-                    self._gpio.cleanup(pin)
-            except:
-                pass
+        self._initialized = False
         print("[RGB LED] Cleaned up")
 
 
@@ -441,10 +494,12 @@ class DoorSensor:
     """
     Magnetic Reed Switch Door Sensor Module.
 
+    Uses lgpio directly — no RPi.GPIO, no gpiozero.
+
     Detects door open/close state changes.
-    Uses INPUT with PULL_UP — reed switch connects GPIO to GND.
-        - Door CLOSED: switch closed → GPIO reads LOW
-        - Door OPEN:   switch open  → GPIO reads HIGH (pulled up)
+    Reed switch connects GPIO to GND:
+        - Door CLOSED: switch closed -> GPIO reads LOW (0)
+        - Door OPEN:   switch open  -> GPIO reads HIGH (1, pulled up)
 
     Role in FSM:
     - Detect unauthorized door openings (ForcedEntry alert)
@@ -458,13 +513,13 @@ class DoorSensor:
         self.is_running = False
         self.lock = threading.Lock()
         self.callback = None
+        self._initialized = False
+        self._error_logged = False
 
         if simulated is None:
             self.simulated = platform.system().lower() != "linux"
         else:
             self.simulated = simulated
-
-        self._gpio = None
 
     def initialize(self):
         if self.simulated:
@@ -472,13 +527,19 @@ class DoorSensor:
             return True
 
         try:
-            import RPi.GPIO as GPIO
-            self._gpio = GPIO
-            self._gpio.setmode(GPIO.BCM)
-            self._gpio.setup(self.pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-            # Read initial state
-            self.is_open = self._gpio.input(self.pin) == 1
-            print(f"[DOOR] Initialized on GPIO pin {self.pin} — {'OPEN' if self.is_open else 'CLOSED'}")
+            import lgpio
+            chip = _get_chip()
+            if chip is None:
+                raise RuntimeError("No GPIO chip available")
+
+            lgpio.gpio_claim_input(chip, self.pin, lgpio.SET_PULL_UP)
+            self._initialized = True
+
+            # Read initial state: HIGH = door open (pull-up, switch open)
+            val = lgpio.gpio_read(chip, self.pin)
+            self.is_open = bool(val)
+
+            print(f"[DOOR] Initialized on GPIO {self.pin} — {'OPEN' if self.is_open else 'CLOSED'}")
             return True
         except Exception as e:
             print(f"[DOOR ERROR] GPIO init failed: {e}")
@@ -501,7 +562,13 @@ class DoorSensor:
                 if self.simulated:
                     current_state = self.is_open
                 else:
-                    current_state = self._gpio.input(self.pin) == 1
+                    import lgpio
+                    chip = _get_chip()
+                    if chip is None:
+                        time.sleep(1)
+                        continue
+                    val = lgpio.gpio_read(chip, self.pin)
+                    current_state = bool(val)
 
                 if current_state != previous_state:
                     with self.lock:
@@ -515,8 +582,12 @@ class DoorSensor:
 
                     previous_state = current_state
 
+                self._error_logged = False
+
             except Exception as e:
-                print(f"[DOOR ERROR] {e}")
+                if not self._error_logged:
+                    print(f"[DOOR ERROR] {e}")
+                    self._error_logged = True
 
             time.sleep(0.2)
 
@@ -545,9 +616,5 @@ class DoorSensor:
 
     def cleanup(self):
         self.is_running = False
-        if not self.simulated and self._gpio:
-            try:
-                self._gpio.cleanup(self.pin)
-            except:
-                pass
+        self._initialized = False
         print("[DOOR] Cleaned up")

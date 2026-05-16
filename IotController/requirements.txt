@@ -4,7 +4,14 @@
 # ============================================================================
 
 # [PI-ONLY - WILL FAIL ON WINDOWS] GPIO control for Raspberry Pi hardware pins
-RPi.GPIO==0.7.0
+# NOTE: rpi-lgpio is a drop-in replacement for RPi.GPIO that uses lgpio internally.
+# This is REQUIRED for Raspberry Pi 5 (RP1 south-bridge chip) where RPi.GPIO fails
+# with "Cannot determine SOC peripheral base address".
+# rpi-lgpio provides the identical RPi.GPIO module interface — zero code changes needed.
+rpi-lgpio>=0.6
+
+# [PI-ONLY] Low-level GPIO library for Raspberry Pi 5 (lgpio backend)
+lgpio>=0.2.2.0
 
 # [PI-ONLY - WILL FAIL ON WINDOWS] Low-level SPI interface for RFID module communication
 spidev==3.6

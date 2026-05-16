@@ -1,3 +1,25 @@
+"""
+Solenoid Door Lock Actuator for Smart Security System
+
+Uses lgpio directly for Pi 5 compatibility.
+No RPi.GPIO. No gpiozero.
+
+GPIO: BCM 18 (Pin 12) — Relay module controlling solenoid lock
+    VCC: 5V (Pin 4)
+    GND: Pin 14
+    IN:  GPIO 18 — HIGH = unlock relay (energize solenoid), LOW = locked
+
+Role in FSM:
+- Actuator ONLY — unlocks door on verified access
+- Does NOT generate database logs
+- Controlled exclusively by the FSM state transitions
+
+Safety:
+- Fail-secure: GPIO LOW on init = door locked
+- Emergency lock overrides any active unlock sequence
+- Cleanup ensures door is locked on shutdown
+"""
+
 import time
 import threading
 import platform
@@ -5,16 +27,10 @@ import platform
 
 class SolenoidLock:
     """
-    Solenoid Door Lock Actuator for Smart Security System
+    Solenoid Door Lock Actuator with timed unlock.
 
-    Supports:
-    - Real Raspberry Pi GPIO control
-    - Simulated mode for laptop/desktop testing
-
-    Role in FSM:
-    - Actuator ONLY — unlocks door on verified access
-    - Does NOT generate database logs
-    - Controlled exclusively by the FSM state transitions
+    Uses lgpio directly — no RPi.GPIO, no gpiozero.
+    Fail-secure design: door defaults to LOCKED.
     """
 
     def __init__(self, pin=18, simulated=None):
@@ -26,6 +42,8 @@ class SolenoidLock:
         self.pin = pin
         self.is_locked = True
         self.lock = threading.Lock()
+        self._initialized = False
+        self._unlock_cancelled = False
 
         # Auto-detect: simulate on non-Linux (laptop testing)
         if simulated is None:
@@ -33,30 +51,47 @@ class SolenoidLock:
         else:
             self.simulated = simulated
 
-        self._gpio = None
-
     # =========================
     # INITIALIZE
     # =========================
     def initialize(self):
-        """Set up GPIO or simulation mode"""
+        """Set up GPIO or simulation mode."""
         if self.simulated:
             print("[LOCK] Running in SIMULATED mode (laptop fallback)")
             return True
 
         try:
-            import RPi.GPIO as GPIO
-            self._gpio = GPIO
-            self._gpio.setmode(GPIO.BCM)
-            self._gpio.setup(self.pin, GPIO.OUT)
-            self._gpio.output(self.pin, GPIO.LOW)  # Start locked
-            print(f"[LOCK] Initialized on GPIO pin {self.pin}")
+            import lgpio
+            from Sensors.hardware import _get_chip
+
+            chip = _get_chip()
+            if chip is None:
+                raise RuntimeError("No GPIO chip available")
+
+            # Claim as output, initial LOW = door locked (fail-secure)
+            lgpio.gpio_claim_output(chip, self.pin, 0)
+            self._initialized = True
+            print(f"[LOCK] Initialized on GPIO {self.pin} (fail-secure: LOCKED)")
             return True
         except Exception as e:
             print(f"[LOCK ERROR] GPIO init failed: {e}")
             print("[LOCK] Falling back to SIMULATED mode")
             self.simulated = True
             return True
+
+    def _gpio_write(self, value):
+        """Safe GPIO write — never raises."""
+        if self.simulated or not self._initialized:
+            return
+        try:
+            import lgpio
+            from Sensors.hardware import _get_chip
+
+            chip = _get_chip()
+            if chip is not None:
+                lgpio.gpio_write(chip, self.pin, value)
+        except Exception:
+            pass
 
     # =========================
     # UNLOCK (TIMED)
@@ -68,6 +103,7 @@ class SolenoidLock:
         Args:
             duration: Seconds to keep door unlocked (default 5)
         """
+        self._unlock_cancelled = False
         thread = threading.Thread(
             target=self._unlock_sequence,
             args=(duration,),
@@ -76,45 +112,49 @@ class SolenoidLock:
         thread.start()
 
     def _unlock_sequence(self, duration):
-        """Internal: timed unlock then re-lock"""
+        """Internal: timed unlock then re-lock."""
         with self.lock:
             self.is_locked = False
+            self._gpio_write(1)
 
             if self.simulated:
-                print(f"[LOCK SIM] 🔓 Door UNLOCKED for {duration}s")
+                print(f"[LOCK SIM] Door UNLOCKED for {duration}s")
             else:
-                self._gpio.output(self.pin, GPIO.HIGH)
-                print(f"[LOCK] 🔓 Door UNLOCKED for {duration}s")
+                print(f"[LOCK] Door UNLOCKED for {duration}s")
 
-        time.sleep(duration)
+        # Wait in small increments so emergency_lock can interrupt
+        elapsed = 0.0
+        while elapsed < duration and not self._unlock_cancelled:
+            time.sleep(0.1)
+            elapsed += 0.1
 
         with self.lock:
             self.is_locked = True
+            self._gpio_write(0)
 
-            if self.simulated:
-                print("[LOCK SIM] 🔒 Door RE-LOCKED")
+            if self._unlock_cancelled:
+                pass  # emergency_lock already logged
+            elif self.simulated:
+                print("[LOCK SIM] Door RE-LOCKED")
             else:
-                self._gpio.output(self.pin, GPIO.LOW)
-                print("[LOCK] 🔒 Door RE-LOCKED")
+                print("[LOCK] Door RE-LOCKED")
 
     # =========================
     # EMERGENCY LOCK
     # =========================
     def emergency_lock(self):
-        """Immediately lock the door (override any unlock sequence)"""
+        """Immediately lock the door (override any unlock sequence)."""
+        self._unlock_cancelled = True
         with self.lock:
             self.is_locked = True
-
-            if not self.simulated and self._gpio:
-                self._gpio.output(self.pin, GPIO.LOW)
-
-            print("[LOCK] 🚨 EMERGENCY LOCK ENGAGED")
+            self._gpio_write(0)
+            print("[LOCK] EMERGENCY LOCK ENGAGED")
 
     # =========================
     # STATUS
     # =========================
     def get_status(self):
-        """Return current lock state"""
+        """Return current lock state."""
         with self.lock:
             return "LOCKED" if self.is_locked else "UNLOCKED"
 
@@ -122,15 +162,10 @@ class SolenoidLock:
     # CLEANUP
     # =========================
     def cleanup(self):
-        """Safe shutdown — ensure door is locked"""
+        """Safe shutdown — ensure door is locked."""
+        self._unlock_cancelled = True
         with self.lock:
             self.is_locked = True
-
-            if not self.simulated and self._gpio:
-                try:
-                    self._gpio.output(self.pin, GPIO.LOW)
-                    self._gpio.cleanup(self.pin)
-                except:
-                    pass
-
+            self._gpio_write(0)
+        self._initialized = False
         print("[LOCK] Cleaned up — door locked")
