@@ -176,8 +176,9 @@ class CameraModule:
 
             picam = Picamera2()
 
+            # BGR888: native OpenCV format — no cvtColor needed, no channel-swap risk
             config = picam.create_preview_configuration(
-                main={"size": (self.width, self.height), "format": "RGB888"}
+                main={"size": (self.width, self.height), "format": "BGR888"}
             )
             picam.configure(config)
 
@@ -194,6 +195,23 @@ class CameraModule:
             test_frame = picam.capture_array()
             if test_frame is None or test_frame.size == 0:
                 raise Exception("picamera2 started but no frame captured")
+
+            # ── FORMAT DIAGNOSTIC (printed on every startup) ──────────────────
+            ch = test_frame.shape[2] if test_frame.ndim == 3 else 1
+            print(f"[CAMERA] picamera2 frame: shape={test_frame.shape} dtype={test_frame.dtype}")
+            if ch == 4:
+                # Detect XRGB vs RGBA by inspecting channel-0 stats
+                # XRGB8888: channel-0 (X) is always 0 or 255 (constant padding)
+                # RGBA8888: channel-0 (R) varies across the image
+                ch0 = test_frame[:, :, 0]
+                unique_vals = len(set(ch0.flatten()[:1024].tolist()))
+                self._picam_4ch_skip_first = unique_vals <= 4  # X byte is constant
+                fmt = "XRGB8888 (skip ch0→RGB)" if self._picam_4ch_skip_first else "RGBA8888 (keep ch0-2→RGB)"
+                print(f"[CAMERA] 4-channel format detected: {fmt}")
+            else:
+                self._picam_4ch_skip_first = False
+                print(f"[CAMERA] 3-channel RGB888 ✓ — will cvtColor RGB→BGR")
+            # ─────────────────────────────────────────────────────────────────
 
             self._picamera2 = picam
             self._use_picamera2 = True
@@ -497,13 +515,37 @@ class CameraModule:
                 time.sleep(0.01)
 
     def _capture_picamera2(self):
-        """Capture from Pi Camera Module 3. Returns BGR frame or None."""
+        """
+        Capture from Pi Camera Module 3 (IMX708). Always returns BGR or None.
+
+        Format is RGB888 (set in _try_picamera2).
+
+        Channel handling (detected once at startup, stored in _picam_4ch_skip_first):
+          3-ch RGB888   → cvtColor(RGB2BGR)              → BGR ✓
+          4-ch XRGB8888 → frame[:, :, 1:] → RGB          → cvtColor → BGR ✓
+          4-ch RGBA8888 → frame[:, :, :3] → RGB           → cvtColor → BGR ✓
+        """
         try:
             frame = self._picamera2.capture_array()
             if frame is None or frame.size == 0:
                 return None
-            # picamera2 returns RGB, convert to BGR for OpenCV
-            return cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+
+            # Strip 4th channel using the format detected at startup
+            if frame.ndim == 3 and frame.shape[2] == 4:
+                if getattr(self, '_picam_4ch_skip_first', True):
+                    # XRGB8888: channels = [X, R, G, B] — skip X at index 0
+                    frame = frame[:, :, 1:]
+                else:
+                    # RGBA8888: channels = [R, G, B, A] — drop alpha at index 3
+                    frame = frame[:, :, :3]
+
+            # Always convert RGB → BGR (RGB888 is NOT OpenCV native format)
+            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+
+            if self._mirror:
+                frame = cv2.flip(frame, 1)
+
+            return frame
         except Exception as e:
             self._log_error(f"picamera2 capture: {e}")
             return None

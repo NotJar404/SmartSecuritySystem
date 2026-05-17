@@ -425,7 +425,8 @@ namespace WebApp.Controllers
                 RfidTag = m.RfidTag ?? "",
                 Status = m.Status,
                 SecurityLevel = m.SecurityLevel,
-                HasFaceData = !string.IsNullOrEmpty(m.FaceEmbedding),
+                HasFaceData = !string.IsNullOrEmpty(m.FaceEmbedding) && m.FaceEmbedding != "PENDING_ENROLLMENT",
+                ProfileImagePath = m.ProfileImagePath,
                 CreatedAt = m.CreatedAt,
                 LastAccess = null,
                 RoomCount = _context.PersonRoomAccess.Count(pra => pra.PersonId == m.PersonId)

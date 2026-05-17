@@ -52,20 +52,34 @@ class FaceVerifier:
         self.current_encoding = None
         self.current_time = None
 
-        # Tolerance (lower = stricter, 0.6 is default, 0.5 is strict)
-        self.tolerance = 0.5
+        # Tolerance: Euclidean distance threshold for face match.
+        # 0.6 = face_recognition library's own recommended default for real-world use.
+        # 0.5 = strict (good for identical twins / high-security), but causes
+        #       false rejections with different lighting or photo quality.
+        # 0.65 = lenient (good for poor lighting or web-uploaded photos).
+        self.tolerance = 0.6
 
     # =========================
     # ENCODING EXTRACTION
     # =========================
-    def extract_encoding(self, image):
+    def extract_encoding(self, image, num_jitters=1):
         """Extract 128-dim face encoding from an image.
-        Returns numpy array or None if no face found."""
+
+        Args:
+            image: BGR frame (OpenCV format)
+            num_jitters: How many times to re-sample face when encoding.
+                         1  = fast (for live camera frames)
+                         5  = more accurate (for enrollment photos)
+                         Higher values give better encodings but take longer.
+
+        Returns:
+            numpy array (128-dim) or None if no face found.
+        """
         if image is None or not _HAS_FACE_RECOGNITION:
             return None
 
         rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        encodings = face_recognition.face_encodings(rgb)
+        encodings = face_recognition.face_encodings(rgb, num_jitters=num_jitters)
 
         if len(encodings) == 0:
             return None
@@ -95,11 +109,13 @@ class FaceVerifier:
     def _decode_embedding(self, embedding_str):
         """Decode a face embedding string from the database.
 
-        Supports multiple formats:
-        - base64-encoded numpy bytes (preferred, most compact)
-        - JSON array of floats [0.1, 0.2, ...]
-        - "PENDING_ENROLLMENT" → returns None (not yet enrolled)
-        - Empty string → returns None
+        Supports three formats:
+        1. base64 numpy bytes (128-dim float64)  -- produced by encode_for_database()
+        2. JSON float array [0.1, 0.2, ...]       -- legacy import format
+        3. base64 JPEG/PNG image                  -- uploaded from web Personnel form
+           The ASP.NET form stores raw photo bytes; we decode the image and
+           extract a 128-dim encoding on-the-fly so face verification works
+           immediately after upload without a separate Pi-side enrollment step.
 
         Returns:
             numpy array (128-dim) or None
@@ -107,7 +123,7 @@ class FaceVerifier:
         if not embedding_str or embedding_str == "PENDING_ENROLLMENT":
             return None
 
-        # Try base64-encoded numpy bytes first (most likely production format)
+        # ── Path 1: base64 numpy bytes (preferred production format) ──────────
         try:
             raw = base64.b64decode(embedding_str)
             arr = np.frombuffer(raw, dtype=np.float64)
@@ -116,7 +132,7 @@ class FaceVerifier:
         except Exception:
             pass
 
-        # Try JSON array of floats
+        # ── Path 2: JSON float array ──────────────────────────────────────────
         try:
             arr = np.array(json.loads(embedding_str), dtype=np.float64)
             if len(arr) == 128:
@@ -124,7 +140,27 @@ class FaceVerifier:
         except Exception:
             pass
 
-        print(f"[FACE VERIFY] Cannot decode embedding (length={len(embedding_str)}, starts with '{embedding_str[:20]}...')")
+        # ── Path 3: base64 JPEG/PNG image (web Personnel photo upload) ─────────
+        # extract_encoding() handles BGR→RGB conversion internally.
+        # Use num_jitters=5 for enrollment photos: slower but gives a much more
+        # accurate reference encoding that better tolerates real-world variation.
+        if _HAS_FACE_RECOGNITION:
+            try:
+                raw = base64.b64decode(embedding_str)
+                nparr = np.frombuffer(raw, dtype=np.uint8)
+                img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)  # returns BGR
+                if img is not None and img.size > 0:
+                    encoding = self.extract_encoding(img, num_jitters=5)
+                    if encoding is not None:
+                        print("[FACE VERIFY] Extracted encoding from stored photo image")
+                        return encoding
+                    else:
+                        print("[FACE VERIFY] Photo decoded but no face found in enrollment image")
+            except Exception as e:
+                print(f"[FACE VERIFY] Photo decode attempt failed: {e}")
+
+        print(f"[FACE VERIFY] Cannot decode embedding "
+              f"(len={len(embedding_str)}, starts='{embedding_str[:20]}...')")
         return None
 
     # =========================

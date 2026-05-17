@@ -672,9 +672,11 @@ class SmartSecuritySystem:
                         self.last_face_event_time = now
 
                 # =========================
-                # FACE BUFFER (preserved from original)
+                # FACE BUFFER
+                # Update every 0.4s: keeps encoding fresh without overloading Pi.
+                # Shorter interval = less stale encoding when RFID is tapped.
                 # =========================
-                if face_images and (now - self.last_face_update > 1):
+                if face_images and (now - self.last_face_update > 0.4):
                     self.face_verifier.store_detected_face(face_images[0])
                     self.last_face_update = now
 
@@ -1991,10 +1993,10 @@ class SmartSecuritySystem:
     def _handle_unknown_rfid(self, uid, now):
         """
         Graduated response for unknown RFID cards:
-        1st tap: capture face, deny, log
-        2nd tap: update face, deny
-        3rd tap: mark suspicious, notify admin
-        5th tap: trigger alarm, buzzer, RED LED, lockout
+        1st tap: capture face snapshot, deny, log AccessDenied
+        2nd tap: 2 beeps, deny
+        3rd tap: 3 beeps, mark suspicious, notify admin
+        4th tap: ALARM + buzzer + lockout (brute-force / intruder)
         """
         tracker = self._unknown_rfid_tracker.get(uid)
 
@@ -2017,43 +2019,63 @@ class SmartSecuritySystem:
         # DENY ACCESS always for unknown UIDs
         self.rgb_led.status_denied()
 
+        # ── Capture snapshot of whoever is at the camera ─────────────────────
+        snapshot_url = ""
+        try:
+            frame = self.camera.get_frame()
+            if frame is not None:
+                snap_dir = os.path.join(self._recording_dir, "snapshots")
+                os.makedirs(snap_dir, exist_ok=True)
+                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                fname = f"unknown_{uid}_{ts}_tap{count}.jpg"
+                fpath = os.path.join(snap_dir, fname)
+                cv2.imwrite(fpath, frame)
+                # URL accessible from dashboard (Pi serves via /snapshots/<filename>)
+                snapshot_url = f"/snapshots/{fname}"
+                print(f"[RFID] Snapshot saved: {fpath}")
+        except Exception as e:
+            print(f"[RFID] Snapshot capture failed: {e}")
+        # ─────────────────────────────────────────────────────────────────────
+
+        snap_note = f" | Snapshot: {snapshot_url}" if snapshot_url else ""
+
         if count == 1:
-            # 1st tap: capture + deny + log
+            # 1st tap: short beep + log
             self.buzzer.beep(duration=0.3)
             self.push_state_transition(
                 event="ALERT",
                 session_id=str(uuid.uuid4()),
                 rfid_uid=uid,
                 alert_type="AccessDenied",
-                description=f"Unknown RFID card detected (UID: {uid})",
+                description=f"Unknown RFID card detected (UID: {uid}){snap_note}",
                 severity="WARNING"
             )
 
         elif count == 2:
-            # 2nd tap: update face + deny
+            # 2nd tap: 2 beeps, deny silently
             self.buzzer.pattern_beep(times=2, interval=0.2)
 
         elif count == 3:
-            # 3rd tap: suspicious - notify admin
+            # 3rd tap: suspicious — notify admin
             self.buzzer.pattern_beep(times=3, interval=0.2)
             self.push_state_transition(
                 event="ALERT",
                 session_id=str(uuid.uuid4()),
                 rfid_uid=uid,
                 alert_type="SuspiciousActivity",
-                description=f"Suspicious RFID activity: unknown card {uid} tapped {count} times",
+                description=f"Suspicious RFID: unknown card {uid} tapped {count} times{snap_note}",
                 severity="HIGH"
             )
 
-        elif count >= 5:
-            # 5th tap: ALARM + lockout
+        elif count >= 4:
+            # 4th tap onwards: ALARM + lockout
             session_id = str(uuid.uuid4())
             self.push_state_transition(
                 event="ALERT",
                 session_id=session_id,
                 rfid_uid=uid,
                 alert_type="BruteForceAttempt",
-                description=f"Brute force RFID: unknown card {uid} tapped {count} times",
+                description=f"INTRUDER ALERT: unknown card {uid} tapped {count} times{snap_note}",
                 severity="CRITICAL"
             )
             self._start_recording(session_id)
@@ -2064,8 +2086,9 @@ class SmartSecuritySystem:
             )
             # Lockout this UID for 5 minutes
             tracker["locked_out_until"] = now + self._unknown_rfid_lockout
-            tracker["count"] = 0  # Reset count after lockout
-            print(f"[RFID] UID {uid} LOCKED OUT for {self._unknown_rfid_lockout}s")
+            tracker["count"] = 0  # Reset after lockout
+            print(f"[RFID] UID {uid} LOCKED OUT for {self._unknown_rfid_lockout}s — INTRUDER ALARM")
+
 
     # =========================
     # RECORDING SYSTEM (MP4/H.264 + pre-buffer + async writer)
@@ -2425,6 +2448,35 @@ def main():
                 'Access-Control-Allow-Origin': '*'
             }
         )
+
+    @stream_app.route('/snapshot', methods=['GET'])
+    def snapshot():
+        """Return a single JPEG frame — used by the Personnel enrollment UI
+        to capture an enrollment photo directly from the Pi Camera."""
+        try:
+            frame = system.camera.get_stream_frame()
+            if frame is None:
+                return Response("No frame available", status=503)
+            ret, buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 92])
+            if not ret:
+                return Response("Encode failed", status=500)
+            return Response(
+                buf.tobytes(),
+                mimetype='image/jpeg',
+                headers={
+                    'Cache-Control': 'no-cache, no-store',
+                    'Access-Control-Allow-Origin': '*'
+                }
+            )
+        except Exception as e:
+            return Response(str(e), status=500)
+
+    @stream_app.route('/snapshots/<path:filename>', methods=['GET'])
+    def serve_snapshot(filename):
+        """Serve a saved intruder snapshot JPEG (evidence for unknown RFID taps)."""
+        import flask
+        snap_dir = os.path.join(system._recording_dir, "snapshots")
+        return flask.send_from_directory(snap_dir, filename)
 
     @stream_app.route('/health')
     def pi_health():

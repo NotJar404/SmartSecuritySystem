@@ -75,7 +75,8 @@ namespace SmartSecuritySystem.Controllers
                     RfidTag = m.RfidTag ?? "",
                     Status = m.Status,
                     SecurityLevel = m.SecurityLevel,
-                    HasFaceData = !string.IsNullOrEmpty(m.FaceEmbedding),
+                    HasFaceData = !string.IsNullOrEmpty(m.FaceEmbedding) && m.FaceEmbedding != "PENDING_ENROLLMENT",
+                    ProfileImagePath = m.ProfileImagePath,
                     CreatedAt = m.CreatedAt,
                     LastAccess = null,
                     RoomCount = _context.PersonRoomAccess.Count(pra => pra.PersonId == m.PersonId)
@@ -88,12 +89,12 @@ namespace SmartSecuritySystem.Controllers
         // =====================================================
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Add(User user, string RegType, string? Department, string? RfidTag, string? Phone)
+        public IActionResult Add(User user, string RegType, string? Department, string? RfidTag, string? Phone, IFormFile? ProfileImage)
         {
             if (RegType == "staff")
                 AddStaff(user);
             else
-                AddCampusMember(user.FullName, user.Email, Department, RfidTag, Phone);
+                AddCampusMember(user.FullName, user.Email, Department, RfidTag, Phone, ProfileImage);
 
             return RedirectToAction(nameof(Index));
         }
@@ -135,13 +136,31 @@ namespace SmartSecuritySystem.Controllers
             }
         }
 
-        private void AddCampusMember(string? name, string? email, string? dept, string? rfid, string? phone)
+        private void AddCampusMember(string? name, string? email, string? dept, string? rfid, string? phone, IFormFile? profileImage)
         {
             if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(rfid))
                 return;
 
             if (_context.AuthorizedPersonnel.Any(p => p.RfidTag == rfid))
                 return;
+
+            // Convert uploaded photo to base64 for face_embedded column
+            string faceData = "PENDING_ENROLLMENT";
+            string? profileImagePath = null;
+            if (profileImage != null && profileImage.Length > 0)
+            {
+                try
+                {
+                    using var ms = new System.IO.MemoryStream();
+                    profileImage.CopyTo(ms);
+                    faceData = Convert.ToBase64String(ms.ToArray());
+                    profileImagePath = $"data:{profileImage.ContentType};base64,{faceData}";
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning($"Failed to process profile image: {ex.Message}");
+                }
+            }
 
             var member = new AuthorizedPersonnel
             {
@@ -152,7 +171,8 @@ namespace SmartSecuritySystem.Controllers
                 Phone = phone,
                 Status = "active",
                 SecurityLevel = "normal",
-                FaceEmbedding = "PENDING_ENROLLMENT",
+                FaceEmbedding = faceData,
+                ProfileImagePath = profileImagePath,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -160,10 +180,12 @@ namespace SmartSecuritySystem.Controllers
             _context.AuthorizedPersonnel.Add(member);
             _context.SaveChanges();
 
-            // ⚠️ WARN: No room assignments = fail-secure = denied everywhere
-            TempData["Warning"] = $"\"{name}\" has been registered but has NO room access assigned. " +
-                                  $"They will be DENIED at all doors until you assign rooms. " +
-                                  $"Click the 🚪 door icon to assign room access.";
+            if (faceData == "PENDING_ENROLLMENT")
+                TempData["Warning"] = $"\"{name}\" has been registered but has NO face photo. " +
+                                      $"Face verification will fail until a photo is uploaded. " +
+                                      $"Click edit to upload a profile image.";
+            else
+                TempData["Success"] = $"\"{name}\" registered successfully with face photo. Don't forget to assign room access.";
         }
 
         // =====================================================
@@ -199,7 +221,7 @@ namespace SmartSecuritySystem.Controllers
         // =====================================================
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult EditMember(int personId, string fullName, string? email, string? department, string? rfidTag, string? phone)
+        public IActionResult EditMember(int personId, string fullName, string? email, string? department, string? rfidTag, string? phone, IFormFile? ProfileImage)
         {
             var existing = _context.AuthorizedPersonnel.FirstOrDefault(p => p.PersonId == personId);
             if (existing == null)
@@ -217,6 +239,24 @@ namespace SmartSecuritySystem.Controllers
                 if (!_context.AuthorizedPersonnel.Any(p => p.RfidTag == rfidTag && p.PersonId != personId))
                 {
                     existing.RfidTag = rfidTag;
+                }
+            }
+
+            // Update face photo if a new one was uploaded
+            if (ProfileImage != null && ProfileImage.Length > 0)
+            {
+                try
+                {
+                    using var ms = new System.IO.MemoryStream();
+                    ProfileImage.CopyTo(ms);
+                    var base64 = Convert.ToBase64String(ms.ToArray());
+                    existing.FaceEmbedding = base64;
+                    existing.ProfileImagePath = $"data:{ProfileImage.ContentType};base64,{base64}";
+                    TempData["Success"] = $"\"{fullName}\" updated with new face photo.";
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning($"Failed to update profile image: {ex.Message}");
                 }
             }
 

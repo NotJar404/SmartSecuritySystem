@@ -191,8 +191,35 @@
                             {
                                 <tr>
                                     <td>
-                                        <div class="font-weight-bold">@m.FullName</div>
+                                        <div class="font-weight-bold">
+                                            @* Profile photo avatar *@
+                                            @if (!string.IsNullOrEmpty(m.ProfileImagePath))
+                                            {
+                                                <img src="@m.ProfileImagePath" alt="@m.FullName"
+                                                     style="width:32px;height:32px;border-radius:50%;object-fit:cover;
+                                                            border:2px solid var(--accent);margin-right:8px;vertical-align:middle;" />
+                                            }
+                                            else
+                                            {
+                                                <span class="avatar-sm mr-2" style="width:32px;height:32px;font-size:13px;">
+                                                    @m.FullName.Substring(0, 1).ToUpper()
+                                                </span>
+                                            }
+                                            @m.FullName
+                                        </div>
                                         <small class="text-muted search-meta">@m.Email</small>
+                                        @if (m.HasFaceData)
+                                        {
+                                            <span style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;background:rgba(46,204,113,0.15);color:#2ecc71;">
+                                                <i class="fas fa-user-check"></i> Face ✓
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;background:rgba(243,156,18,0.15);color:#f39c12;">
+                                                <i class="fas fa-exclamation-triangle"></i> No Face
+                                            </span>
+                                        }
                                     </td>
 
                                     <td>
@@ -224,7 +251,8 @@
                                                     @Html.Raw(Json.Serialize(m.Email)),
                                                     @Html.Raw(Json.Serialize(m.Department)),
                                                     @Html.Raw(Json.Serialize(m.RfidTag)),
-                                                    @Html.Raw(Json.Serialize(m.Phone)))'>
+                                                    @Html.Raw(Json.Serialize(m.Phone)),
+                                                    @Html.Raw(Json.Serialize(m.ProfileImagePath ?? "")))'>
                                             <i class="fas fa-edit"></i>
                                         </button>
 
@@ -259,7 +287,7 @@
 
         <div class="modal-content">
 
-            <form method="post" id="userForm">
+            <form method="post" id="userForm" enctype="multipart/form-data">
                 @Html.AntiForgeryToken()
                 <input type="hidden" id="userId" name="Id" />
                 <input type="hidden" id="personIdField" name="personId" />
@@ -314,8 +342,19 @@
 
                     <div id="campusFields" style="display:none;">
                         <div class="form-group">
-                            <label>Profile Image</label>
-                            <input id="profileImage" name="ProfileImage" type="file" accept="image/*" class="form-control" />
+                            <label>Profile Photo <small style="color:var(--accent);">(Required for face verification)</small></label>
+                            <!-- Preview -->
+                            <div id="photoPreviewWrap" style="display:none;margin-bottom:8px;text-align:center;">
+                                <img id="photoPreview" src="" alt="Preview"
+                                     style="width:90px;height:90px;border-radius:50%;object-fit:cover;
+                                            border:2px solid var(--accent);" />
+                            </div>
+                            <input id="profileImage" name="ProfileImage" type="file" accept="image/*"
+                                   class="form-control"
+                                   onchange="previewPhoto(this)" />
+                            <small style="color:var(--text-dim);display:block;margin-top:4px;">
+                                Upload a clear, front-facing photo. This is used for face recognition.
+                            </small>
                         </div>
                         <div class="form-group">
                             <label>RFID Tag</label>
@@ -448,6 +487,13 @@ function openAddModal() {
     document.getElementById("formMode").value = "add";
     document.getElementById("RegType").value = "staff";
     document.getElementById("RegType").disabled = false;
+
+    // Reset photo preview
+    const wrap = document.getElementById('photoPreviewWrap');
+    const preview = document.getElementById('photoPreview');
+    if (wrap) wrap.style.display = 'none';
+    if (preview) preview.src = '';
+
     toggleFields();
     
     // Show modal
@@ -486,7 +532,7 @@ function openEditStaff(id, name, user, email) {
 // =====================================================
 // EDIT MEMBER (AUTHORIZED PERSONNEL)
 // =====================================================
-function openEditMember(id, name, email, dept, rfid, phone) {
+function openEditMember(id, name, email, dept, rfid, phone, profileImgSrc) {
     document.getElementById("userForm").reset();
     document.getElementById("modalTitle").innerText = "Edit Authorized Personnel";
     document.getElementById("userForm").action = "/Personnel/EditMember";
@@ -508,12 +554,42 @@ function openEditMember(id, name, email, dept, rfid, phone) {
         document.getElementById("phoneNumber").value = phone || "";
     }
 
+    // Show existing profile photo if available
+    const wrap = document.getElementById('photoPreviewWrap');
+    const preview = document.getElementById('photoPreview');
+    if (profileImgSrc && wrap && preview) {
+        preview.src = profileImgSrc;
+        wrap.style.display = 'block';
+    } else if (wrap) {
+        wrap.style.display = 'none';
+        if (preview) preview.src = '';
+    }
+
     toggleFields();
 
     // Show modal
     const modal = document.getElementById('userModal');
     modal.classList.add('show');
     document.body.style.overflow = 'hidden';
+}
+
+// =====================================================
+// PHOTO PREVIEW
+// =====================================================
+function previewPhoto(input) {
+    const wrap = document.getElementById('photoPreviewWrap');
+    const preview = document.getElementById('photoPreview');
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            preview.src = e.target.result;
+            wrap.style.display = 'block';
+        };
+        reader.readAsDataURL(input.files[0]);
+    } else {
+        wrap.style.display = 'none';
+        preview.src = '';
+    }
 }
 
 // =====================================================

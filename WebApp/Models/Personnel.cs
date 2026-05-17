@@ -24,6 +24,7 @@ namespace SmartSecuritySystem.ViewModels
         public string Status { get; set; } = "active"; // Added
         public string SecurityLevel { get; set; } = "normal"; // Added
         public bool HasFaceData { get; set; }
+        public string? ProfileImagePath { get; set; } // base64 data URI for face photo
         public DateTime? CreatedAt { get; set; } // Added for "Joined Date"
         public DateTime? LastAccess { get; set; }
         public int RoomCount { get; set; } // Room access assignments count
