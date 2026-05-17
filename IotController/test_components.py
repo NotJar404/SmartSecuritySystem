@@ -5,9 +5,9 @@ Run individual component tests without the full system
 
 import cv2
 import sys
-from Sensors.camera_module import CameraModule
-from AI.face_detection import FaceDetector
-from AI.face_verfication import FaceVerifier
+from IotController.Sensors.camera_module import CameraModule
+from IotController.AI.face_detection import FaceDetector
+from IotController.AI.face_verfication import FaceVerifier
 
 
 def test_camera():

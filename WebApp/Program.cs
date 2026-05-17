@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using SmartSecuritySystem.Filters;
 using WebApp.Data;
@@ -95,7 +95,7 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
+// app.UseHttpsRedirection();  // Disabled — Pi sends HTTP only, no HTTPS endpoint exists
 app.UseStaticFiles();
 
 app.UseRouting();

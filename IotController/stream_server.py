@@ -33,10 +33,10 @@ from flask import Flask, Response, request
 # =========================
 # SAME PRODUCTION AI MODULES AS main.py
 # =========================
-from AI.overlay_renderer import render_full_frame
-from AI.face_detection import FaceDetector
-from AI.person_detector import PersonDetector
-from AI.person_tracker import CentroidTracker
+from IotController.AI.overlay_renderer import render_full_frame
+from IotController.AI.face_detection import FaceDetector
+from IotController.AI.person_detector import PersonDetector
+from IotController.AI.person_tracker import CentroidTracker
 
 app = Flask(__name__)
 

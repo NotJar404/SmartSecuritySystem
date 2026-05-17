@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using WebApp.Data;
@@ -201,6 +201,38 @@ namespace WebApp.Controllers
                 activeSessionCount = activeSessions.Count,
                 activePersonIds
             });
+        }
+
+        // =========================
+        // PERSON HISTORY (FIX-7: Personnel Access History)
+        // Returns last N access logs for a specific personnel
+        // =========================
+        [HttpGet]
+        public IActionResult GetPersonHistory(string personnelId, int count = 20)
+        {
+            if (string.IsNullOrEmpty(personnelId) || !int.TryParse(personnelId, out int personId))
+                return Json(new { logs = Array.Empty<object>() });
+
+            var logs = _context.AccessLogs
+                .Include(x => x.Person)
+                .Include(x => x.RoomEntity)
+                .Where(x => x.PersonId == personId)
+                .OrderByDescending(x => x.Timestamp)
+                .Take(count)
+                .ToList();
+
+            var result = logs.Select(log => new
+            {
+                room = log.RoomEntity?.RoomName ?? "Unknown Room",
+                time = log.Timestamp.ToString("MMM dd, hh:mm tt"),
+                riskLevel = log.ComputedRiskLevel,
+                rfidValid = log.RfidValid,
+                faceVerified = log.FaceVerified,
+                hasVideo = !string.IsNullOrEmpty(log.VideoPath),
+                accessResult = log.AccessResult ?? "unknown"
+            });
+
+            return Json(new { logs = result });
         }
 
         // =========================

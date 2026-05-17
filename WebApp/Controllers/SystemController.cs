@@ -423,6 +423,27 @@ namespace WebApp.Controllers
 
             _context.SaveChanges();
 
+            // FIX-3: Forward lockdown to Pi Flask for immediate hardware response
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using var client = new System.Net.Http.HttpClient();
+                    client.Timeout = System.TimeSpan.FromSeconds(3);
+                    var cam = _context.CameraDevices.FirstOrDefault(c => c.Status == "active");
+                    if (cam?.StreamUrl != null)
+                    {
+                        var uri = new System.Uri(cam.StreamUrl);
+                        var lockdownUrl = $"http://{uri.Host}:5050/lockdown";
+                        var content = new System.Net.Http.StringContent(
+                            System.Text.Json.JsonSerializer.Serialize(new { reason = _lockdownReason }),
+                            System.Text.Encoding.UTF8, "application/json");
+                        await client.PostAsync(lockdownUrl, content);
+                    }
+                }
+                catch { /* Pi may be offline — lockdown state will sync via polling */ }
+            });
+
             return Ok(new { success = true, message = "Lockdown activated." });
         }
 
@@ -445,6 +466,24 @@ namespace WebApp.Controllers
                 Timestamp = System.DateTime.UtcNow
             });
             _context.SaveChanges();
+
+            // FIX-3: Forward lockdown resolve to Pi Flask
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using var client = new System.Net.Http.HttpClient();
+                    client.Timeout = System.TimeSpan.FromSeconds(3);
+                    var cam = _context.CameraDevices.FirstOrDefault(c => c.Status == "active");
+                    if (cam?.StreamUrl != null)
+                    {
+                        var uri = new System.Uri(cam.StreamUrl);
+                        var lockdownUrl = $"http://{uri.Host}:5050/lockdown";
+                        await client.DeleteAsync(lockdownUrl);
+                    }
+                }
+                catch { /* Pi may be offline */ }
+            });
 
             return Ok(new { success = true, message = "Lockdown resolved." });
         }

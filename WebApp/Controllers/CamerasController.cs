@@ -482,17 +482,26 @@ namespace WebApp.Controllers
 
                     _context.OccupancySessions.Add(session);
 
-                    // Single access log for the entry event
-                    // Uses actual verification flags from Python edge controller
-                    _context.AccessLogs.Add(new AccessLog
+                    // ANTI-SPAM: Don't create duplicate access log for rapid re-taps (FIX-2)
+                    bool recentLogExists = data.PersonId.HasValue && _context.AccessLogs.Any(a =>
+                        a.PersonId == data.PersonId &&
+                        a.RoomId == roomId &&
+                        a.Timestamp > DateTime.UtcNow.AddSeconds(-10));
+
+                    if (!recentLogExists)
                     {
-                        PersonId = data.PersonId,
-                        RoomId = roomId,
-                        RfidValid = data.RfidValid,
-                        FaceVerified = data.FaceVerified,
-                        AccessResult = "granted",
-                        Timestamp = DateTime.UtcNow
-                    });
+                        // Single access log for the entry event
+                        // Uses actual verification flags from Python edge controller
+                        _context.AccessLogs.Add(new AccessLog
+                        {
+                            PersonId = data.PersonId,
+                            RoomId = roomId,
+                            RfidValid = data.RfidValid,
+                            FaceVerified = data.FaceVerified,
+                            AccessResult = "granted",
+                            Timestamp = DateTime.UtcNow
+                        });
+                    }
 
                     _context.SaveChanges();
 

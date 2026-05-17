@@ -60,7 +60,7 @@ class PIRSensor:
 
         try:
             import lgpio
-            from Sensors.hardware import _get_chip
+            from .hardware import _get_chip
 
             chip = _get_chip()
             if chip is None:
@@ -107,7 +107,7 @@ class PIRSensor:
                     current_state = self.motion_detected
                 else:
                     import lgpio
-                    from Sensors.hardware import _get_chip
+                    from .hardware import _get_chip
 
                     chip = _get_chip()
                     if chip is None:

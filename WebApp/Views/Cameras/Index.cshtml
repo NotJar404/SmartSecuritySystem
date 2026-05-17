@@ -424,9 +424,19 @@ function selectCamera(cam) {
         }
         return 'http://localhost:5050';
     })();
-    const streamUrl = (cam.StreamUrl && cam.StreamUrl.trim() !== '')
-        ? cam.StreamUrl
-        : STREAM_BASE + '/video';
+    // Auto-append /video if user only entered base URL (e.g. http://192.168.x.x:5050)
+    const streamUrl = (() => {
+        if (!cam.StreamUrl || cam.StreamUrl.trim() === '') return STREAM_BASE + '/video';
+        let url = cam.StreamUrl.trim();
+        // If URL ends with just a port (no path), append /video
+        try {
+            const parsed = new URL(url);
+            if (parsed.pathname === '/' || parsed.pathname === '') {
+                url = parsed.origin + '/video';
+            }
+        } catch {}
+        return url;
+    })();
 
     // =================================================================
     // STREAM SOURCE CLASSIFICATION
@@ -618,12 +628,38 @@ function startClock() {
 }
 
 function toggleFullscreen() {
+    const viewerBody = document.querySelector('.viewer-body');
     if (!document.fullscreenElement) {
-        focusView.requestFullscreen();
+        // Fullscreen the viewer body (just the camera feed, not entire sidebar)
+        (viewerBody || focusView).requestFullscreen().then(() => {
+            viewerBody?.classList.add('fullscreen-active');
+        }).catch(() => {
+            // Fallback to focus view fullscreen
+            focusView.requestFullscreen().catch(() => {});
+        });
     } else {
         document.exitFullscreen();
     }
 }
+
+// Handle fullscreen exit (restore classes)
+document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement) {
+        document.querySelector('.viewer-body')?.classList.remove('fullscreen-active');
+    }
+});
+
+// Double-click on viewer body = toggle fullscreen (FIX-8)
+document.addEventListener('DOMContentLoaded', () => {
+    const viewerBody = document.querySelector('.viewer-body');
+    if (viewerBody) {
+        viewerBody.addEventListener('dblclick', (e) => {
+            // Don't trigger on controls
+            if (e.target.closest('button, .overlay, .ai-status-panel')) return;
+            toggleFullscreen();
+        });
+    }
+});
 
 // =====================================================
 // REAL-TIME POLLING ENGINE (5 SECOND INTERVAL)

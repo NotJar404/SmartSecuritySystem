@@ -62,7 +62,7 @@ class SolenoidLock:
 
         try:
             import lgpio
-            from Sensors.hardware import _get_chip
+            from .hardware import _get_chip
 
             chip = _get_chip()
             if chip is None:
@@ -85,7 +85,7 @@ class SolenoidLock:
             return
         try:
             import lgpio
-            from Sensors.hardware import _get_chip
+            from .hardware import _get_chip
 
             chip = _get_chip()
             if chip is not None:

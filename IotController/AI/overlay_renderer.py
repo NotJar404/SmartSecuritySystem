@@ -425,10 +425,121 @@ def render_emergency_overlay(frame):
                 cv2.FONT_HERSHEY_SIMPLEX, font_scale, color, thickness, cv2.LINE_AA)
 
 
+def render_verification_overlay(frame, overlay_data):
+    """
+    Render RFID face verification status overlay on camera stream.
+    
+    Shows: VERIFYING... → MATCH ✓ / NO MATCH ✗
+    With person name, RFID UID, and confidence score.
+    
+    Args:
+        frame: OpenCV frame (modified in-place)
+        overlay_data: dict with {status, uid, name, confidence, start_time}
+    """
+    if not overlay_data:
+        return
+
+    h, w = frame.shape[:2]
+    sf = _scale_factor(frame)
+    status = overlay_data.get("status", "")
+    uid = overlay_data.get("uid", "")
+    name = overlay_data.get("name", "")
+    confidence = overlay_data.get("confidence", 0)
+
+    # Color based on status
+    if status == "VERIFYING...":
+        bg_color = (200, 200, 0)  # Yellow
+        text_color = (0, 0, 0)
+    elif "MATCH" in status and "NO" not in status:
+        bg_color = (0, 180, 0)  # Green
+        text_color = (255, 255, 255)
+    else:
+        bg_color = (0, 0, 200)  # Red
+        text_color = (255, 255, 255)
+
+    # Banner at bottom-center
+    banner_h = int(80 * sf)
+    banner_y = h - banner_h - int(30 * sf)
+    banner_x = int(w * 0.1)
+    banner_w = int(w * 0.8)
+
+    # Semi-transparent background
+    overlay = frame.copy()
+    cv2.rectangle(overlay, (banner_x, banner_y),
+                  (banner_x + banner_w, banner_y + banner_h),
+                  bg_color, -1)
+    cv2.addWeighted(overlay, 0.85, frame, 0.15, 0, frame)
+
+    # Status text (large)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    status_scale = 0.8 * sf
+    status_thick = max(2, int(2 * sf))
+    status_size = _cached_text_size(status, font, status_scale, status_thick)
+    sx = banner_x + (banner_w - status_size[0]) // 2
+    sy = banner_y + int(30 * sf)
+    cv2.putText(frame, status, (sx, sy), font, status_scale,
+                text_color, status_thick, cv2.LINE_AA)
+
+    # Detail line: name + UID + confidence
+    detail_parts = []
+    if name:
+        detail_parts.append(name)
+    if uid:
+        detail_parts.append(f"UID: {uid}")
+    if confidence > 0:
+        detail_parts.append(f"{confidence:.0f}%")
+    detail = " | ".join(detail_parts)
+
+    if detail:
+        detail_scale = 0.45 * sf
+        detail_thick = max(1, int(1 * sf))
+        detail_size = _cached_text_size(detail, font, detail_scale, detail_thick)
+        dx = banner_x + (banner_w - detail_size[0]) // 2
+        dy = banner_y + int(60 * sf)
+        cv2.putText(frame, detail, (dx, dy), font, detail_scale,
+                    text_color, detail_thick, cv2.LINE_AA)
+
+
+def render_countdown_overlay(frame, seconds_remaining):
+    """
+    Render silent countdown timer during IDLE detection.
+    Shows how many seconds remain before alert triggers.
+    
+    Args:
+        frame: OpenCV frame (modified in-place)
+        seconds_remaining: int, seconds left in countdown
+    """
+    if seconds_remaining is None or seconds_remaining <= 0:
+        return
+
+    h, w = frame.shape[:2]
+    sf = _scale_factor(frame)
+
+    # Small countdown badge in top-right area
+    text = f"RFID: {int(seconds_remaining)}s"
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 0.55 * sf
+    thickness = max(1, int(2 * sf))
+    text_size = _cached_text_size(text, font, font_scale, thickness)
+
+    # Position: top-right, below REC indicator area
+    tx = w - text_size[0] - 15
+    ty = int(65 * sf)
+
+    # Background pill
+    pad = 6
+    cv2.rectangle(frame, (tx - pad, ty - text_size[1] - pad),
+                  (tx + text_size[0] + pad, ty + pad),
+                  (0, 120, 200), -1)
+    cv2.putText(frame, text, (tx, ty), font, font_scale,
+                (255, 255, 255), thickness, cv2.LINE_AA)
+
+
 def render_full_frame(frame, state, occupancy, sessions=0,
                       tracked_persons=None, faces=None,
                       is_recording=False, armed=True,
-                      extra_info=None):
+                      extra_info=None, verification_overlay=None,
+                      countdown_seconds=None):
     """
     MASTER RENDER FUNCTION — Draws ALL overlays on a frame.
     
@@ -445,6 +556,8 @@ def render_full_frame(frame, state, occupancy, sessions=0,
         is_recording: Whether recording is active
         armed: Whether the system is armed
         extra_info: Optional bottom-left info string
+        verification_overlay: dict {status, uid, name, confidence, start_time}
+        countdown_seconds: float, seconds remaining in IDLE countdown (None=hidden)
     
     Returns:
         tuple: (frame, boxes_rendered) — the drawn frame and count of boxes
@@ -477,5 +590,13 @@ def render_full_frame(frame, state, occupancy, sessions=0,
         render_lockdown_overlay(frame)
     elif state == 'EMERGENCY':
         render_emergency_overlay(frame)
+
+    # 5. RFID verification overlay (FIX-7: VERIFYING/MATCH/NO MATCH banner)
+    if verification_overlay:
+        render_verification_overlay(frame, verification_overlay)
+
+    # 6. IDLE countdown timer (FIX-1: shows seconds until buzzer)
+    if countdown_seconds is not None and countdown_seconds > 0:
+        render_countdown_overlay(frame, countdown_seconds)
 
     return frame, boxes_rendered
