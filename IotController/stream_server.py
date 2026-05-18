@@ -417,6 +417,37 @@ def video_feed():
     )
 
 
+@app.route('/snapshot')
+def snapshot():
+    """Return the current frame as a single JPEG image (for enrollment capture)."""
+    if not capture_running:
+        start_capture()
+        time.sleep(0.5)  # Give camera a moment to warm up
+
+    with frame_lock:
+        frame = current_frame
+
+    if frame is None:
+        return Response('No frame available — camera may be initialising.',
+                        status=503, mimetype='text/plain')
+
+    ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
+    if not ret:
+        return Response('Failed to encode frame.', status=500, mimetype='text/plain')
+
+    return Response(
+        buffer.tobytes(),
+        mimetype='image/jpeg',
+        headers={
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'Content-Type',
+        }
+    )
+
+
 @app.route('/ready', methods=['GET'])
 def stream_ready():
     """Instant health check — frontend pings this before loading /video."""

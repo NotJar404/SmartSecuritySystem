@@ -57,7 +57,9 @@ namespace WebApp.Controllers
                 log.Department = log.Person?.Department ?? "-";
                 log.Email = log.Person?.Email ?? "-";
                 log.Phone = log.Person?.Phone ?? "-";
-                log.ImageUrl = "/images/default-user.png";
+                log.ImageUrl = !string.IsNullOrEmpty(log.Person?.ProfileImagePath)
+                    ? log.Person!.ProfileImagePath
+                    : "/images/default-user.png";
 
                 // =========================
                 // ROOM MAPPING
@@ -178,21 +180,24 @@ namespace WebApp.Controllers
 
             var result = logs.Select(log => new
             {
-                fullName = log.Person?.FullName ?? "Unknown User",
-                personnelId = log.PersonId?.ToString() ?? "N/A",
-                department = log.Person?.Department ?? "-",
-                email = log.Person?.Email ?? "-",
-                phone = log.Person?.Phone ?? "-",
-                room = log.RoomEntity?.RoomName ?? "Unknown Room",
-                location = "Unknown Location",
-                imageUrl = "/images/default-user.png",
-                time = log.Timestamp.ToString("hh:mm tt"),
-                videoPath = log.VideoPath ?? "",
-                hasVideo = !string.IsNullOrEmpty(log.VideoPath),
-                riskLevel = log.ComputedRiskLevel,
-                rfidValid = log.RfidValid,
-                faceVerified = log.FaceVerified,
-                personId = log.PersonId ?? 0
+                fullName       = log.Person?.FullName ?? "Unknown User",
+                personnelId    = log.PersonId?.ToString() ?? "N/A",
+                department     = log.Person?.Department ?? "-",
+                email          = log.Person?.Email ?? "-",
+                phone          = log.Person?.Phone ?? "-",
+                room           = log.RoomEntity?.RoomName ?? "Unknown Room",
+                location       = "Unknown Location",
+                // Use the enrolled profile photo; fall back to default avatar
+                imageUrl       = !string.IsNullOrEmpty(log.Person?.ProfileImagePath)
+                                     ? log.Person!.ProfileImagePath
+                                     : "/images/default-user.png",
+                time           = log.Timestamp.ToString("hh:mm tt"),
+                videoPath      = log.VideoPath ?? "",
+                hasVideo       = !string.IsNullOrEmpty(log.VideoPath),
+                riskLevel      = log.ComputedRiskLevel,
+                rfidValid      = log.RfidValid,
+                faceVerified   = log.FaceVerified,
+                personId       = log.PersonId ?? 0
             });
 
             return Json(new
@@ -542,6 +547,39 @@ namespace WebApp.Controllers
 
             return Json(rooms);
         }
+
+        // ====================================
+        // FACE ENROLLMENT SAVE (FROM PI)  FIX-6
+        // Pi calls PATCH /api/access/rfid/enroll-face after capturing + averaging
+        // Saves the base64 embedding string to authorized_personnel.FaceEmbedded
+        // ====================================
+        [HttpPatch]
+        [AllowAnonymous]
+        [Route("/api/access/rfid/enroll-face")]
+        public async Task<IActionResult> SaveFaceEmbedding(
+            [FromBody] EnrollFaceEmbeddingRequest request)
+        {
+            if (request == null || request.PersonId <= 0 ||
+                string.IsNullOrWhiteSpace(request.FaceEmbedded))
+                return BadRequest(new { success = false, message = "personId and faceEmbedded are required." });
+
+            var person = await _context.AuthorizedPersonnel
+                .FirstOrDefaultAsync(p => p.PersonId == request.PersonId);
+
+            if (person == null)
+                return NotFound(new { success = false, message = $"Person {request.PersonId} not found." });
+
+            person.FaceEmbedding = request.FaceEmbedded;
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                success    = true,
+                message    = $"Face embedding saved for {person.FullName} (ID={person.PersonId}).",
+                personId   = person.PersonId,
+                personName = person.FullName
+            });
+        }
     }
 
     // =========================
@@ -563,5 +601,15 @@ namespace WebApp.Controllers
     {
         public int PersonId { get; set; }
         public int RoomId { get; set; }
+    }
+
+    // ====================================
+    // FACE ENROLLMENT DTO  (FIX-6)
+    // Body for PATCH /api/access/rfid/enroll-face
+    // ====================================
+    public class EnrollFaceEmbeddingRequest
+    {
+        public int PersonId { get; set; }
+        public string FaceEmbedded { get; set; } = string.Empty;
     }
 }

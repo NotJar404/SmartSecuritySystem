@@ -89,12 +89,13 @@ namespace SmartSecuritySystem.Controllers
         // =====================================================
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Add(User user, string RegType, string? Department, string? RfidTag, string? Phone, IFormFile? ProfileImage)
+        public IActionResult Add(User user, string RegType, string? Department, string? RfidTag, string? Phone,
+                                 IFormFile? ProfileImage, string? CapturedImageData)
         {
             if (RegType == "staff")
                 AddStaff(user);
             else
-                AddCampusMember(user.FullName, user.Email, Department, RfidTag, Phone, ProfileImage);
+                AddCampusMember(user.FullName, user.Email, Department, RfidTag, Phone, ProfileImage, CapturedImageData);
 
             return RedirectToAction(nameof(Index));
         }
@@ -136,7 +137,8 @@ namespace SmartSecuritySystem.Controllers
             }
         }
 
-        private void AddCampusMember(string? name, string? email, string? dept, string? rfid, string? phone, IFormFile? profileImage)
+        private void AddCampusMember(string? name, string? email, string? dept, string? rfid, string? phone,
+                                     IFormFile? profileImage, string? capturedImageData = null)
         {
             if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(rfid))
                 return;
@@ -144,9 +146,10 @@ namespace SmartSecuritySystem.Controllers
             if (_context.AuthorizedPersonnel.Any(p => p.RfidTag == rfid))
                 return;
 
-            // Convert uploaded photo to base64 for face_embedded column
             string faceData = "PENDING_ENROLLMENT";
             string? profileImagePath = null;
+
+            // Priority 1: file upload
             if (profileImage != null && profileImage.Length > 0)
             {
                 try
@@ -160,6 +163,18 @@ namespace SmartSecuritySystem.Controllers
                 {
                     _logger.LogWarning($"Failed to process profile image: {ex.Message}");
                 }
+            }
+            // Priority 2: Pi Camera live capture (data URI from hidden field)
+            else if (!string.IsNullOrEmpty(capturedImageData))
+            {
+                profileImagePath = capturedImageData.StartsWith("data:")
+                    ? capturedImageData
+                    : $"data:image/jpeg;base64,{capturedImageData}";
+                // Strip prefix to get raw base64 for FaceEmbedding
+                faceData = profileImagePath.Contains(",")
+                    ? profileImagePath.Split(",")[1]
+                    : capturedImageData;
+                _logger.LogInformation("[ENROLLMENT] Using Pi Camera capture for {Name}", name);
             }
 
             var member = new AuthorizedPersonnel
@@ -181,9 +196,7 @@ namespace SmartSecuritySystem.Controllers
             _context.SaveChanges();
 
             if (faceData == "PENDING_ENROLLMENT")
-                TempData["Warning"] = $"\"{name}\" has been registered but has NO face photo. " +
-                                      $"Face verification will fail until a photo is uploaded. " +
-                                      $"Click edit to upload a profile image.";
+                TempData["Warning"] = $"\"{name}\" registered but has NO face photo — face verification will fail. Click Edit to add a photo.";
             else
                 TempData["Success"] = $"\"{name}\" registered successfully with face photo. Don't forget to assign room access.";
         }
@@ -221,7 +234,9 @@ namespace SmartSecuritySystem.Controllers
         // =====================================================
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult EditMember(int personId, string fullName, string? email, string? department, string? rfidTag, string? phone, IFormFile? ProfileImage)
+        public IActionResult EditMember(int personId, string fullName, string? email, string? department,
+                                        string? rfidTag, string? phone, IFormFile? ProfileImage,
+                                        string? CapturedImageData)
         {
             var existing = _context.AuthorizedPersonnel.FirstOrDefault(p => p.PersonId == personId);
             if (existing == null)
@@ -242,7 +257,7 @@ namespace SmartSecuritySystem.Controllers
                 }
             }
 
-            // Update face photo if a new one was uploaded
+            // Priority 1: file upload replaces face photo
             if (ProfileImage != null && ProfileImage.Length > 0)
             {
                 try
@@ -258,6 +273,18 @@ namespace SmartSecuritySystem.Controllers
                 {
                     _logger.LogWarning($"Failed to update profile image: {ex.Message}");
                 }
+            }
+            // Priority 2: Pi Camera capture from hidden input
+            else if (!string.IsNullOrEmpty(CapturedImageData))
+            {
+                var profileImagePath = CapturedImageData.StartsWith("data:")
+                    ? CapturedImageData
+                    : $"data:image/jpeg;base64,{CapturedImageData}";
+                var base64 = profileImagePath.Contains(",") ? profileImagePath.Split(",")[1] : CapturedImageData;
+                existing.FaceEmbedding = base64;
+                existing.ProfileImagePath = profileImagePath;
+                TempData["Success"] = $"\"{fullName}\" updated with Pi Camera face photo.";
+                _logger.LogInformation("[ENROLLMENT] EditMember Pi Camera capture saved for {Name}", fullName);
             }
 
             _context.SaveChanges();
@@ -510,5 +537,43 @@ namespace SmartSecuritySystem.Controllers
             client.Send(mail);
         }
 #pragma warning restore SYSLIB0014
+
+
+        // =====================================================
+        // CAMERA ENROLLMENT - capture face from Pi live stream
+        // =====================================================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult CaptureEnrollmentPhoto([FromForm] int personId, [FromForm] string imageData)
+        {
+            if (string.IsNullOrEmpty(imageData))
+                return Json(new { success = false, message = "No image data received." });
+
+            var person = _context.AuthorizedPersonnel.FirstOrDefault(p => p.PersonId == personId);
+            if (person == null)
+                return Json(new { success = false, message = "Person not found." });
+
+            try
+            {
+                // Strip data URI prefix (data:image/jpeg;base64,...)
+                var base64 = imageData.Contains(",") ? imageData.Split(",")[1] : imageData;
+
+                // Store JPEG base64 as FaceEmbedding - Pi decodes at verification time (Path 3)
+                person.FaceEmbedding = base64;
+
+                // Store full data URI for profile photo display in dashboard
+                string prefix = "data:image/jpeg;base64,";
+                person.ProfileImagePath = imageData.StartsWith("data:") ? imageData : prefix + base64;
+
+                _context.SaveChanges();
+                _logger.LogInformation("[ENROLLMENT] Camera capture saved for {Name} (ID {Id})", person.FullName, person.PersonId);
+                return Json(new { success = true, message = "Face enrolled from Pi Camera for " + person.FullName + "." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[ENROLLMENT] Camera capture failed for PersonId={Id}", personId);
+                return Json(new { success = false, message = "Save failed: " + ex.Message });
+            }
+        }
     }
 }

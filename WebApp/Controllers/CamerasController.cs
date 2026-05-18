@@ -999,6 +999,98 @@ namespace WebApp.Controllers
         }
 
         // ===============================
+        // FACE ENROLLMENT  (FIX-6)
+        // Proxies to Pi Flask: POST /enroll-face/{personId}
+        // Pi captures 5 frames, averages 128-dim embeddings,
+        // saves averaged vector to authorized_personnel.face_embedded,
+        // saves 5 backup photos to enrolled_faces/{personId}/.
+        // Photos are human-reference only — NOT used during verification.
+        // ===============================
+        [HttpPost]
+        [AllowAnonymous]
+        [Route("/api/cameras/enroll-face")]
+        public async Task<IActionResult> EnrollFace([FromBody] EnrollFaceRequest request)
+        {
+            if (request == null || request.PersonId <= 0)
+                return BadRequest(new { success = false, message = "personId is required." });
+
+            // Find the person first so we can return their name in the response
+            var person = await _context.AuthorizedPersonnel
+                .FirstOrDefaultAsync(p => p.PersonId == request.PersonId);
+
+            if (person == null)
+                return NotFound(new { success = false, message = $"Person {request.PersonId} not found." });
+
+            // Locate the active Pi camera to get its IP
+            var cam = _context.CameraDevices.FirstOrDefault(c => c.Status == "active");
+            string piIp = "192.168.254.181";   // fallback to known Pi IP
+
+            if (cam?.StreamUrl != null)
+            {
+                try
+                {
+                    var uri = new Uri(cam.StreamUrl);
+                    piIp = uri.Host;
+                }
+                catch { /* use default */ }
+            }
+
+            try
+            {
+                using var client = new System.Net.Http.HttpClient
+                {
+                    Timeout = System.TimeSpan.FromSeconds(30)   // 5 frames ~10-15s
+                };
+
+                var piUrl = $"http://{piIp}:5050/enroll-face/{request.PersonId}";
+                var response = await client.PostAsync(piUrl, null);
+                var body = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    // Pi confirmed enrollment — log notification
+                    _context.Notifications.Add(new Notification
+                    {
+                        TargetRole = "Admin",
+                        Message    = $"Face enrolled for {person.FullName} (ID={person.PersonId}) via Pi camera.",
+                        IsRead     = false,
+                        Timestamp  = DateTime.UtcNow
+                    });
+                    await _context.SaveChangesAsync();
+
+                    return Ok(new
+                    {
+                        success    = true,
+                        message    = $"Face enrolled successfully for {person.FullName}.",
+                        personId   = person.PersonId,
+                        personName = person.FullName,
+                        piResponse = body
+                    });
+                }
+                else
+                {
+                    return StatusCode((int)response.StatusCode, new
+                    {
+                        success = false,
+                        message = $"Pi returned {(int)response.StatusCode}: {body}"
+                    });
+                }
+            }
+            catch (System.Net.Http.HttpRequestException)
+            {
+                return StatusCode(503, new
+                {
+                    success = false,
+                    message = $"Cannot reach Pi at {piIp}:5050. Ensure the Pi is running and on the same network."
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = ex.Message });
+            }
+        }
+
+        // ===============================
         // HELPERS
         // ===============================
         private List<Camera> GetCameras()
@@ -1200,5 +1292,13 @@ namespace WebApp.Controllers
         public string? SessionId { get; set; }
         public string FilePath { get; set; } = string.Empty;
         public float FileSizeMb { get; set; }
+    }
+
+    // ===============================
+    // FACE ENROLLMENT DTO  (FIX-6)
+    // ===============================
+    public class EnrollFaceRequest
+    {
+        public int PersonId { get; set; }
     }
 }

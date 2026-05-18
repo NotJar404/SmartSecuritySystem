@@ -210,13 +210,15 @@
                                         <small class="text-muted search-meta">@m.Email</small>
                                         @if (m.HasFaceData)
                                         {
-                                            <span style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;background:rgba(46,204,113,0.15);color:#2ecc71;">
+                                            <span id="face-badge-@m.Id"
+                                                  style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;background:rgba(46,204,113,0.15);color:#2ecc71;">
                                                 <i class="fas fa-user-check"></i> Face ✓
                                             </span>
                                         }
                                         else
                                         {
-                                            <span style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;background:rgba(243,156,18,0.15);color:#f39c12;">
+                                            <span id="face-badge-@m.Id"
+                                                  style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;background:rgba(243,156,18,0.15);color:#f39c12;">
                                                 <i class="fas fa-exclamation-triangle"></i> No Face
                                             </span>
                                         }
@@ -227,13 +229,16 @@
                                         <code>@m.RfidTag</code>
                                         @if (m.RoomCount == 0)
                                         {
-                                            <span style="display:inline-block;margin-left:6px;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;background:rgba(243,156,18,0.15);color:#f39c12;" title="No room access assigned — will be denied at all doors">
+                                            <span id="room-badge-@m.Id"
+                                                  style="display:inline-block;margin-left:6px;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;background:rgba(243,156,18,0.15);color:#f39c12;"
+                                                  title="No room access assigned — will be denied at all doors">
                                                 <i class="fas fa-exclamation-triangle me-1"></i>No rooms
                                             </span>
                                         }
                                         else
                                         {
-                                            <span style="display:inline-block;margin-left:6px;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;background:rgba(46,204,113,0.15);color:#2ecc71;">
+                                            <span id="room-badge-@m.Id"
+                                                  style="display:inline-block;margin-left:6px;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;background:rgba(46,204,113,0.15);color:#2ecc71;">
                                                 <i class="fas fa-door-open me-1"></i>@m.RoomCount room@(m.RoomCount > 1 ? "s" : "")
                                             </span>
                                         }
@@ -343,18 +348,78 @@
                     <div id="campusFields" style="display:none;">
                         <div class="form-group">
                             <label>Profile Photo <small style="color:var(--accent);">(Required for face verification)</small></label>
-                            <!-- Preview -->
+
+                            <!-- Photo source tab switcher -->
+                            <div style="display:flex;gap:6px;margin-bottom:10px;">
+                                <button type="button" id="tabUpload" onclick="setPhotoTab('upload')"
+                                        style="flex:1;padding:6px 10px;border-radius:6px;border:1.5px solid var(--accent);background:var(--accent);color:#fff;font-size:12px;cursor:pointer;">
+                                    📁 Upload File
+                                </button>
+                                <button type="button" id="tabCamera" onclick="setPhotoTab('camera')"
+                                        style="flex:1;padding:6px 10px;border-radius:6px;border:1.5px solid var(--accent);background:transparent;color:var(--accent);font-size:12px;cursor:pointer;">
+                                    📷 Use Pi Camera
+                                </button>
+                            </div>
+
+                            <!-- Preview (shared) -->
                             <div id="photoPreviewWrap" style="display:none;margin-bottom:8px;text-align:center;">
                                 <img id="photoPreview" src="" alt="Preview"
                                      style="width:90px;height:90px;border-radius:50%;object-fit:cover;
                                             border:2px solid var(--accent);" />
                             </div>
-                            <input id="profileImage" name="ProfileImage" type="file" accept="image/*"
-                                   class="form-control"
-                                   onchange="previewPhoto(this)" />
-                            <small style="color:var(--text-dim);display:block;margin-top:4px;">
-                                Upload a clear, front-facing photo. This is used for face recognition.
-                            </small>
+
+                            <!-- Upload panel -->
+                            <div id="panelUpload">
+                                <input id="profileImage" name="ProfileImage" type="file" accept="image/*"
+                                       class="form-control"
+                                       onchange="previewPhoto(this)" />
+                                <small style="color:var(--text-dim);display:block;margin-top:4px;">
+                                    Upload a clear, front-facing photo for face recognition.
+                                </small>
+                            </div>
+
+                            <!-- Pi Camera capture panel -->
+                            <div id="panelCamera" style="display:none;">
+                                <div style="margin-bottom:6px;display:flex;gap:6px;align-items:center;">
+                                    <input id="piStreamUrl" type="text" class="form-control"
+                                           value="http://raspberrypi.local:5050/video"
+                                           placeholder="Pi stream URL (e.g. http://192.168.x.x:5050/video)"
+                                           style="font-size:11px;flex:1;" />
+                                    <button type="button" onclick="startEnrollStream()"
+                                            style="padding:5px 10px;border-radius:6px;background:var(--accent);color:#fff;border:none;white-space:nowrap;cursor:pointer;font-size:12px;">
+                                        ▶ Connect
+                                    </button>
+                                </div>
+
+                                <!-- Live stream display with face guide -->
+                                <div style="position:relative;display:inline-block;width:100%;max-width:320px;">
+                                    <img id="enrollStreamImg" src="" alt="Connecting..."
+                                         style="width:100%;border-radius:8px;border:2px solid var(--border);display:block;background:#111;min-height:180px;" />
+                                    <!-- Oval face guide overlay -->
+                                    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-55%);
+                                                width:90px;height:110px;border:2px dashed rgba(255,200,100,0.75);
+                                                border-radius:50%;pointer-events:none;"></div>
+                                    <div style="position:absolute;bottom:6px;left:0;right:0;text-align:center;
+                                                font-size:10px;color:rgba(255,255,255,0.7);">
+                                        Align face within the oval then capture
+                                    </div>
+                                </div>
+                                <canvas id="enrollCanvas" style="display:none;"></canvas>
+
+                                <div style="margin-top:8px;display:flex;gap:6px;">
+                                    <button type="button" id="btnCapture" onclick="captureEnrollFrame()" disabled
+                                            style="flex:1;padding:6px;border-radius:6px;background:#2ecc71;color:#fff;border:none;cursor:pointer;font-size:12px;">
+                                        📷 Capture
+                                    </button>
+                                    <button type="button" id="btnEnrollNow" onclick="enrollNow()" disabled
+                                            style="flex:1;padding:6px;border-radius:6px;background:#3498db;color:#fff;border:none;cursor:pointer;font-size:12px;">
+                                        ✅ Enroll Now
+                                    </button>
+                                </div>
+                                <div id="enrollMsg" style="margin-top:6px;font-size:11px;color:var(--text-dim);"></div>
+                                <!-- Hidden input carries captured image into normal form POST -->
+                                <input type="hidden" id="capturedImageData" name="CapturedImageData" value="" />
+                            </div>
                         </div>
                         <div class="form-group">
                             <label>RFID Tag</label>
@@ -430,7 +495,10 @@
 
                 <div class="form-group">
                     <label>Currently Assigned Rooms</label>
-                    <div id="roomList" style="min-height:60px; margin-top:8px;"></div>
+                    <div id="roomMsg" style="display:none;font-size:12px;font-weight:600;margin-top:4px;"></div>
+                    <div id="roomList" style="min-height:60px; margin-top:8px;">
+                        <p class="text-muted small text-center">Loading...</p>
+                    </div>
                 </div>
 
             </div>
@@ -488,6 +556,11 @@ function openAddModal() {
     document.getElementById("RegType").value = "staff";
     document.getElementById("RegType").disabled = false;
 
+    // Restore email validation for new registrations
+    const emailEl = document.getElementById('email');
+    emailEl.setAttribute('required', '');
+    emailEl.setAttribute('pattern', '.*@@gmail\\.com$');
+
     // Reset photo preview
     const wrap = document.getElementById('photoPreviewWrap');
     const preview = document.getElementById('photoPreview');
@@ -543,6 +616,11 @@ function openEditMember(id, name, email, dept, rfid, phone, profileImgSrc) {
     document.getElementById("email").value = email || "";
     document.getElementById("RegType").value = "campus";
     document.getElementById("RegType").disabled = true;
+
+    // Email is optional for campus members — remove HTML5 validation so Save is never blocked
+    const emailEl = document.getElementById('email');
+    emailEl.removeAttribute('required');
+    emailEl.removeAttribute('pattern');
 
     if (document.getElementById("department")) {
         document.getElementById("department").value = dept || "";
@@ -646,17 +724,21 @@ document.addEventListener('DOMContentLoaded', function() {
 // =====================================================
 // ROOM ACCESS MANAGEMENT
 // =====================================================
+let _currentRoomPersonId = null;
+
 function openRoomAccess(personId, personName) {
+    _currentRoomPersonId = personId;
     document.getElementById('roomPersonId').value = personId;
     document.getElementById('roomPersonName').innerText = personName;
 
     // Load available rooms
     fetch('/api/access/rooms')
-        .then(r => r.json())
+        .then(r => r.ok ? r.json() : Promise.reject('Auth error — please refresh'))
         .then(rooms => {
             const sel = document.getElementById('roomSelect');
             sel.innerHTML = rooms.map(r => `<option value="${r.roomId}">${r.roomName}</option>`).join('');
-        });
+        })
+        .catch(err => showRoomMsg('Could not load rooms: ' + err, 'error'));
 
     // Load current assignments
     loadRoomAssignments(personId);
@@ -673,26 +755,57 @@ function closeRoomModal() {
     document.body.style.overflow = 'auto';
 }
 
+function showRoomMsg(msg, type) {
+    const el = document.getElementById('roomMsg');
+    if (!el) return;
+    el.textContent = msg;
+    el.style.color = type === 'error' ? '#e74c3c' : '#2ecc71';
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 3000);
+}
+
+function updatePersonBadge(personId, count) {
+    const badge = document.getElementById('room-badge-' + personId);
+    if (!badge) return;
+    if (count === 0) {
+        badge.style.background = 'rgba(243,156,18,0.15)';
+        badge.style.color = '#f39c12';
+        badge.title = 'No room access assigned — will be denied at all doors';
+        badge.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i>No rooms';
+    } else {
+        badge.style.background = 'rgba(46,204,113,0.15)';
+        badge.style.color = '#2ecc71';
+        badge.title = '';
+        badge.innerHTML = '<i class="fas fa-door-open me-1"></i>' + count + ' room' + (count > 1 ? 's' : '');
+    }
+}
+
 function loadRoomAssignments(personId) {
     fetch(`/api/access/room-list?personId=${personId}`)
-        .then(r => r.json())
+        .then(r => r.ok ? r.json() : Promise.reject('Auth error'))
         .then(list => {
             const container = document.getElementById('roomList');
             if (!list.length) {
                 container.innerHTML = '<p class="text-muted small text-center">No rooms assigned — access will be denied at all doors.</p>';
-                return;
-            }
-            container.innerHTML = list.map(a => `
-                <div class="d-flex justify-content-between align-items-center mb-2" style="padding:8px 10px;background:var(--bg-input);border-radius:6px;border:1px solid var(--border);">
-                    <div>
-                        <strong style="font-size:13px;">${a.roomName}</strong>
-                        <small class="text-muted d-block">${a.accessLevel} • Since ${a.createdAt}</small>
+            } else {
+                container.innerHTML = list.map(a => `
+                    <div class="d-flex justify-content-between align-items-center mb-2" style="padding:8px 10px;background:var(--bg-input);border-radius:6px;border:1px solid var(--border);">
+                        <div>
+                            <strong style="font-size:13px;">${a.roomName}</strong>
+                            <small class="text-muted d-block">${a.accessLevel} &bull; Since ${a.createdAt}</small>
+                        </div>
+                        <button class="btn btn-link text-danger btn-sm" onclick="revokeRoom(${personId}, ${a.roomId})">
+                            <i class="fas fa-times-circle"></i>
+                        </button>
                     </div>
-                    <button class="btn btn-link text-danger btn-sm" onclick="revokeRoom(${personId}, ${a.roomId})">
-                        <i class="fas fa-times-circle"></i>
-                    </button>
-                </div>
-            `).join('');
+                `).join('');
+            }
+            // Live-update the badge in the personnel table row
+            updatePersonBadge(personId, list.length);
+        })
+        .catch(err => {
+            document.getElementById('roomList').innerHTML =
+                '<p class="text-danger small text-center">Failed to load assignments. ' + err + '</p>';
         });
 }
 
@@ -700,6 +813,8 @@ function assignRoom() {
     const personId = document.getElementById('roomPersonId').value;
     const roomId = document.getElementById('roomSelect').value;
     const btn = document.querySelector('[onclick="assignRoom()"]');
+
+    if (!roomId) { showRoomMsg('Please select a room first.', 'error'); return; }
 
     // Anti-dedup: disable button during request
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin me-1"></i>Assigning...'; }
@@ -711,13 +826,13 @@ function assignRoom() {
     })
     .then(r => r.json())
     .then(data => {
+        showRoomMsg(data.message, data.success ? 'ok' : 'error');
         if (data.success) {
             loadRoomAssignments(personId);
             refreshPersonnelCounts();
         }
-        alert(data.message);
     })
-    .catch(err => alert('Assignment failed: ' + err.message))
+    .catch(err => showRoomMsg('Assignment failed: ' + err.message, 'error'))
     .finally(() => {
         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa fa-plus me-1"></i>Assign Room Access'; }
     });
@@ -732,12 +847,13 @@ function revokeRoom(personId, roomId) {
     })
     .then(r => r.json())
     .then(data => {
+        showRoomMsg(data.message, data.success ? 'ok' : 'error');
         if (data.success) {
             loadRoomAssignments(personId);
             refreshPersonnelCounts();
         }
-        alert(data.message);
-    });
+    })
+    .catch(err => showRoomMsg('Revoke failed: ' + err, 'error'));
 }
 
 // ==============================================
@@ -759,5 +875,115 @@ function refreshPersonnelCounts() {
 
 // Poll every 30 seconds
 setInterval(refreshPersonnelCounts, 30000);
+
+// ==============================================
+// PI CAMERA ENROLLMENT
+// ==============================================
+let _capturedBase64 = '';
+
+function setPhotoTab(tab) {
+    const isCamera = tab === 'camera';
+    document.getElementById('panelUpload').style.display = isCamera ? 'none' : 'block';
+    document.getElementById('panelCamera').style.display = isCamera ? 'block' : 'none';
+    document.getElementById('tabUpload').style.background = isCamera ? 'transparent' : 'var(--accent)';
+    document.getElementById('tabUpload').style.color      = isCamera ? 'var(--accent)' : '#fff';
+    document.getElementById('tabCamera').style.background = isCamera ? 'var(--accent)' : 'transparent';
+    document.getElementById('tabCamera').style.color      = isCamera ? '#fff' : 'var(--accent)';
+    if (!isCamera) { var img = document.getElementById('enrollStreamImg'); if (img) img.src = ''; }
+}
+
+function startEnrollStream() {
+    var urlInput = document.getElementById('piStreamUrl');
+    var img      = document.getElementById('enrollStreamImg');
+    var btnCap   = document.getElementById('btnCapture');
+    var msg      = document.getElementById('enrollMsg');
+    var base = urlInput.value.trim().replace(/\/video$/, '');
+    img.src = base + '/video?t=' + Date.now();
+    img.onerror = function() { msg.textContent = 'Cannot connect — check Pi URL and ensure main.py is running.'; msg.style.color = '#e74c3c'; };
+    img.onload  = function() { msg.textContent = 'Stream connected. Align face within the oval, then click Capture.'; msg.style.color = '#2ecc71'; };
+    btnCap.disabled = false;
+    msg.textContent = 'Connecting...';
+    msg.style.color = 'var(--text-dim)';
+}
+
+function captureEnrollFrame() {
+    var urlInput = document.getElementById('piStreamUrl');
+    var msg      = document.getElementById('enrollMsg');
+
+    // Build snapshot URL from the stream URL
+    var base = urlInput.value.trim().replace(/\/video(\?.*)?$/, '');
+    var snapshotUrl = base + '/snapshot?t=' + Date.now();
+
+    msg.textContent = 'Requesting snapshot from Pi camera...';
+    msg.style.color = 'var(--text-dim)';
+    document.getElementById('btnCapture').disabled = true;
+
+    // Use fetch() so the JPEG comes as a clean Blob — avoids MJPEG canvas CORS taint
+    fetch(snapshotUrl)
+        .then(function(r) {
+            if (!r.ok) throw new Error('Pi returned HTTP ' + r.status + ' — is main.py running?');
+            return r.blob();
+        })
+        .then(function(blob) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                _capturedBase64 = e.target.result;  // data:image/jpeg;base64,...
+
+                document.getElementById('photoPreview').src = _capturedBase64;
+                document.getElementById('photoPreviewWrap').style.display = 'block';
+
+                var hidden = document.getElementById('capturedImageData');
+                if (hidden) hidden.value = _capturedBase64;
+
+                document.getElementById('btnCapture').disabled = false;
+                document.getElementById('btnEnrollNow').disabled = false;
+                msg.textContent = 'Snapshot captured! Click Enroll Now to save immediately.';
+                msg.style.color = '#2ecc71';
+            };
+            reader.readAsDataURL(blob);
+        })
+        .catch(function(e) {
+            document.getElementById('btnCapture').disabled = false;
+            msg.textContent = 'Capture failed: ' + e.message;
+            msg.style.color = '#e74c3c';
+        });
+}
+
+function enrollNow() {
+    var msg      = document.getElementById('enrollMsg');
+    var pidEl    = document.getElementById('personIdField');
+    var personId = pidEl ? pidEl.value : '';
+    if (!_capturedBase64) { msg.textContent = 'No frame captured yet.'; msg.style.color = '#e74c3c'; return; }
+    if (!personId || personId === '0') { msg.textContent = 'Save the person record first, then use Enroll Now.'; msg.style.color = '#f39c12'; return; }
+    msg.textContent = 'Enrolling...';
+    msg.style.color = 'var(--text-dim)';
+    var tokenEl = document.querySelector('input[name="__RequestVerificationToken"]');
+    var token   = tokenEl ? tokenEl.value : '';
+    var form    = new FormData();
+    form.append('personId', personId);
+    form.append('imageData', _capturedBase64);
+    form.append('__RequestVerificationToken', token);
+    fetch('/Personnel/CaptureEnrollmentPhoto', { method: 'POST', body: form })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            msg.textContent = (data.success ? '✅ ' : '❌ ') + data.message;
+            msg.style.color = data.success ? '#2ecc71' : '#e74c3c';
+            if (data.success) {
+                // Live-update the Face ✓ badge in the personnel table row — no page reload needed
+                var badge = document.getElementById('face-badge-' + personId);
+                if (badge) {
+                    badge.style.background = 'rgba(46,204,113,0.15)';
+                    badge.style.color = '#2ecc71';
+                    badge.innerHTML = '<i class="fas fa-user-check"></i> Face ✓';
+                }
+                // Also update the photo preview with the captured image
+                var prev = document.getElementById('photoPreview');
+                var wrap = document.getElementById('photoPreviewWrap');
+                if (prev) { prev.src = _capturedBase64; }
+                if (wrap) { wrap.style.display = 'block'; }
+            }
+        })
+        .catch(function(e) { msg.textContent = 'Network error: ' + e.message; msg.style.color = '#e74c3c'; });
+}
 </script>
 }

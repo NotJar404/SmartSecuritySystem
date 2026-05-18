@@ -446,58 +446,196 @@ def render_verification_overlay(frame, overlay_data):
     name = overlay_data.get("name", "")
     confidence = overlay_data.get("confidence", 0)
 
-    # Color based on status
-    if status == "VERIFYING...":
-        bg_color = (200, 200, 0)  # Yellow
+    # ── Color by status ───────────────────────────────────────────────────
+    # Granted outcomes → GREEN
+    if status in ("ACCESS GRANTED", "RFID VERIFIED") or \
+       ("MATCH" in status and "NO" not in status):
+        bg_color = (0, 180, 0)        # Green
+        text_color = (255, 255, 255)
+    # Biometric bypass (RFID only, no face check) → BLUE
+    elif status in ("RFID ONLY", "BIOMETRIC DISABLED"):
+        bg_color = (200, 140, 0)      # Amber — granted but no face check
+        text_color = (255, 255, 255)
+    # In-progress → YELLOW
+    elif "VERIFYING" in status or "CHECKING" in status:
+        bg_color = (200, 200, 0)      # Yellow
         text_color = (0, 0, 0)
-    elif "MATCH" in status and "NO" not in status:
-        bg_color = (0, 180, 0)  # Green
+    # No face present → ORANGE (different from MISMATCH which is intentionally red)
+    elif "NOT DETECTED" in status or "NO FACE" in status or "EXPIRED" in status:
+        bg_color = (0, 140, 220)      # Orange-blue
         text_color = (255, 255, 255)
+    # Denied / mismatch → RED
     else:
-        bg_color = (0, 0, 200)  # Red
+        bg_color = (0, 0, 200)        # Red (BGR)
         text_color = (255, 255, 255)
+    # ─────────────────────────────────────────────────────────────────────
 
-    # Banner at bottom-center
-    banner_h = int(80 * sf)
-    banner_y = h - banner_h - int(30 * sf)
-    banner_x = int(w * 0.1)
-    banner_w = int(w * 0.8)
+    is_final_result = status in (
+        "ACCESS GRANTED", "RFID VERIFIED", "ACCESS DENIED",
+        "NO MATCH", "CHECKED OUT", "TIMEOUT - NO FACE",
+    ) or (("MATCH" in status or "DENIED" in status) and "VERIFYING" not in status)
 
-    # Semi-transparent background
-    overlay = frame.copy()
-    cv2.rectangle(overlay, (banner_x, banner_y),
-                  (banner_x + banner_w, banner_y + banner_h),
-                  bg_color, -1)
-    cv2.addWeighted(overlay, 0.85, frame, 0.15, 0, frame)
+    if is_final_result:
+        # ── Full-frame color tint so result is IMPOSSIBLE to miss ──────────
+        tint = frame.copy()
+        cv2.rectangle(tint, (0, 0), (w, h), bg_color, -1)
+        cv2.addWeighted(tint, 0.12, frame, 0.88, 0, frame)
 
-    # Status text (large)
+        # ── Full-width tall banner ─────────────────────────────────────────
+        banner_h = int(120 * sf)
+        banner_y = h - banner_h - int(20 * sf)
+        banner_x = 0
+        banner_w = w
+
+        overlay = frame.copy()
+        cv2.rectangle(overlay, (banner_x, banner_y),
+                      (banner_x + banner_w, banner_y + banner_h),
+                      bg_color, -1)
+        cv2.addWeighted(overlay, 0.92, frame, 0.08, 0, frame)
+
+        # Border line at top of banner
+        cv2.line(frame, (0, banner_y), (w, banner_y),
+                 tuple(min(255, c + 80) for c in bg_color), max(3, int(3 * sf)))
+
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        status_scale  = 1.2 * sf
+        status_thick  = max(2, int(3 * sf))
+        status_size   = _cached_text_size(status, font, status_scale, status_thick)
+        sx = (w - status_size[0]) // 2
+        sy = banner_y + int(50 * sf)
+        cv2.putText(frame, status, (sx, sy), font, status_scale,
+                    text_color, status_thick, cv2.LINE_AA)
+
+        # Detail line
+        detail_parts = []
+        if name:
+            detail_parts.append(name)
+        if uid:
+            detail_parts.append(f"UID: {uid[-8:]}")
+        if confidence > 0:
+            detail_parts.append(f"{confidence:.0f}% match")
+        detail = "  |  ".join(detail_parts)
+
+        if detail:
+            detail_scale = 0.55 * sf
+            detail_thick = max(1, int(1 * sf))
+            detail_size  = _cached_text_size(detail, font, detail_scale, detail_thick)
+            dx = (w - detail_size[0]) // 2
+            dy = banner_y + int(95 * sf)
+            cv2.putText(frame, detail, (dx, dy), font, detail_scale,
+                        text_color, detail_thick, cv2.LINE_AA)
+
+    else:
+        # ── Compact banner for VERIFYING / in-progress states ─────────────
+        face_found = overlay_data.get('face_found', None)
+        guidance   = overlay_data.get('guidance', '')
+
+        banner_h = int(90 * sf)   # slightly taller to fit guidance line
+        banner_y = h - banner_h - int(30 * sf)
+        banner_x = int(w * 0.05)
+        banner_w = int(w * 0.90)
+
+        overlay = frame.copy()
+        cv2.rectangle(overlay, (banner_x, banner_y),
+                      (banner_x + banner_w, banner_y + banner_h),
+                      bg_color, -1)
+        cv2.addWeighted(overlay, 0.85, frame, 0.15, 0, frame)
+
+        font = cv2.FONT_HERSHEY_SIMPLEX
+
+        # Face indicator dot (left side of banner)
+        dot_cx = banner_x + int(20 * sf)
+        dot_cy = banner_y + int(28 * sf)
+        dot_r  = int(8 * sf)
+        if face_found is True:
+            cv2.circle(frame, (dot_cx, dot_cy), dot_r, (0, 255, 80), -1)   # green dot
+        elif face_found is False:
+            cv2.circle(frame, (dot_cx, dot_cy), dot_r, (0, 60, 220), -1)   # red dot
+
+        # Status text
+        status_scale = 0.8 * sf
+        status_thick = max(2, int(2 * sf))
+        status_size  = _cached_text_size(status, font, status_scale, status_thick)
+        sx = banner_x + (banner_w - status_size[0]) // 2
+        sy = banner_y + int(30 * sf)
+        cv2.putText(frame, status, (sx, sy), font, status_scale,
+                    text_color, status_thick, cv2.LINE_AA)
+
+        # Guidance line (smaller, italic-style)
+        guide_line_parts = []
+        if guidance:
+            guide_line_parts.append(guidance)
+        if uid:
+            guide_line_parts.append(f"UID: {uid}")
+        if confidence > 0:
+            guide_line_parts.append(f"{confidence:.0f}%")
+        guide_line = "  |  ".join(guide_line_parts) if guide_line_parts else ""
+
+        if guide_line:
+            g_scale = 0.42 * sf
+            g_thick = max(1, int(1 * sf))
+            g_size  = _cached_text_size(guide_line, font, g_scale, g_thick)
+            gx = banner_x + (banner_w - g_size[0]) // 2
+            gy = banner_y + int(68 * sf)
+            cv2.putText(frame, guide_line, (gx, gy), font, g_scale,
+                        text_color, g_thick, cv2.LINE_AA)
+
+
+
+def render_face_guide(frame, face_detected: bool, state: str = "ACCESS",
+                      face_boxes=None):
+    """
+    Draw face bounding boxes in IDLE / ACCESS state.
+    OVAL REMOVED — replaced with plain rectangles.
+
+    Colors:
+      IDLE  (monitoring, no RFID) → BLUE  (255, 100, 0)
+      ACCESS (RFID tapped, verifying) → YELLOW (0, 255, 255)
+
+    If face_boxes is provided, draws each box.
+    If face_boxes is empty/None but face_detected, draws a centre placeholder.
+    """
+    if state not in ("IDLE", "ACCESS"):
+        return
+
+    h, w = frame.shape[:2]
+    sf   = _scale_factor(frame)
     font = cv2.FONT_HERSHEY_SIMPLEX
-    status_scale = 0.8 * sf
-    status_thick = max(2, int(2 * sf))
-    status_size = _cached_text_size(status, font, status_scale, status_thick)
-    sx = banner_x + (banner_w - status_size[0]) // 2
-    sy = banner_y + int(30 * sf)
-    cv2.putText(frame, status, (sx, sy), font, status_scale,
-                text_color, status_thick, cv2.LINE_AA)
 
-    # Detail line: name + UID + confidence
-    detail_parts = []
-    if name:
-        detail_parts.append(name)
-    if uid:
-        detail_parts.append(f"UID: {uid}")
-    if confidence > 0:
-        detail_parts.append(f"{confidence:.0f}%")
-    detail = " | ".join(detail_parts)
+    box_color  = (0, 255, 255) if state == "ACCESS" else (255, 100, 0)
+    label      = "VERIFYING..." if state == "ACCESS" else ("FACE DETECTED" if face_detected else "NO FACE")
+    label_color = box_color
 
-    if detail:
-        detail_scale = 0.45 * sf
-        detail_thick = max(1, int(1 * sf))
-        detail_size = _cached_text_size(detail, font, detail_scale, detail_thick)
-        dx = banner_x + (banner_w - detail_size[0]) // 2
-        dy = banner_y + int(60 * sf)
-        cv2.putText(frame, detail, (dx, dy), font, detail_scale,
-                    text_color, detail_thick, cv2.LINE_AA)
+    drawn = False
+    if face_boxes:
+        for (x, y, bw, bh) in face_boxes:
+            if bw > 0 and bh > 0:
+                cv2.rectangle(frame, (x, y), (x + bw, y + bh), box_color, 2)
+                # Label above the box
+                font_scale = 0.45 * sf
+                thick = max(1, int(1.5 * sf))
+                (tw, th), _ = cv2.getTextSize(label, font, font_scale, thick)
+                lx = x
+                ly = max(th + 6, y - 6)
+                cv2.rectangle(frame, (lx - 2, ly - th - 4),
+                              (lx + tw + 4, ly + 2), (0, 0, 0), -1)
+                cv2.putText(frame, label, (lx, ly), font,
+                            font_scale, label_color, thick, cv2.LINE_AA)
+                drawn = True
+
+    if not drawn:
+        # No box available — show a simple text badge at the bottom-centre
+        msg = "FACE DETECTED - TAP RFID" if face_detected else "NO FACE - LOOK AT CAMERA"
+        color = (0, 220, 80) if face_detected else (0, 165, 255)
+        font_scale = 0.48 * sf
+        thick = max(1, int(1.5 * sf))
+        (tw, th), _ = cv2.getTextSize(msg, font, font_scale, thick)
+        tx = (w - tw) // 2
+        ty = int(h * 0.85)
+        cv2.rectangle(frame, (tx - 5, ty - th - 5), (tx + tw + 5, ty + 5),
+                      (0, 0, 0), -1)
+        cv2.putText(frame, msg, (tx, ty), font, font_scale, color, thick, cv2.LINE_AA)
+
 
 
 def render_countdown_overlay(frame, seconds_remaining):
@@ -539,7 +677,7 @@ def render_full_frame(frame, state, occupancy, sessions=0,
                       tracked_persons=None, faces=None,
                       is_recording=False, armed=True,
                       extra_info=None, verification_overlay=None,
-                      countdown_seconds=None):
+                      countdown_seconds=None, face_detected=None):
     """
     MASTER RENDER FUNCTION — Draws ALL overlays on a frame.
     
@@ -573,13 +711,15 @@ def render_full_frame(frame, state, occupancy, sessions=0,
 
     # 2. Bounding boxes (state-dependent)
     if state in ('INSIDE', 'LOITERING', 'ALERT', 'MONITORING', 'LOCKDOWN', 'EMERGENCY'):
+        # MONITORING STATES: show tracking boxes only — no oval
         if tracked_persons:
             boxes_rendered = render_person_boxes(frame, tracked_persons)
     else:
-        # IDLE / ACCESS: face detection boxes
-        if faces:
-            state_color = STATUS_COLORS.get(state, (128, 128, 128))
-            boxes_rendered = render_face_boxes(frame, faces, state_color, state)
+        # IDLE / ACCESS: draw plain rectangle bounding boxes — no oval
+        # Blue in IDLE, Yellow in ACCESS (verifying)
+        if face_detected is not None:
+            render_face_guide(frame, face_detected, state,
+                              face_boxes=faces)
 
     # 3. REC indicator (ALERT state or active recording)
     if state == 'ALERT' or is_recording:

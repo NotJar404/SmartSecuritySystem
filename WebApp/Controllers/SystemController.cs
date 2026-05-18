@@ -81,6 +81,25 @@ namespace WebApp.Controllers
             setting.IsEnabled = isEnabled;
             await _context.SaveChangesAsync();
 
+            // FIX-4: Immediately push refresh to Pi so it doesn't wait for 3s poll
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using var client = new System.Net.Http.HttpClient
+                    {
+                        Timeout = System.TimeSpan.FromSeconds(2)
+                    };
+                    var cam = _context.CameraDevices.FirstOrDefault(c => c.Status == "active");
+                    if (cam?.StreamUrl != null)
+                    {
+                        var uri = new System.Uri(cam.StreamUrl);
+                        await client.PostAsync($"http://{uri.Host}:5050/alarm-settings/refresh", null);
+                    }
+                }
+                catch { /* Pi may be offline — 3s poller will sync */ }
+            });
+
             return Json(new
             {
                 success = true,

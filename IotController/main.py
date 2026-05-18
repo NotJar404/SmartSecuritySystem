@@ -249,6 +249,14 @@ class SmartSecuritySystem:
         self.exit_inference_timeout = 1800  # 30 minutes no activity = soft exit
 
         # =========================
+        # HARD SESSION TIME LIMIT
+        # Force logout after this many seconds regardless of activity.
+        # Prevents forgotten cards from keeping sessions open indefinitely.
+        # Default: 4 hours (14400 s). Override via DB config if needed.
+        # =========================
+        self.session_max_duration = 14400   # 4 hours = hard session cap
+
+        # =========================
         # RECORDING SYSTEM (MP4/H.264 + pre-buffer + async writer)
         # =========================
         self._is_recording = False
@@ -305,7 +313,7 @@ class SmartSecuritySystem:
         # Displayed on camera stream during RFID face verification
         # =========================
         self._verification_overlay = None  # {status, uid, name, confidence, start_time}
-        self._verification_overlay_duration = 5  # seconds to show result
+        self._verification_overlay_duration = 8  # seconds to show result (was 5)
 
         # Door held-open tracking (FIX-6)
         self._door_open_time = None
@@ -321,7 +329,6 @@ class SmartSecuritySystem:
             "forcedentry": True
         }  # Defaults to all armed; updated by polling thread
 
-        # =========================
         # SYSTEM CONFIG (polled from ASP.NET /api/system/config)
         # Maps 1:1 to UI card settings in System.cshtml
         # =========================
@@ -329,6 +336,9 @@ class SmartSecuritySystem:
         self._hardware_siren_enabled = True    # Alert Protocols â†’ Hardware Siren
         self._gate_hold_open = 5               # Access Control â†’ Gate Hold-Open (seconds)
         self._biometric_lock_enabled = True    # Access Control â†’ Biometric Lock
+        self._checkout_min_seconds = 10        # Minimum seconds inside before tap-out is accepted
+                                               # Prevents accidental checkout when user
+                                               # taps again after not seeing grant feedback
         self._active_alarm_priority = 0        # Emergency trigger priority tracker
 
         # =========================
@@ -403,6 +413,27 @@ class SmartSecuritySystem:
         if self._enable_api_retry:
             threading.Thread(target=self._api_retry_worker, daemon=True).start()
             print("[SYSTEM] API retry worker started")
+
+        # ── Startup diagnostic summary ──────────────────────────────────────
+        biometric_status = "ENABLED  (RFID + face required)" if self._biometric_lock_enabled \
+                           else "DISABLED (RFID alone grants access — face NOT checked)"
+        print("")
+        print("=" * 60)
+        print(f"[CONFIG] Biometric lock  : {biometric_status}")
+        print(f"[CONFIG] Face tolerance  : {self.face_verifier.tolerance}  "
+              f"(lower=stricter, 0.6=recommended)")
+        print(f"[CONFIG] Min confidence  : {self.face_confidence_threshold * 100:.0f}%")
+        print(f"[CONFIG] camera_id       : {self.camera_id}")
+        print(f"[CONFIG] room_id         : {self.room_id}")
+        print(f"[CONFIG] ASP.NET URL     : {self.base_url}")
+        print("=" * 60)
+        print("")
+        if not self._biometric_lock_enabled:
+            print("[WARN]  *** Biometric lock is OFF — face is NOT verified! ***")
+            print("[WARN]  Anyone with a valid RFID card can enter.")
+            print("[WARN]  Enable via the dashboard Settings > Biometric Lock.")
+            print("")
+        # ────────────────────────────────────────────────────────────────────
 
     # =========================
     # FSM STATE TRANSITION (THREAD-SAFE)
@@ -553,14 +584,17 @@ class SmartSecuritySystem:
                     raw_occupancy = self.person_tracker.get_active_count()
 
                     # Still run face detection at reduced rate for face buffer
-                    # (needed if someone new taps RFID while in INSIDE state)
-                    if now - self.last_face_update > 2:
+                    # SKIP while verification is collecting — dlib is not thread-safe
+                    # (calling face_recognition from two threads simultaneously → SIGSEGV)
+                    if now - self.last_face_update > 2 and not self.face_verifier.is_collecting:
                         faces, face_images = self.face_detector.detect_faces(frame)
                 else:
                     # =========================
                     # IDLE/ACCESS MODE: Face detection
+                    # SKIP while verification thread is running — dlib is not thread-safe
                     # =========================
-                    faces, face_images = self.face_detector.detect_faces(frame)
+                    if not self.face_verifier.is_collecting:
+                        faces, face_images = self.face_detector.detect_faces(frame)
                     raw_occupancy = len(faces)
 
                     # Debug: periodically log detection stats
@@ -617,7 +651,10 @@ class SmartSecuritySystem:
                     is_recording=self._is_recording,
                     armed=self._master_armed,
                     verification_overlay=_v_overlay,
-                    countdown_seconds=_countdown
+                    countdown_seconds=_countdown,
+                    # Pass live face-buffer state so the guide oval is green/orange
+                    face_detected=(self.face_verifier.current_encoding is not None)
+                                   if current_state in (STATE_IDLE, STATE_ACCESS) else None
                 )
 
                 # === SET PROCESSED FRAME IMMEDIATELY after rendering ===
@@ -1112,6 +1149,34 @@ class SmartSecuritySystem:
         # Cancel the 30-second idle countdown (FIX-1)
         self._idle_person_first_seen = None
 
+        # ── RFID Tap diagnostic (visible in Pi terminal) ─────────────────────
+        face_buffered = self.face_verifier.current_encoding is not None
+        face_age_str  = ""
+        if face_buffered:
+            face_age_s = (datetime.now() - self.face_verifier.current_time).total_seconds()
+            face_age_str = f" (buffered {face_age_s:.1f}s ago)"
+        print("")
+        print(f"[RFID] ══════════════════════════════════════════════")
+        print(f"[RFID]  CARD TAPPED  UID={uid_str}")
+        print(f"[RFID]  Face buffer  : {'YES' + face_age_str if face_buffered else 'NO — face not detected yet'}")
+        print(f"[RFID]  Biometric    : {'ENABLED' if self._biometric_lock_enabled else 'DISABLED (RFID only)'}")
+        print(f"[RFID] ══════════════════════════════════════════════")
+        # ─────────────────────────────────────────────────────────────────────
+
+        # ── Save debug snapshot of what camera sees at tap time ───────────────
+        try:
+            dbg_frame = self.camera.get_frame()
+            if dbg_frame is not None:
+                snap_dir = os.path.join(self._recording_dir, "snapshots")
+                os.makedirs(snap_dir, exist_ok=True)
+                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                dbg_path = os.path.join(snap_dir, f"debug_{uid_str}_{ts}.jpg")
+                cv2.imwrite(dbg_path, dbg_frame)
+                print(f"[RFID]  Debug snapshot saved: {dbg_path}")
+        except Exception as _snap_err:
+            print(f"[RFID]  Debug snapshot failed: {_snap_err}")
+        # ─────────────────────────────────────────────────────────────────────
+
         # Short buzzer feedback on every RFID tap
         self.buzzer.beep(duration=0.1)
 
@@ -1128,8 +1193,11 @@ class SmartSecuritySystem:
         # UNKNOWN RFID CHECK + ROOM ACCESS CHECK
         # Query backend to see if UID is registered AND allowed in this room
         # =========================
+        # Pre-initialize so variables are ALWAYS defined even if backend is offline
         room_allowed = False
-        person_id = None  # Resolved from backend for DB linkage
+        person_id = None
+        face_embedding_str = None   # ← fix: UnboundLocalError when ConnectionError fires
+        data = {}                   # ← fix: data must exist for later .get() calls
         try:
             resp = requests.get(
                 f"{self.base_url}/api/access/rfid?uid={uid_str}&roomId={self.room_id}",
@@ -1150,7 +1218,7 @@ class SmartSecuritySystem:
             room_name = data.get("roomName", "Unknown")
 
             if not room_allowed:
-                print(f"[ACCESS] DENIED — {data.get('fullName', uid_str)} not authorized for {room_name}")
+                print(f"[ACCESS] DENIED -- {data.get('fullName', uid_str)} not authorized for {room_name}")
                 # Yellow LED flash to indicate room denial
                 self.rgb_led.status_access()
                 time.sleep(0.3)
@@ -1177,17 +1245,23 @@ class SmartSecuritySystem:
                 return
 
         except requests.exceptions.ConnectionError:
-            pass  # Backend offline - proceed with local logic
+            print(f"[RFID] Backend offline (localhost:{self.base_url.split(':')[-1]}) "
+                  f"-- set ASPNET_URL env var. Falling back to local .pkl verification.")
         except Exception as e:
             print(f"[RFID] Backend lookup failed: {e}")
 
         # =========================
-        # ALREADY INSIDE CHECK (per-person session tracking)
+        # RE-TAP = CHECKOUT (per-person session tracking)
+        # If this person is already logged in, treat the tap as a tap-out.
         # =========================
+        session_to_close = None
         with self.session_lock:
             if uid_str in self.active_sessions:
-                print(f"[FSM] User {user_id} already inside - ignoring RFID re-tap")
-                return
+                session_to_close = self.active_sessions.pop(uid_str)
+
+        if session_to_close is not None:
+            self._handle_rfid_logout(uid_str, user_id, session_to_close)
+            return
 
         # =========================
         # TRANSITION: -> ACCESS MODE
@@ -1195,54 +1269,115 @@ class SmartSecuritySystem:
         self.set_state(STATE_ACCESS)
 
         # =========================
-        # FACE VERIFICATION (with confidence threshold)
-        # Biometric Lock OFF = skip face check, grant access on RFID alone
-        # Compares live camera face against face_embedding from the database.
-        # The faceEmbedding is fetched from ASP.NET RFID lookup response.
-        # Falls back to local .pkl file if database embedding unavailable.
+        # FACE VERIFICATION
+        # Biometric Lock OFF -> grant on RFID alone (no face check)
+        # Biometric Lock ON  -> multi-frame window, non-blocking thread
         # =========================
         face_lookup_id = str(person_id) if person_id else uid_str
-        if not self._biometric_lock_enabled:
-            print(f"[ACCESS] Biometric Lock DISABLED â€” granting access on RFID alone for {user_id}")
-            result = {"verified": True, "confidence": 100, "failure_type": None}
-        else:
-            result = self.face_verifier.verify_rfid_with_face(face_lookup_id, db_embedding_str=face_embedding_str)
 
-        if result["verified"] and result["confidence"] >= self.face_confidence_threshold * 100:
+        if not self._biometric_lock_enabled:
+            # Biometric DISABLED: instant RFID-only grant
+            print(f"[ACCESS] Biometric Lock DISABLED -- granting access on RFID alone for {user_id}")
+            self._verification_overlay = {
+                'status':     'RFID ONLY',
+                'uid':        uid_str,
+                'name':       data.get('fullName', '') if isinstance(data, dict) else '',
+                'confidence': 100,
+                'start_time': time.time()
+            }
+            biometric_result = {
+                "verified": True, "confidence": 100,
+                "message": "RFID ONLY", "frames_checked": 0
+            }
+            self._apply_verification_result(
+                biometric_result, user_id, uid_str, person_id, data, now
+            )
+            return
+
+        # Biometric ENABLED: multi-frame non-blocking verification
+        # Capture locals for closure -- on_rfid_tapped returns immediately after this
+        _user_id   = user_id
+        _uid_str   = uid_str
+        _person_id = person_id
+        _data      = data
+        _now       = now
+
+        def _overlay_setter(overlay_dict):
+            # Update verification overlay from worker thread
+            self._verification_overlay = overlay_dict
+
+        def _on_result(result):
+            # Called by worker thread when multi-frame decision is ready.
+            # MUST be wrapped in try/except — an unhandled exception here
+            # would silently kill the grant feedback (solenoid/LED/buzzer).
+            try:
+                print(f"[ACCESS] Multi-frame result: {result.get('message')} | "
+                      f"confidence={result.get('confidence')}% | "
+                      f"frames={result.get('frames_checked')}")
+                self._apply_verification_result(result, _user_id, _uid_str, _person_id, _data, _now)
+            except Exception as e:
+                import traceback
+                print(f"[ACCESS ERROR] _on_result callback failed — hardware may not have fired!")
+                print(f"[ACCESS ERROR] Exception: {e}")
+                traceback.print_exc()
+                # Emergency reset so system doesn't stay stuck in ACCESS state
+                self.set_state(STATE_IDLE)
+
+        self.face_verifier.start_multiframe_window(
+            user_id              = face_lookup_id,
+            stored_embedding_str = face_embedding_str,
+            camera_get_frame_fn  = self.camera.get_frame,
+            overlay_setter_fn    = _overlay_setter,
+            result_callback_fn   = _on_result,
+            # Audio cue when camera can't see the user's face:
+            # 2 quick beeps every 3 seconds = "reposition the camera toward your face"
+            guidance_fn          = lambda: self.buzzer.pattern_beep(times=2, interval=0.1)
+        )
+        # on_rfid_tapped returns here -- MJPEG stream stays live while thread verifies
+
+    def _apply_verification_result(self, result, user_id, uid_str, person_id, data, now):
+        """
+        Apply GRANTED or DENIED FSM logic from a verification result dict.
+        Called directly (biometric OFF) or from worker thread (biometric ON).
+
+        Decision authority is the verifier's triple-gate (best_distance, passing_frames,
+        avg_distance) — result['verified'] is the single source of truth here.
+        The confidence secondary gate is intentionally removed to avoid the polling
+        thread's face_confidence_threshold overriding a correctly verified result.
+        """
+        reason = result.get("reason", "")
+
+        if result["verified"]:  # triple-gate already enforced in face_verfication.py
             # =========================
-            # ACCESS GRANTED â€” Create session
+            # ACCESS GRANTED -- Create session
             # =========================
             session_id = str(uuid.uuid4())
 
             with self.session_lock:
                 self.active_sessions[str(user_id)] = {
-                    "session_id": session_id,
-                    "entry_time": now,
+                    "session_id":  session_id,
+                    "entry_time":  now,
                     "last_active": now,
-                    "status": "INSIDE",
-                    "rfid_uid": str(user_id),
-                    "person_id": person_id
+                    "status":      "INSIDE",
+                    "rfid_uid":    str(user_id),
+                    "person_id":   person_id
                 }
 
-            # =========================
-            # TRANSITION: â†’ INSIDE MODE
-            # =========================
+            # TRANSITION: -> INSIDE MODE
             self.set_state(STATE_INSIDE)
 
-            # Push to backend (single ENTRY event)
-            # rfid_valid=True because RFID was verified by backend lookup
-            # face_verified depends on whether biometric lock was enabled and passed
+            # Push ENTRY event to backend
             self.push_state_transition(
-                event="ENTRY",
-                session_id=session_id,
-                rfid_uid=str(user_id),
-                person_id=person_id,
-                confidence=result["confidence"] / 100.0,
-                rfid_valid=True,
-                face_verified=self._biometric_lock_enabled
+                event        = "ENTRY",
+                session_id   = session_id,
+                rfid_uid     = str(user_id),
+                person_id    = person_id,
+                confidence   = result["confidence"] / 100.0,
+                rfid_valid   = True,
+                face_verified = self._biometric_lock_enabled
             )
 
-            # Unlock door + track entry window for tailgating
+            # Unlock door + track entry window for tailgating detection
             self.solenoid_lock.unlock(duration=self._gate_hold_open)
             self._last_unlock_time = now
 
@@ -1250,105 +1385,115 @@ class SmartSecuritySystem:
             self.buzzer.beep(duration=0.2)
             self.rgb_led.status_granted()
 
-            # Update verification overlay: MATCH (FIX-7)
+            # Update overlay: ACCESS GRANTED (green banner)
+            person_name = data.get('fullName', '') if isinstance(data, dict) else ''
             self._verification_overlay = {
-                'status': 'ACCESS GRANTED',
-                'uid': uid_str,
-                'name': data.get('fullName', '') if 'data' in dir() else '',
+                'status':     'ACCESS GRANTED',
+                'uid':        uid_str,
+                'name':       person_name,
                 'confidence': result['confidence'],
                 'start_time': time.time()
             }
 
-            # Push detection event (preserves existing behavior)
             self.push_detection("face_verified", 1, result["confidence"] / 100.0)
-
-            print(f"[ACCESS GRANTED] {user_id} â€” Session: {session_id[:8]}...")
+            frames_info = (f" ({result.get('frames_checked', 0)} frames)"
+                           if result.get('frames_checked') else '')
+            print(f"[ACCESS GRANTED] {user_id}{frames_info} -- Session: {session_id[:8]}...")
 
         else:
             # =========================
-            # ACCESS DENIED â€” Differentiated by failure type (BUG-4 FIX)
+            # ACCESS DENIED — route by reason key (reliable) not message string
             # =========================
             failure_type = result.get("message", "")
 
-            if failure_type == "FACE MISMATCH":
-                # REAL THREAT: Face captured but doesn't match RFID owner
+            if reason in ("NO_MATCH", "FACE_MISMATCH") or failure_type == "FACE MISMATCH":
+                # REAL THREAT: face captured, does not match RFID owner
                 self.set_state(STATE_ALERT)
                 self._alert_start_time = time.time()
 
-                # Update verification overlay: NO MATCH (FIX-7)
                 self._verification_overlay = {
-                    'status': 'NO MATCH',
-                    'uid': uid_str,
-                    'name': data.get('fullName', '') if 'data' in dir() else '',
+                    'status':     'NO MATCH',
+                    'uid':        uid_str,
+                    'name':       data.get('fullName', '') if isinstance(data, dict) else '',
                     'confidence': result['confidence'],
                     'start_time': time.time()
                 }
 
                 session_id = str(uuid.uuid4())
                 self.push_state_transition(
-                    event="ALERT",
-                    session_id=session_id,
-                    rfid_uid=str(user_id),
-                    person_id=person_id,
-                    alert_type="UnauthorizedAccess",
-                    description=f"RFID {user_id} face MISMATCH (confidence: {result['confidence']}%)",
-                    severity="HIGH"
+                    event       = "ALERT",
+                    session_id  = session_id,
+                    rfid_uid    = str(user_id),
+                    person_id   = person_id,
+                    alert_type  = "UnauthorizedAccess",
+                    description = f"RFID {user_id} face MISMATCH (best: {result['confidence']}%)",
+                    severity    = "HIGH"
                 )
                 self.push_detection("unknown_face", 1, result["confidence"] / 100.0, triggered_alert=True)
                 self._start_recording(session_id)
 
-                # Hardware feedback: alarm via emergency trigger system
                 self.rgb_led.status_denied()
                 self.trigger_emergency(
                     "intrusion", duration=5,
-                    session_id=session_id,
-                    description=f"RFID {user_id} face MISMATCH (confidence: {result['confidence']}%)"
+                    session_id  = session_id,
+                    description = f"RFID {user_id} face MISMATCH (best: {result['confidence']}%)"
                 )
-
-                print(f"[ACCESS DENIED] {user_id} â€” Face MISMATCH")
+                print(f"[ACCESS DENIED] {user_id} -- Face MISMATCH")
 
                 time.sleep(2)
-                self.buzzer.stop()  # Ensure buzzer stops before state change
+                self.buzzer.stop()
                 self.set_state(STATE_IDLE)
 
-            elif failure_type == "No face detected":
-                # TEMPORARY: Camera didn't capture face â€” allow retry
-                print(f"[ACCESS] {user_id} â€” No face captured, returning to IDLE")
+            elif reason == "TIMEOUT" or failure_type in (
+                    "TIMEOUT - NO FACE DETECTED", "FACE TIMEOUT",
+                    "No face detected", "Face expired"):
+                # Camera could not capture face in time -- allow retry
+                print(f"[ACCESS] {user_id} -- {failure_type}, returning to IDLE (retryable)")
+                self._verification_overlay = {
+                    'status':     'TIMEOUT - NO FACE',
+                    'uid':        uid_str,
+                    'name':       '',
+                    'confidence': 0,
+                    'start_time': time.time()
+                }
+                # Hardware feedback: red LED + 2 beeps (positioning issue, not a threat)
+                self.rgb_led.status_denied()
+                self.buzzer.pattern_beep(times=2, interval=0.3)
                 self.set_state(STATE_IDLE)
-                # Do NOT push alert â€” camera issue, not security threat
+                # Do NOT push alert -- camera/positioning issue, not a security threat
 
-            elif failure_type == "Face expired":
-                # STALE: Encoding too old
-                print(f"[ACCESS] {user_id} â€” Face encoding expired, returning to IDLE")
-                self.set_state(STATE_IDLE)
-
-            elif failure_type == "No registered face":
-                # ADMIN ISSUE: User has no stored face data
+            elif reason == "LOAD_ERROR" or failure_type in ("No registered face", "FACE LOAD ERROR"):
+                # ADMIN ISSUE: user has no enrolled face data
                 self.set_state(STATE_ALERT)
                 self._alert_start_time = time.time()
 
                 session_id = str(uuid.uuid4())
                 self.push_state_transition(
-                    event="ALERT",
-                    session_id=session_id,
-                    rfid_uid=str(user_id),
-                    alert_type="SuspiciousActivity",
-                    description=f"RFID {user_id} has no registered face data",
-                    severity="WARNING"
+                    event       = "ALERT",
+                    session_id  = session_id,
+                    rfid_uid    = str(user_id),
+                    alert_type  = "SuspiciousActivity",
+                    description = f"RFID {user_id} has no registered face data",
+                    severity    = "WARNING"
                 )
-                print(f"[ACCESS DENIED] {user_id} â€” No registered face")
-
-                # Warning beep (not full alarm â€” admin issue, not security threat)
+                print(f"[ACCESS DENIED] {user_id} -- No registered face")
                 self.buzzer.pattern_beep(times=3, interval=0.3)
-
                 time.sleep(2)
                 self.set_state(STATE_IDLE)
 
             else:
-                # Unknown failure â€” safe fallback
-                print(f"[ACCESS] {user_id} â€” Verification failed: {failure_type}")
+                # Unknown failure — safe fallback, reset to IDLE
+                print(f"[ACCESS DENIED] {user_id} -- Unknown failure: reason={reason!r} msg={failure_type!r}")
+                self._verification_overlay = {
+                    'status':     'ACCESS DENIED',
+                    'uid':        uid_str,
+                    'name':       '',
+                    'confidence': result.get('confidence', 0),
+                    'start_time': time.time()
+                }
+                self.rgb_led.status_denied()
+                self.buzzer.pattern_beep(times=2, interval=0.3)
                 self.set_state(STATE_IDLE)
-
     # =========================
     # PIR MOTION CALLBACK
     # =========================
@@ -1362,6 +1507,79 @@ class SmartSecuritySystem:
             with self.session_lock:
                 for user_id, session in self.active_sessions.items():
                     session["last_active"] = time.time()
+
+    # =========================
+    # RFID LOGOUT (TAP-OUT)
+    # =========================
+    def _handle_rfid_logout(self, uid_str, user_id, session):
+        """
+        Clean tap-out when an already-inside person re-taps their RFID card.
+        Pushes an EXIT event, clears the session, and returns to IDLE when
+        the room is empty.
+
+        Hardware response: double-beep (friendly 'goodbye') + green LED flash.
+        """
+        now = time.time()
+        session_id = session.get("session_id", str(uuid.uuid4()))
+        person_id  = session.get("person_id")
+        entry_time = session.get("entry_time", now)
+        duration_s = now - entry_time
+
+        # Protect against accidental immediate checkout.
+        # If the person taps out within _checkout_min_seconds of entry, they
+        # probably didn't see the grant feedback and are re-tapping to check if
+        # it worked. Ignore the tap and remind them they're already inside.
+        if duration_s < self._checkout_min_seconds:
+            print(f"[CHECKOUT] {user_id} tapped {duration_s:.1f}s after entry — "
+                  f"too soon (min {self._checkout_min_seconds}s). Tap-out ignored.")
+            # Give friendly visual + audio reminder that they ARE inside
+            self.buzzer.beep(duration=0.1)
+            time.sleep(0.15)
+            self.buzzer.beep(duration=0.1)
+            self.rgb_led.status_granted()
+            return
+
+        print(f"[CHECKOUT] {user_id} tapped out — "
+              f"session {session_id[:8]}... | inside {duration_s / 60:.1f} min")
+
+        # Push EXIT event to backend (critical — queued for retry on failure)
+        self.push_state_transition(
+            event        = "EXIT",
+            session_id   = session_id,
+            rfid_uid     = uid_str,
+            person_id    = person_id,
+            exit_reason  = "RFID_CHECKOUT"
+        )
+
+        # Hardware: 2 quick beeps (distinct from single-beep entry) + green
+        self.buzzer.beep(duration=0.1)
+        time.sleep(0.12)
+        self.buzzer.beep(duration=0.1)
+        self.rgb_led.status_granted()
+
+        # Update overlay
+        self._verification_overlay = {
+            'status':     'CHECKED OUT',
+            'uid':        uid_str,
+            'name':       '',
+            'confidence': 0,
+            'start_time': time.time()
+        }
+
+        # Decrement occupancy — this person is leaving
+        # Clamp to 0 so we never go negative even if counts drift
+        self.current_occupancy = max(0, self.current_occupancy - 1)
+        print(f"[CHECKOUT] Occupancy → {self.current_occupancy} (tap-out)")
+
+        # If no more sessions → return to IDLE
+        with self.session_lock:
+            remaining = len(self.active_sessions)
+
+        if remaining == 0:
+            self.set_state(STATE_IDLE)
+            print("[FSM] All sessions ended → IDLE")
+        else:
+            print(f"[FSM] {remaining} session(s) still active → staying INSIDE")
 
     # =========================
     # DOOR SENSOR CALLBACK
@@ -1427,7 +1645,21 @@ class SmartSecuritySystem:
                 )
 
             elif has_active:
-                print("[DOOR] Door opened - active session present (normal)")
+                print("[DOOR] Door opened - active session present (normal entry)")
+                # ── Door-based occupancy ──────────────────────────────────────
+                # The door opening physically confirms someone is entering.
+                # Guarantee occupancy ≥ 1 even if the camera did not see the person
+                # (backlit corridor, wide-angle miss, person too close to lens, etc.)
+                if self.current_occupancy < 1:
+                    self.current_occupancy = 1
+                    print("[DOOR] Occupancy set to 1 via door sensor (camera-blind entry)")
+                # ── ACCESS state → INSIDE on door confirmation ────────────────
+                # If we are still waiting in ACCESS state (face verification timed out
+                # or biometric is OFF), the physical door opening is proof of entry.
+                if current_state == STATE_ACCESS and not self.face_verifier.is_collecting:
+                    self.set_state(STATE_INSIDE)
+                    print("[DOOR] Door open confirms physical entry → INSIDE")
+
         else:
             # Door closed - check if was held open too long
             if hasattr(self, '_door_open_time') and self._door_open_time:
@@ -1819,6 +2051,41 @@ class SmartSecuritySystem:
                             if len(self.active_sessions) == 0:
                                 self.set_state(STATE_IDLE)
 
+                    # =========================
+                    # HARD SESSION TIME LIMIT
+                    # Force exit after session_max_duration regardless of activity.
+                    # Prevents forgotten cards from holding sessions open forever.
+                    # =========================
+                    elif time_inside > self.session_max_duration:
+                        sid = session["session_id"]
+                        if sid not in self._extended_stay_warned:
+                            self._extended_stay_warned.add(sid)
+                            hrs = time_inside / 3600
+                            print(f"[SESSION LIMIT] {user_id} — {hrs:.1f}h exceeded max "
+                                  f"{self.session_max_duration/3600:.0f}h → forcing EXIT")
+
+                            self.push_state_transition(
+                                event       = "EXIT",
+                                session_id  = sid,
+                                rfid_uid    = session.get("rfid_uid", user_id),
+                                person_id   = session.get("person_id"),
+                                exit_reason = "SESSION_TIMEOUT"
+                            )
+
+                            with self.session_lock:
+                                self.active_sessions.pop(user_id, None)
+                                self._extended_stay_warned.discard(sid)
+
+                            # Audible signal: 3 beeps (distinct from other alerts)
+                            try:
+                                self.buzzer.pattern_beep(times=3, interval=0.2)
+                            except Exception:
+                                pass
+
+                            with self.session_lock:
+                                if len(self.active_sessions) == 0:
+                                    self.set_state(STATE_IDLE)
+
             except Exception as e:
                 print(f"[LOITERING MONITOR ERROR] {e}")
 
@@ -1992,34 +2259,42 @@ class SmartSecuritySystem:
     # =========================
     def _handle_unknown_rfid(self, uid, now):
         """
-        Graduated response for unknown RFID cards:
-        1st tap: capture face snapshot, deny, log AccessDenied
-        2nd tap: 2 beeps, deny
-        3rd tap: 3 beeps, mark suspicious, notify admin
-        4th tap: ALARM + buzzer + lockout (brute-force / intruder)
+        Graduated response for unknown (unenrolled) RFID cards:
+          1st tap : short beep + log (deny, AccessDenied alert)
+          2nd tap : 2 beeps + deny (still silent)
+          3rd tap+: 10-second continuous alarm buzz + CRITICAL alert + 5-min lockout
+                    NO recording — recording is reserved for forced door entry and face mismatch.
+
+        After lockout expires, the counter resets so the escalation
+        restarts from 1 if the card is tried again.
         """
         tracker = self._unknown_rfid_tracker.get(uid)
 
-        # Check lockout
+        # Check lockout — silently ignore taps while locked out
         if tracker and tracker.get("locked_out_until", 0) > now:
-            print(f"[RFID] Unknown UID {uid} locked out for {tracker['locked_out_until'] - now:.0f}s")
+            remaining_s = tracker["locked_out_until"] - now
+            print(f"[RFID] Unknown UID {uid} still locked out for {remaining_s:.0f}s — ignoring")
             return
 
-        # Initialize or update tracker
+        # Initialize or update tap counter
         if tracker is None:
             tracker = {"count": 0, "first_tap": now, "last_tap": now, "locked_out_until": 0}
             self._unknown_rfid_tracker[uid] = tracker
+        else:
+            # Reset counter when lockout has expired
+            if tracker.get("locked_out_until", 0) < now and tracker["count"] >= 3:
+                tracker["count"] = 0
 
         tracker["count"] += 1
         tracker["last_tap"] = now
         count = tracker["count"]
 
-        print(f"[RFID] Unknown UID {uid} - tap #{count}")
+        print(f"[RFID] Unknown UID {uid} — tap #{count}")
 
-        # DENY ACCESS always for unknown UIDs
+        # Always deny
         self.rgb_led.status_denied()
 
-        # ── Capture snapshot of whoever is at the camera ─────────────────────
+        # ── Snapshot at every tap ────────────────────────────────────────────
         snapshot_url = ""
         try:
             frame = self.camera.get_frame()
@@ -2030,17 +2305,16 @@ class SmartSecuritySystem:
                 fname = f"unknown_{uid}_{ts}_tap{count}.jpg"
                 fpath = os.path.join(snap_dir, fname)
                 cv2.imwrite(fpath, frame)
-                # URL accessible from dashboard (Pi serves via /snapshots/<filename>)
                 snapshot_url = f"/snapshots/{fname}"
                 print(f"[RFID] Snapshot saved: {fpath}")
         except Exception as e:
             print(f"[RFID] Snapshot capture failed: {e}")
-        # ─────────────────────────────────────────────────────────────────────
+        # ────────────────────────────────────────────────────────────────────
 
         snap_note = f" | Snapshot: {snapshot_url}" if snapshot_url else ""
 
         if count == 1:
-            # 1st tap: short beep + log
+            # 1st tap: short beep + denied log
             self.buzzer.beep(duration=0.3)
             self.push_state_transition(
                 event="ALERT",
@@ -2052,42 +2326,39 @@ class SmartSecuritySystem:
             )
 
         elif count == 2:
-            # 2nd tap: 2 beeps, deny silently
+            # 2nd tap: 2 beeps, warn quietly
             self.buzzer.pattern_beep(times=2, interval=0.2)
-
-        elif count == 3:
-            # 3rd tap: suspicious — notify admin
-            self.buzzer.pattern_beep(times=3, interval=0.2)
             self.push_state_transition(
                 event="ALERT",
                 session_id=str(uuid.uuid4()),
                 rfid_uid=uid,
-                alert_type="SuspiciousActivity",
-                description=f"Suspicious RFID: unknown card {uid} tapped {count} times{snap_note}",
-                severity="HIGH"
+                alert_type="AccessDenied",
+                description=f"Unknown RFID repeated (UID: {uid}, tap #{count}){snap_note}",
+                severity="WARNING"
             )
 
-        elif count >= 4:
-            # 4th tap onwards: ALARM + lockout
+        else:
+            # 3rd tap onwards: 10-second alarm buzz + CRITICAL alert + lockout
+            # NO _start_recording — recording is reserved for forced door entry & face mismatch
             session_id = str(uuid.uuid4())
+            print(f"[RFID] UID {uid} — ALARM triggered on tap #{count} (10s buzz, no recording)")
+
             self.push_state_transition(
                 event="ALERT",
                 session_id=session_id,
                 rfid_uid=uid,
                 alert_type="BruteForceAttempt",
-                description=f"INTRUDER ALERT: unknown card {uid} tapped {count} times{snap_note}",
+                description=f"Unenrolled card alarm: UID {uid} tapped {count} time(s){snap_note}",
                 severity="CRITICAL"
             )
-            self._start_recording(session_id)
-            self.trigger_emergency(
-                "intrusion", duration=10,
-                session_id=session_id,
-                description=f"Brute force RFID: unknown card {uid} tapped {count} times"
-            )
-            # Lockout this UID for 5 minutes
+
+            # 10-second continuous alarm — no recording
+            self.buzzer.alarm(duration=10)
+            self.rgb_led.status_alert()
+
+            # Lockout this UID for 5 minutes so alarm doesn't re-trigger on rapid taps
             tracker["locked_out_until"] = now + self._unknown_rfid_lockout
-            tracker["count"] = 0  # Reset after lockout
-            print(f"[RFID] UID {uid} LOCKED OUT for {self._unknown_rfid_lockout}s — INTRUDER ALARM")
+            print(f"[RFID] UID {uid} locked out for {self._unknown_rfid_lockout}s")
 
 
     # =========================
@@ -2316,11 +2587,33 @@ def main():
 
     is_pi = platform.system().lower() == "linux"
 
+    # ──────────────────────────────────────────────────────────────────────
+    # DEPLOYMENT CONFIG — read from environment variables
+    # Set these on the Pi before running main.py:
+    #   export CAMERA_ID=2        # ID of this camera in the ASP.NET database
+    #   export ROOM_ID=3          # ID of the room this Pi is in
+    #   export ASPNET_URL=http://192.168.x.x:5145
+    # ──────────────────────────────────────────────────────────────────────
+    _env_camera_id = int(os.environ.get("CAMERA_ID", "0"))
+    _env_room_id   = int(os.environ.get("ROOM_ID",   "0"))
+
+    if _env_camera_id == 0:
+        print("[WARN] CAMERA_ID env var not set — defaulting to camera_id=1.")
+        print("[WARN] All access logs will show the WRONG room (IK202).")
+        print("[WARN] Fix: export CAMERA_ID=<your camera ID from the dashboard>")
+        _env_camera_id = 1
+    if _env_room_id == 0:
+        print("[WARN] ROOM_ID env var not set — defaulting to room_id=1.")
+        print("[WARN] Fix: export ROOM_ID=<your room ID from the dashboard>")
+        _env_room_id = 1
+
+    print(f"[CONFIG] camera_id={_env_camera_id}  room_id={_env_room_id}")
+
     system = SmartSecuritySystem(
         use_simulated_rfid=not is_pi,  # Auto: real RFID on Pi, simulated on laptop
         base_url=os.environ.get("ASPNET_URL", "http://localhost:5145"),
-        camera_id=1,
-        room_id=1,
+        camera_id=_env_camera_id,
+        room_id=_env_room_id,
         # =============================================
         # ROOM-SPECIFIC CONFIG (no DB columns needed)
         # Change these per-room when deploying to Raspberry Pi
@@ -2451,13 +2744,19 @@ def main():
 
     @stream_app.route('/snapshot', methods=['GET'])
     def snapshot():
-        """Return a single JPEG frame — used by the Personnel enrollment UI
-        to capture an enrollment photo directly from the Pi Camera."""
+        """Return a single RAW JPEG frame for Personnel enrollment.
+        Uses get_frame() (not get_stream_frame) so the photo has NO overlays,
+        NO HUD, NO bounding boxes, NO oval guide — just a clean face image.
+        The MJPEG stream still shows the fully-rendered processed view."""
         try:
-            frame = system.camera.get_stream_frame()
+            # get_frame() = raw camera output, no overlays applied
+            frame = system.camera.get_frame()
+            if frame is None:
+                # Fallback: try processed frame if raw isn't ready yet
+                frame = system.camera.get_stream_frame()
             if frame is None:
                 return Response("No frame available", status=503)
-            ret, buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 92])
+            ret, buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
             if not ret:
                 return Response("Encode failed", status=500)
             return Response(
@@ -2708,6 +3007,118 @@ def main():
             'armed': system._master_armed
         }), 200, {'Content-Type': 'application/json'}
 
+    # =========================
+    # FACE ENROLLMENT ENDPOINT (FIX-6)
+    # Called by CamerasController.cs POST /api/cameras/enroll-face
+    # Captures 5 frames, averages embeddings, saves to DB + backup folder
+    # =========================
+    @stream_app.route('/enroll-face/<int:person_id>', methods=['POST'])
+    def enroll_face(person_id):
+        """
+        Multi-frame face enrollment via Pi camera.
+        Captures ENROLLMENT_FRAMES frames, averages embeddings, saves to DB.
+        Backup photos saved to enrolled_faces/{person_id}/ (human-reference only).
+        """
+        ENROLLMENT_FRAMES  = 5
+        FRAME_INTERVAL     = 1.5   # seconds between captures (allow repositioning)
+        BACKUP_DIR         = os.path.join(
+            os.path.dirname(__file__), 'enrolled_faces', str(person_id)
+        )
+        os.makedirs(BACKUP_DIR, exist_ok=True)
+
+        print(f"[ENROLL] Starting face enrollment for person_id={person_id}")
+        print(f"[ENROLL] Will capture {ENROLLMENT_FRAMES} frames at {FRAME_INTERVAL}s intervals")
+
+        if not _HAS_FACE_RECOGNITION:
+            return json.dumps({
+                'success': False,
+                'message': 'face_recognition not installed on Pi'
+            }), 503, {'Content-Type': 'application/json'}
+
+        embeddings  = []
+        saved_photos = []
+        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+        for i in range(ENROLLMENT_FRAMES):
+            print(f"[ENROLL] Capturing frame {i+1}/{ENROLLMENT_FRAMES}...")
+            frame = system.camera.get_frame()
+
+            if frame is None:
+                print(f"[ENROLL] Frame {i+1}: no frame from camera — skipping")
+                time.sleep(FRAME_INTERVAL)
+                continue
+
+            # Extract embedding (high jitters = highest quality)
+            enc, bbox = system.face_verifier.extract_encoding(frame, num_jitters=5)
+
+            if enc is None:
+                print(f"[ENROLL] Frame {i+1}: no face detected — skipping")
+                time.sleep(FRAME_INTERVAL)
+                continue
+
+            embeddings.append(enc)
+            print(f"[ENROLL] Frame {i+1}: face detected  bbox={bbox}  embedding norm={float(np.linalg.norm(enc)):.4f}")
+
+            # Save backup photo
+            photo_path = os.path.join(BACKUP_DIR, f'frame_{i+1}_{ts}.jpg')
+            cv2.imwrite(photo_path, frame)
+            saved_photos.append(photo_path)
+
+            if i < ENROLLMENT_FRAMES - 1:
+                time.sleep(FRAME_INTERVAL)
+
+        if len(embeddings) < 1:
+            msg = ("No face detected in any of the " + str(ENROLLMENT_FRAMES) + " frames. "
+                   "Ensure face is clearly visible in front of the camera.")
+            print(f"[ENROLL] FAILED: {msg}")
+            return json.dumps({'success': False, 'message': msg}), 400, \
+                   {'Content-Type': 'application/json'}
+
+        # Average the valid embeddings (already L2-normalised per frame)
+        avg_enc = np.mean(np.stack(embeddings, axis=0), axis=0)
+        avg_norm = np.linalg.norm(avg_enc)
+        avg_enc  = avg_enc / avg_norm if avg_norm > 1e-6 else avg_enc
+
+        # Encode as base64 for database storage
+        embedding_b64 = system.face_verifier.encode_for_database(avg_enc)
+
+        print(f"[ENROLL] Averaged {len(embeddings)} embeddings — storing to DB")
+
+        # Save averaged embedding to ASP.NET database via API
+        try:
+            save_resp = requests.patch(
+                f"{system.base_url}/api/access/rfid/enroll-face",
+                json={
+                    'personId':    person_id,
+                    'faceEmbedded': embedding_b64
+                },
+                timeout=5
+            )
+            if save_resp.status_code not in (200, 204):
+                raise RuntimeError(f"API returned {save_resp.status_code}: {save_resp.text[:200]}")
+            print(f"[ENROLL] DB save OK for person_id={person_id}")
+        except Exception as e:
+            msg = f"Enrollment captured ({len(embeddings)} frames) but DB save failed: {e}"
+            print(f"[ENROLL] WARNING: {msg}")
+            return json.dumps({
+                'success': False,
+                'message': msg,
+                'frames_captured': len(embeddings),
+                'backup_photos': saved_photos
+            }), 500, {'Content-Type': 'application/json'}
+
+        print(f"[ENROLL] SUCCESS — {len(embeddings)}/{ENROLLMENT_FRAMES} frames used, "
+              f"{len(saved_photos)} photos saved to {BACKUP_DIR}")
+
+        return json.dumps({
+            'success':        True,
+            'message':        f"Face enrolled from {len(embeddings)} frames.",
+            'person_id':      person_id,
+            'frames_used':    len(embeddings),
+            'frames_skipped': ENROLLMENT_FRAMES - len(embeddings),
+            'backup_photos':  saved_photos
+        }), 200, {'Content-Type': 'application/json'}
+
     # Need request import for routes
     from flask import request
 
@@ -2747,4 +3158,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main()

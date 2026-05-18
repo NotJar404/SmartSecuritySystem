@@ -183,11 +183,21 @@ let currentLogContext = null;
 // =========================
 // MAIN LOG VIEW (SESSION-AWARE)
 // =========================
+// Image store — avoids embedding 50-100 KB base64 strings in every onclick attribute.
+// updateLogList() populates this; server-rendered rows use a Razor init block below.
+window._imgStore = window._imgStore || {};
+
 function dockData(name, id, loc, img, dept, email, phone, room, time, videoPath, riskLevel, isInside, rfidValid, faceVerified) {
     document.getElementById("emptyState").style.display = "none";
     document.getElementById("detailContent").style.display = "block";
 
     currentVideoPath = videoPath;
+
+    // Resolve image: stored reference (AJAX rows) OR direct URL (server-rendered rows)
+    if (img && img.startsWith('_img_')) {
+        img = (window._imgStore || {})[img.slice(5)] || '/images/default-user.png';
+    }
+    img = img || '/images/default-user.png';
 
     currentLogContext = {
         name, id, loc, img, dept, email, phone, room, time, riskLevel, isInside, rfidValid, faceVerified
@@ -195,7 +205,9 @@ function dockData(name, id, loc, img, dept, email, phone, room, time, videoPath,
 
     document.getElementById("detName").innerText = name;
     document.getElementById("detId").innerText = id || "N/A";
-    document.getElementById("detImg").src = img || '/images/default-user.png';
+    const detImg = document.getElementById("detImg");
+    detImg.onerror = () => { detImg.src = '/images/default-user.png'; };
+    detImg.src = img;
 
     document.getElementById("detDept").innerText = dept || "-";
     document.getElementById("detEmail").innerText = email || "-";
@@ -572,7 +584,7 @@ let _accessPollTimer = null;
 let _lastLogCount = @Model.Count;
 
 function startAccessPolling() {
-    _accessPollTimer = setInterval(pollAccessLogs, 4000);
+    _accessPollTimer = setInterval(pollAccessLogs, 2000);
 }
 
 function pollAccessLogs() {
@@ -611,16 +623,21 @@ function updateLogList(logs, activePersonIds) {
     if (!scrollContainer) return;
     
     let html = '';
+    // Populate image store — avoids embedding base64 strings in onclick attributes
+    window._imgStore = window._imgStore || {};
     logs.forEach(log => {
+        const imgKey = log.personnelId || ('log_' + (log.logId || '0'));
+        window._imgStore[imgKey] = log.imageUrl || '/images/default-user.png';
+
         const initials = log.fullName ? log.fullName.split(' ').map(n => n[0]).join('') : '??';
         const isInside = activePersonIds.includes(log.personId);
         const insideClass = isInside ? 'session-active' : '';
         const insideBadge = isInside ? '<span style="color:#2ecc71;font-weight:600;margin-left:6px;">● INSIDE</span>' : '';
         const videoBadge = log.hasVideo ? '<span style="color:#f39c12;font-weight:600;margin-left:6px;" title="Video Evidence"><i class="fa fa-video"></i> REC</span>' : '';
-        
+
         html += `
-        <div class="log-card ${insideClass}" 
-             onclick="dockData('${log.fullName}','${log.personnelId}','${log.location}','${log.imageUrl}','${log.department}','${log.email}','${log.phone}','${log.room}','${log.time}','${log.videoPath || ''}','${log.riskLevel}',${isInside},'${log.rfidValid}','${log.faceVerified}')">
+        <div class="log-card ${insideClass}"
+             onclick="dockData('${log.fullName}','${log.personnelId}','${log.location}','_img_${imgKey}','${log.department}','${log.email}','${log.phone}','${log.room}','${log.time}','${log.videoPath || ''}','${log.riskLevel}',${isInside},'${log.rfidValid}','${log.faceVerified}')">
             <div class="log-avatar-box">
                 <span class="avatar-initial">${initials}</span>
             </div>
@@ -633,7 +650,7 @@ function updateLogList(logs, activePersonIds) {
             </div>
         </div>`;
     });
-    
+
     scrollContainer.innerHTML = html;
 }
 
