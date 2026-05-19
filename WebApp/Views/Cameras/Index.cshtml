@@ -19,6 +19,17 @@
 <script defer src="https://cdn.jsdelivr.net/npm/@@vladmandic/face-api@@1.7.12/dist/face-api.min.js"></script>
 <script defer src="~/js/camera-detect.js"></script>
 
+<!-- LOCKDOWN BANNER (shown/hidden by fetchSystemStatus every 2s) -->
+<div id="lockdownBanner" style="display:none;position:fixed;top:0;left:0;width:100%;z-index:9999;
+     background:linear-gradient(90deg,#7f0000,#dc2626,#7f0000);color:#fff;
+     padding:11px 24px;text-align:center;font-weight:700;font-size:0.95rem;
+     letter-spacing:0.07em;animation:ldBlink 1.2s ease-in-out infinite;
+     box-shadow:0 4px 20px rgba(220,38,38,0.55);">
+    <i class="fas fa-lock me-2"></i>LOCKDOWN ACTIVE — All Entry Points Secured
+    <span id="lockdownReason" style="margin-left:14px;font-weight:400;opacity:.9;"></span>
+</div>
+<style>@@keyframes ldBlink{0%,100%{opacity:1}50%{opacity:.83}}</style>
+
 <div class="monitoring-page">
 
     <!-- TOP BAR -->
@@ -908,8 +919,42 @@ document.addEventListener('DOMContentLoaded', function() {
         if (aiPollInterval) clearInterval(aiPollInterval);
         aiPollInterval = setInterval(fetchAIStatus, 1000);
         fetchAIStatus(); // immediate first fetch
+        // Also poll ASP.NET status every 2s for real alert count + lockdown state
+        setInterval(fetchSystemStatus, 2000);
+        fetchSystemStatus();
     }
 
+    // ---- Real alert count + lockdown from ASP.NET (DB-backed) ----
+    function fetchSystemStatus() {
+        fetch('/api/system/status')
+            .then(r => r.json())
+            .then(data => {
+                // Real active alert count from database
+                const ac = document.getElementById('focusAlertCount');
+                if (ac && data.activeAlertCount !== undefined) {
+                    const newVal = String(data.activeAlertCount);
+                    if (ac.textContent !== newVal) {
+                        ac.textContent = newVal;
+                        ac.classList.add('count-flip');
+                        setTimeout(() => ac.classList.remove('count-flip'), 400);
+                    }
+                }
+                // Lockdown banner (reuse same banner helper pattern)
+                const banner   = document.getElementById('lockdownBanner');
+                const reasonEl = document.getElementById('lockdownReason');
+                if (data.lockdown) {
+                    if (banner) banner.style.display = 'block';
+                    if (reasonEl) reasonEl.textContent = data.lockdownReason ? '— ' + data.lockdownReason : '';
+                    document.body.style.paddingTop = '50px';
+                } else {
+                    if (banner) banner.style.display = 'none';
+                    document.body.style.paddingTop = '';
+                }
+            })
+            .catch(() => {});
+    }
+
+    // ---- Live FSM state from Pi Flask /status (1s) ----
     function fetchAIStatus() {
         fetch(PYTHON_STATUS_URL, { mode: 'cors' })
             .then(r => r.json())
@@ -925,16 +970,23 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
 
-                // Face Recognition
+                // Face Recognition — map FSM state to meaningful label
                 const fs = document.getElementById('focusFaceStatus');
                 if (fs) {
-                    if (data.face_detected) {
-                        fs.textContent = 'Detected';
-                        fs.className = 'ai-stat-value face-text-detected';
-                    } else {
-                        fs.textContent = 'No Face';
-                        fs.className = 'ai-stat-value face-text-none';
+                    const fsmState = (data.state || '').toUpperCase();
+                    let label = 'No Face';
+                    let cls   = 'ai-stat-value face-text-none';
+                    if (fsmState === 'ACCESS') {
+                        label = 'Verifying…'; cls = 'ai-stat-value face-text-detected';
+                    } else if (fsmState === 'INSIDE') {
+                        label = 'Match ✓';   cls = 'ai-stat-value face-text-detected';
+                    } else if (fsmState === 'ALERT' || fsmState === 'LOITERING') {
+                        label = 'Threat';    cls = 'ai-stat-value face-text-none';
+                    } else if (data.face_detected) {
+                        label = 'Scanning';  cls = 'ai-stat-value face-text-detected';
                     }
+                    fs.textContent = label;
+                    fs.className   = cls;
                 }
 
                 // Threat Level
@@ -944,43 +996,36 @@ document.addEventListener('DOMContentLoaded', function() {
                     tl.className = 'ai-stat-value threat-text-' + (data.threat_level || 'safe').toLowerCase();
                 }
 
-                // Active Alerts
-                const ac = document.getElementById('focusAlertCount');
-                if (ac) {
-                    const alertCount = data.state === 'ALERT' ? 1 : 0;
-                    ac.textContent = String(alertCount);
-                }
-
-                // Detection Feed (live events)
+                // Detection Feed (live events from Pi)
                 const feed = document.getElementById('detectionFeed');
                 if (feed) {
                     const stateIcons = {
                         'IDLE': 'fa-eye', 'ACCESS': 'fa-door-open',
                         'INSIDE': 'fa-home', 'LOITERING': 'fa-clock',
                         'ALERT': 'fa-exclamation-triangle',
-                        'MONITORING': 'fa-video'
+                        'MONITORING': 'fa-video', 'LOCKDOWN': 'fa-lock'
                     };
                     const stateColors = {
-                        'IDLE': 'safe', 'ACCESS': 'safe',
+                        'IDLE': 'safe',  'ACCESS': 'safe',
                         'INSIDE': 'safe', 'LOITERING': 'warning',
-                        'ALERT': 'alert', 'MONITORING': 'safe'
+                        'ALERT': 'alert', 'MONITORING': 'safe',
+                        'LOCKDOWN': 'alert'
                     };
-                    const icon = stateIcons[data.state] || 'fa-satellite-dish';
-                    const color = stateColors[data.state] || 'safe';
+                    const state     = data.state || 'IDLE';
+                    const icon      = stateIcons[state]  || 'fa-satellite-dish';
+                    const color     = stateColors[state] || 'safe';
                     const motionTag = data.pir_motion ? '🟢 Motion' : '⚪ No Motion';
-                    const recTag = data.recording ? ' | 🔴 REC' : '';
-                    const armedTag = data.armed === false ? ' | ⚠️ DISARMED' : '';
-                    const modeTag = data.mode ? ` (${data.mode})` : '';
-
+                    const recTag    = data.recording  ? ' | 🔴 REC'   : '';
+                    const armedTag  = data.armed === false ? ' | ⚠️ DISARMED' : '';
+                    const modeTag   = data.mode ? ` (${data.mode})` : '';
                     feed.innerHTML = `<div class="feed-item feed-${color}">
                         <i class="fas ${icon}"></i>
-                        <span>State: <strong>${data.state}</strong>${modeTag} | ${motionTag}${recTag}${armedTag}</span>
+                        <span>State: <strong>${state}</strong>${modeTag} | ${motionTag}${recTag}${armedTag}</span>
                         <small>Occupancy: ${data.occupancy} | Tracked: ${data.tracked_persons}</small>
                     </div>`;
                 }
             })
             .catch(() => {
-                // Python backend not running — show offline
                 const feed = document.getElementById('detectionFeed');
                 if (feed) {
                     feed.innerHTML = '<span class="feed-placeholder"><i class="fas fa-satellite-dish"></i> AI backend offline</span>';

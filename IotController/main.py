@@ -2993,6 +2993,59 @@ def main():
         }), 200, {'Content-Type': 'application/json'}
 
     # =========================
+    # ALARM HARDWARE ENDPOINTS
+    # ASP.NET POST /alarm  → activate hardware pattern for alarm type
+    # ASP.NET DELETE /alarm → stop all alarm hardware, return to idle
+    # =========================
+    _ALARM_TYPE_MAP = {
+        "intruder alert":   "intrusion",
+        "intruder":         "intrusion",
+        "fire alarm":       "fire",
+        "fire protocol":    "fire",
+        "fire":             "fire",
+        "earthquake drill": "earthquake",
+        "earthquake mode":  "earthquake",
+        "earthquake":       "earthquake",
+        "emergency drill":  "forcedentry",
+        "medical emergency":"forcedentry",
+        "emergency":        "forcedentry",
+    }
+
+    @stream_app.route('/alarm', methods=['POST'])
+    def alarm_activate():
+        """Activate alarm hardware from ASP.NET dashboard."""
+        try:
+            data = json.loads(request.data) if request.data else {}
+        except Exception:
+            data = {}
+        raw_type = data.get("type", "intrusion").lower().strip()
+        mapped   = _ALARM_TYPE_MAP.get(raw_type, raw_type)
+        try:
+            system._apply_alarm_protocol(mapped, active=True)
+            return json.dumps({
+                'success': True,
+                'message': f'Alarm activated: {mapped}',
+                'state':   system.get_state()
+            }), 200, {'Content-Type': 'application/json'}
+        except Exception as e:
+            return json.dumps({'success': False, 'error': str(e)}), 500, \
+                   {'Content-Type': 'application/json'}
+
+    @stream_app.route('/alarm', methods=['DELETE'])
+    def alarm_deactivate():
+        """Stop all alarm hardware from ASP.NET dashboard."""
+        try:
+            system._apply_alarm_protocol("", active=False)
+            return json.dumps({
+                'success': True,
+                'message': 'All alarms deactivated',
+                'state':   system.get_state()
+            }), 200, {'Content-Type': 'application/json'}
+        except Exception as e:
+            return json.dumps({'success': False, 'error': str(e)}), 500, \
+                   {'Content-Type': 'application/json'}
+
+    # =========================
     # ALARM SETTINGS REFRESH (FIX-4)
     # Dashboard pushes instant refresh after toggle
     # =========================

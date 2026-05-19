@@ -516,6 +516,63 @@ def archive():
     }), 200, {'Content-Type': 'application/json'}
 
 
+@app.route('/alarm-settings/refresh', methods=['POST'])
+def alarm_settings_refresh_stub():
+    return json.dumps({'success': True, 'message': 'Test mode — no settings to refresh'}), \
+           200, {'Content-Type': 'application/json'}
+
+
+# =========================
+# LOCKDOWN STUBS  (laptop test mode — no hardware)
+# ASP.NET forwards lockdown commands here; we reflect state in /status
+# =========================
+_lockdown_active = False
+_lockdown_lock   = threading.Lock()
+
+@app.route('/lockdown', methods=['POST'])
+def lockdown_activate_stub():
+    global _lockdown_active
+    with _lockdown_lock:
+        _lockdown_active = True
+    _set_demo_state(STATE_ALERT)  # reflect in /status
+    return json.dumps({'success': True, 'message': 'Lockdown simulated (test mode)',
+                       'state': STATE_ALERT}), 200, {'Content-Type': 'application/json'}
+
+@app.route('/lockdown', methods=['DELETE'])
+def lockdown_resolve_stub():
+    global _lockdown_active
+    with _lockdown_lock:
+        _lockdown_active = False
+    _set_demo_state(STATE_IDLE)
+    return json.dumps({'success': True, 'message': 'Lockdown resolved (test mode)',
+                       'state': STATE_IDLE}), 200, {'Content-Type': 'application/json'}
+
+@app.route('/lockdown', methods=['GET'])
+def lockdown_status_stub():
+    with _lockdown_lock:
+        active = _lockdown_active
+    return json.dumps({'active': active, 'state': _get_demo_state()}), \
+           200, {'Content-Type': 'application/json'}
+
+
+# =========================
+# ALARM STUBS  (laptop test mode — no hardware)
+# =========================
+@app.route('/alarm', methods=['POST'])
+def alarm_activate_stub():
+    _set_demo_state(STATE_ALERT)
+    return json.dumps({'success': True, 'message': 'Alarm simulated (test mode)'}), \
+           200, {'Content-Type': 'application/json'}
+
+@app.route('/alarm', methods=['DELETE'])
+def alarm_deactivate_stub():
+    with _lockdown_lock:
+        if not _lockdown_active:
+            _set_demo_state(STATE_IDLE)
+    return json.dumps({'success': True, 'message': 'Alarm cleared (test mode)'}), \
+           200, {'Content-Type': 'application/json'}
+
+
 # =========================
 # MAIN
 # =========================

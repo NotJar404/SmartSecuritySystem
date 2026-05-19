@@ -12,6 +12,24 @@
 <link rel="stylesheet" href="~/css/access.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
 
+<!-- LOCKDOWN BANNER (JS polling shows/hides this) -->
+<div id="lockdownBanner" style="display:none;position:fixed;top:0;left:0;width:100%;z-index:9999;
+     background:linear-gradient(90deg,#7f0000,#dc2626,#7f0000);color:#fff;
+     padding:11px 24px;text-align:center;font-weight:700;font-size:0.95rem;
+     letter-spacing:0.07em;animation:ldBlink 1.2s ease-in-out infinite;
+     box-shadow:0 4px 20px rgba(220,38,38,0.55);">
+    <i class="fas fa-lock me-2"></i>LOCKDOWN ACTIVE — All Access Restricted
+    <span id="lockdownReason" style="margin-left:14px;font-weight:400;opacity:.9;"></span>
+    @if (User.IsInRole("Admin")) {
+        <button onclick="resolveLockdown()" style="margin-left:20px;padding:3px 12px;border-radius:6px;
+            background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);
+            color:#fff;font-weight:600;cursor:pointer;font-size:0.82rem;">
+            <i class="fas fa-unlock me-1"></i>Resolve
+        </button>
+    }
+</div>
+<style>@@keyframes ldBlink{0%,100%{opacity:1}50%{opacity:.83}}</style>
+
 <div class="access-grid">
 
     <div class="grid-header">
@@ -382,48 +400,58 @@ function flagForAdmin() {
 }
 
 // =========================
-// BACKEND ACTION: LOCKDOWN (ANTI-SPAM)
+// LOCKDOWN — forwards to Pi via /api/system/lockdown
 // =========================
 function lockdownRoom() {
     if (!currentLogContext) return;
-
-    if (!confirm(`🔒 Confirm room lockdown for ${currentLogContext.room}?`)) return;
-
-    fetch('/api/security/lockdown', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            room: currentLogContext.room
-        })
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.duplicate) {
-            alert("⚠️ Room lockdown already active.");
-        } else {
-            alert("🔒 Room lockdown triggered.");
+    SecureConfirm.show({
+        title: 'ACTIVATE LOCKDOWN?', icon: 'fas fa-lock', isDelete: true,
+        confirmText: 'LOCKDOWN NOW', confirmClass: 'btn-danger',
+        fields: [
+            { label: 'Room',   value: currentLogContext.room || 'All Rooms' },
+            { label: 'Action', value: 'Lock all doors and activate hardware alarms' }
+        ],
+        onConfirm: function() {
+            fetch('/api/system/lockdown', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reason: 'Lockdown: ' + (currentLogContext.room || 'Security event') })
+            })
+            .then(r => r.json())
+            .then(d => { if (!d.duplicate) showLockdownBanner(d.message || ''); })
+            .catch(() => alert('❌ Failed to activate lockdown.'));
         }
-    })
-    .catch(err => console.error(err));
+    });
+}
+function resolveLockdown() {
+    if (!confirm('🔓 Resolve lockdown and restore normal access?')) return;
+    fetch('/api/system/lockdown/resolve', { method: 'POST' })
+    .then(r => r.json()).then(() => hideLockdownBanner())
+    .catch(() => alert('❌ Failed to resolve lockdown.'));
+}
+function showLockdownBanner(reason) {
+    const b = document.getElementById('lockdownBanner');
+    const r = document.getElementById('lockdownReason');
+    if (b) b.style.display = 'block';
+    if (r) r.textContent = reason ? '— ' + reason : '';
+    document.body.style.paddingTop = '50px';
+}
+function hideLockdownBanner() {
+    const b = document.getElementById('lockdownBanner');
+    if (b) b.style.display = 'none';
+    document.body.style.paddingTop = '';
 }
 
 // =========================
-// BACKEND ACTION: ALARM (ANTI-SPAM)
+// ALARM — triggers Intruder Alert on Pi hardware
 // =========================
 function triggerAlarm() {
-    if (!confirm("🚨 CONFIRM: Trigger emergency alarm?")) return;
-
-    fetch('/api/security/alarm', {
-        method: 'POST'
+    if (!confirm('🚨 CONFIRM: Trigger Intruder Alert on Raspberry Pi hardware?')) return;
+    fetch('/api/system/alarm', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'Intruder Alert', duration: 30 })
     })
     .then(r => r.json())
-    .then(data => {
-        if (data.duplicate) {
-            alert("⚠️ Alarm already active.");
-        } else {
-            alert("🚨 Emergency alarm triggered!");
-        }
-    })
+    .then(d => alert(d.success ? '🚨 Intruder alarm triggered on hardware!' : '⚠️ Alarm already active.'))
     .catch(err => console.error(err));
 }
 
@@ -577,14 +605,22 @@ document.addEventListener('click', function(e) {
 });
 
 // =========================
-// REALTIME ACCESS LOG POLLING (3-5s)
-// Updates the "Recent Activity" list dynamically
+// REALTIME ACCESS LOG + LOCKDOWN BANNER POLLING (2s)
 // =========================
 let _accessPollTimer = null;
 let _lastLogCount = @Model.Count;
 
 function startAccessPolling() {
     _accessPollTimer = setInterval(pollAccessLogs, 2000);
+    setInterval(pollLockdownStatus, 2000);
+    pollLockdownStatus(); // immediate first check
+}
+
+function pollLockdownStatus() {
+    fetch('/api/system/status')
+    .then(r => r.json())
+    .then(d => { d.lockdown ? showLockdownBanner(d.lockdownReason) : hideLockdownBanner(); })
+    .catch(() => {});
 }
 
 function pollAccessLogs() {

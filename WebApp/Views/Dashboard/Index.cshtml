@@ -9,6 +9,22 @@
 <link rel="stylesheet" href="~/css/dashboard.css" />
 <link rel="stylesheet" href="~/css/camera.css" />
 
+<!-- LOCKDOWN BANNER (shown/hidden by pollDashboardStatus every 5s) -->
+<div id="lockdownBanner" style="display:none;position:fixed;top:0;left:0;width:100%;z-index:9999;
+     background:linear-gradient(90deg,#7f0000,#dc2626,#7f0000);color:#fff;
+     padding:11px 24px;text-align:center;font-weight:700;font-size:0.95rem;
+     letter-spacing:0.07em;animation:ldBlink 1.2s ease-in-out infinite;
+     box-shadow:0 4px 20px rgba(220,38,38,0.55);">
+    <i class="fas fa-lock me-2"></i>LOCKDOWN ACTIVE — All Entry Points Secured
+    <span id="lockdownReason" style="margin-left:14px;font-weight:400;opacity:.9;"></span>
+    <button onclick="resolveLockdownDash()" style="margin-left:20px;padding:3px 12px;
+        border-radius:6px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);
+        color:#fff;font-weight:600;cursor:pointer;font-size:0.82rem;">
+        <i class="fas fa-unlock me-1"></i>Resolve
+    </button>
+</div>
+<style>@@keyframes ldBlink{0%,100%{opacity:1}50%{opacity:.83}}</style>
+
 <div class="dashboard-container">
 
     <!-- ===================== -->
@@ -392,17 +408,21 @@ function triggerEmergency() {
         confirmText: 'SEND ALERT',
         confirmClass: 'btn-danger',
         fields: [
-            { label: 'Action', value: 'Notify all security personnel' },
-            { label: 'Response', value: 'Emergency services will be contacted' }
+            { label: 'Action',   value: 'Trigger Intruder Alert on Pi hardware' },
+            { label: 'Response', value: 'LED + Buzzer + Solenoid activated for 30s' }
         ],
         onConfirm: function() {
-            fetch('/api/security/alarm', { method: 'POST' })
+            fetch('/api/system/alarm', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: 'Intruder Alert', duration: 30 })
+            })
             .then(r => r.json())
             .then(data => {
-                if (data.duplicate) {
-                    alert('⚠️ Alarm already active.');
+                if (data.success) {
+                    alert('🚨 Emergency alarm triggered on hardware!');
                 } else {
-                    alert('🚨 Emergency alarm triggered!');
+                    alert('⚠️ Alarm already active.');
                 }
             })
             .catch(() => alert('❌ Failed to trigger alarm.'));
@@ -431,7 +451,19 @@ function pollDashboardStatus() {
             if (h3) h3.textContent = data.activeAlertCount;
         }
 
-        // Lockdown indicator on header
+        // Lockdown banner
+        const banner   = document.getElementById('lockdownBanner');
+        const reasonEl = document.getElementById('lockdownReason');
+        if (data.lockdown) {
+            if (banner) banner.style.display = 'block';
+            if (reasonEl) reasonEl.textContent = data.lockdownReason ? '— ' + data.lockdownReason : '';
+            document.body.style.paddingTop = '50px';
+        } else {
+            if (banner) banner.style.display = 'none';
+            document.body.style.paddingTop = '';
+        }
+
+        // Lockdown button state (existing behaviour)
         const lockdownBtn = document.querySelector('.btn-lockdown');
         if (lockdownBtn) {
             if (data.lockdown) {
@@ -446,6 +478,17 @@ function pollDashboardStatus() {
         }
     })
     .catch(() => {});
+}
+
+function resolveLockdownDash() {
+    if (!confirm('🔓 Resolve lockdown and restore normal access?')) return;
+    fetch('/api/system/lockdown/resolve', { method: 'POST' })
+    .then(r => r.json()).then(() => {
+        const banner = document.getElementById('lockdownBanner');
+        if (banner) banner.style.display = 'none';
+        document.body.style.paddingTop = '';
+    })
+    .catch(() => alert('❌ Failed to resolve lockdown.'));
 }
 
 // Start polling on page load

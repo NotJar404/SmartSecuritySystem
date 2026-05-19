@@ -570,6 +570,81 @@ namespace WebApp.Controllers
                 activeAlertCount
             });
         }
+
+        // =========================
+        // ALARM HARDWARE ACTIVATION (called from system.cshtml alarm buttons)
+        // Saves alarm state in memory + immediately forwards to Pi Flask /alarm
+        // =========================
+        [HttpPost]
+        [Route("/api/system/alarm")]
+        public IActionResult ActivateAlarm([FromBody] AlarmActivateRequest? request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.Type))
+                return BadRequest(new { success = false, message = "No alarm type specified." });
+
+            // Update in-memory alarm state so /api/system/status reflects it instantly
+            lock (_alarmLock)
+            {
+                _activeAlarm = new AlarmStatusPayload
+                {
+                    Type        = request.Type,
+                    IsActive    = true,
+                    Description = $"Manual {request.Type} activated from dashboard",
+                    Timestamp   = System.DateTime.UtcNow.ToString("o")
+                };
+            }
+
+            // Forward to Pi hardware — fire-and-forget, never block on Pi
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using var http = new System.Net.Http.HttpClient { Timeout = System.TimeSpan.FromSeconds(3) };
+                    var cam = _context.CameraDevices.FirstOrDefault(c => c.Status == "active");
+                    if (cam?.StreamUrl != null)
+                    {
+                        var uri  = new System.Uri(cam.StreamUrl);
+                        var body = System.Text.Json.JsonSerializer.Serialize(
+                            new { type = request.Type, duration = request.Duration });
+                        await http.PostAsync(
+                            $"http://{uri.Host}:5050/alarm",
+                            new System.Net.Http.StringContent(body, System.Text.Encoding.UTF8, "application/json"));
+                    }
+                }
+                catch { /* Pi offline — in-memory state already set, will retry on next action */ }
+            });
+
+            return Ok(new { success = true, message = $"Alarm '{request.Type}' forwarded to Pi hardware." });
+        }
+
+        [HttpPost]
+        [Route("/api/system/alarm/resolve")]
+        public IActionResult ResolveAlarm()
+        {
+            // Clear in-memory alarm state immediately
+            lock (_alarmLock)
+            {
+                _activeAlarm = null;
+            }
+
+            // Forward deactivation to Pi
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using var http = new System.Net.Http.HttpClient { Timeout = System.TimeSpan.FromSeconds(3) };
+                    var cam = _context.CameraDevices.FirstOrDefault(c => c.Status == "active");
+                    if (cam?.StreamUrl != null)
+                    {
+                        var uri = new System.Uri(cam.StreamUrl);
+                        await http.DeleteAsync($"http://{uri.Host}:5050/alarm");
+                    }
+                }
+                catch { /* Pi offline */ }
+            });
+
+            return Ok(new { success = true, message = "All alarms deactivated." });
+        }
     }
 
     // LockdownRequest is defined in AccessController.cs
@@ -612,5 +687,11 @@ namespace WebApp.Controllers
         public string Description { get; set; } = string.Empty;
         public int RoomId { get; set; }
         public string Timestamp { get; set; } = string.Empty;
+    }
+
+    public class AlarmActivateRequest
+    {
+        public string Type { get; set; } = string.Empty;
+        public int Duration { get; set; } = 60;
     }
 }
