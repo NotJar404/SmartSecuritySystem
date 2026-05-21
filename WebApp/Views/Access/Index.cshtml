@@ -51,6 +51,7 @@
     <div class="grid-main">
         <div class="panel-body">
 
+
             <div id="emptyState" class="center-content">
                 <div class="avatar-bg">
                     <i class="fa fa-user-shield"></i>
@@ -692,4 +693,68 @@ function updateLogList(logs, activePersonIds) {
 
 // Start polling when page loads
 document.addEventListener('DOMContentLoaded', startAccessPolling);
+
+// =========================
+// REAL-TIME MJPEG STREAM
+// =========================
+let streamRetryCount = 0;
+let maxStreamRetries = 3;
+
+function initializeStream() {
+    const mjpegImg = document.getElementById('mjpegStream');
+    const streamStatus = document.getElementById('streamStatus');
+    const placeholder = document.getElementById('streamPlaceholder');
+
+    if (!mjpegImg || !streamStatus) return;
+
+    // Try Pi backend first (http://192.168.0.100:5050 or localhost:5050)
+    const backendUrls = [
+        'http://localhost:5050/video',      // Docker or local dev
+        'http://192.168.0.100:5050/video',  // Pi on network
+        'http://192.168.0.103:5050/video',  // Alternative Pi address
+        'http://127.0.0.1:5050/video'       // Local fallback
+    ];
+
+    function tryNextUrl(index) {
+        if (index >= backendUrls.length) {
+            streamStatus.innerHTML = '<i class="fa fa-times-circle me-1" style="color: #e74c3c;"></i>Stream Offline';
+            streamStatus.style.color = '#e74c3c';
+            placeholder.innerHTML = '<div style="text-align: center; color: #8b949e;"><i class="fa fa-exclamation-triangle fa-2x mb-2" style="display: block; color: #e74c3c;"></i>Camera stream not available<br/><small>Is the Pi running?</small></div>';
+            return;
+        }
+
+        const url = backendUrls[index];
+        mjpegImg.src = url + '?t=' + Date.now();  // Bypass cache with timestamp
+
+        const timeout = setTimeout(() => {
+            console.log(`[ACCESS STREAM] Timeout on ${url}`);
+            tryNextUrl(index + 1);
+        }, 5000);
+
+        mjpegImg.onload = () => {
+            clearTimeout(timeout);
+            streamStatus.innerHTML = '<i class="fa fa-circle me-1" style="color: #00ff00;\"></i>Live';
+            streamStatus.style.color = '#00ff00';
+            placeholder.style.display = 'none';
+            console.log(`[ACCESS STREAM] Connected to ${url}`);
+        };
+
+        mjpegImg.onerror = () => {
+            clearTimeout(timeout);
+            console.log(`[ACCESS STREAM] Failed to load from ${url}`);
+            tryNextUrl(index + 1);
+        };
+    }
+
+    // Start trying URLs
+    tryNextUrl(0);
+}
+
+// Initialize stream when page loads
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(initializeStream, 500);  // Wait for DOM to settle
+});
+
+// Reinitialize stream every 30 seconds in case connection drops
+setInterval(initializeStream, 30000);
 </script>

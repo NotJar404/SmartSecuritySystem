@@ -267,8 +267,8 @@ sudo apt install -y python3-opencv libopencv-dev
 # GStreamer (for libcamera → OpenCV pipeline)
 sudo apt install -y gstreamer1.0-tools gstreamer1.0-plugins-good gstreamer1.0-plugins-bad
 
-# Face recognition build dependencies
-sudo apt install -y cmake build-essential libdlib-dev python3-dev
+# Face recognition build dependencies (CRITICAL for dlib compilation)
+sudo apt install -y cmake build-essential libboost-all-dev python3-dev
 
 # GPIO permissions
 sudo usermod -aG gpio,spi,i2c,video pi
@@ -290,24 +290,32 @@ source ../venv/bin/activate
 ```bash
 pip install --upgrade pip
 
-# Core packages
-pip install opencv-python-headless numpy requests flask
-
-# Raspberry Pi hardware
-pip install RPi.GPIO mfrc522
-
-# Face recognition (takes ~30 min on Pi — needs dlib compilation)
-pip install face_recognition
+# Install from requirements.txt (includes all dependencies)
+pip install -r requirements.txt
 ```
 
-> ⚠️ **If dlib compilation fails (out of memory):**
+> ⚠️ **CRITICAL**: `face-recognition` and `dlib` require compilation. This takes 15-30 minutes on Pi 5.
+
+> **If installation fails with "No space left on device":**
 > ```bash
+> # Check disk space
+> df -h
+> 
+> # If < 500MB free, expand root partition or add swap:
 > sudo dphys-swapfile swapoff
 > sudo sed -i 's/CONF_SWAPSIZE=.*/CONF_SWAPSIZE=2048/' /etc/dphys-swapfile
 > sudo dphys-swapfile setup
 > sudo dphys-swapfile swapon
-> # Then retry: pip install face_recognition
+> 
+> # Clean package cache
+> sudo apt-get clean
+> 
+> # Retry installation
+> pip install -r requirements.txt
+> 
 > # After success, reduce swap back to 200MB
+> sudo sed -i 's/CONF_SWAPSIZE=.*/CONF_SWAPSIZE=200/' /etc/dphys-swapfile
+> sudo dphys-swapfile setup
 > ```
 
 ### 4.4 Download AI Models

@@ -40,6 +40,19 @@ requests==2.32.3
 # Image processing and manipulation library
 Pillow==10.3.0
 
+# Face detection and recognition library (uses dlib internally)
+# CRITICAL for face encoding extraction and biometric verification
+# Requires: CMake, boost (build dependencies on Pi)
+face-recognition==1.3.5
+
+# dlib machine learning library (dependency for face_recognition)
+# Used for HOG face detection and ResNet-34 embedding extraction
+dlib==19.24.2
+
+# OpenCV with DNN module for person detection (MobileNet SSD v2)
+# Currently using system-installed opencv-python
+# opencv-python>=4.8.0
+
 # [BUILT-IN - NO INSTALL NEEDED] Threading module for concurrent task execution
 # import threading
 

@@ -63,12 +63,25 @@ This system integrates camera-based face detection with RFID verification to cre
 
 ### Installation
 
-1. Install dependencies:
+1. Install system dependencies (Raspberry Pi 5):
+```bash
+sudo apt-get update
+sudo apt-get install cmake build-essential libboost-all-dev
+```
+
+2. Install Python dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-2. Configure RFID reader port (if using hardware):
+⚠️ **CRITICAL**: `face-recognition` and `dlib` require compilation on Raspberry Pi. This can take 10-20 minutes.
+If installation fails with "No space left" error, ensure 500MB+ free disk space is available:
+```bash
+df -h  # Check disk usage
+sudo apt-get clean  # Free up space
+```
+
+3. Configure RFID reader port (if using hardware):
    - Edit `rfid_reader.py` line with `port='COM3'` to match your RFID reader port
    - On Windows: COM3, COM4, etc.
    - On Linux/Mac: /dev/ttyUSB0, /dev/ttyACM0, etc.

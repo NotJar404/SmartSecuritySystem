@@ -176,9 +176,10 @@ class CameraModule:
 
             picam = Picamera2()
 
-            # BGR888: native OpenCV format — no cvtColor needed, no channel-swap risk
+            # NOTE: picamera2 primarily uses RGB888 format (BGR888 may not be supported).
+            # We request RGB888 and will convert to BGR in the capture loop.
             config = picam.create_preview_configuration(
-                main={"size": (self.width, self.height), "format": "BGR888"}
+                main={"size": (self.width, self.height), "format": "RGB888"}
             )
             picam.configure(config)
 
@@ -196,27 +197,11 @@ class CameraModule:
             if test_frame is None or test_frame.size == 0:
                 raise Exception("picamera2 started but no frame captured")
 
-            # ── FORMAT DIAGNOSTIC (printed on every startup) ──────────────────
-            ch = test_frame.shape[2] if test_frame.ndim == 3 else 1
-            print(f"[CAMERA] picamera2 frame: shape={test_frame.shape} dtype={test_frame.dtype}")
-            if ch == 4:
-                # Detect XRGB vs RGBA by inspecting channel-0 stats
-                # XRGB8888: channel-0 (X) is always 0 or 255 (constant padding)
-                # RGBA8888: channel-0 (R) varies across the image
-                ch0 = test_frame[:, :, 0]
-                unique_vals = len(set(ch0.flatten()[:1024].tolist()))
-                self._picam_4ch_skip_first = unique_vals <= 4  # X byte is constant
-                fmt = "XRGB8888 (skip ch0→RGB)" if self._picam_4ch_skip_first else "RGBA8888 (keep ch0-2→RGB)"
-                print(f"[CAMERA] 4-channel format detected: {fmt}")
-            else:
-                self._picam_4ch_skip_first = False
-                print(f"[CAMERA] 3-channel RGB888 ✓ — will cvtColor RGB→BGR")
-            # ─────────────────────────────────────────────────────────────────
-
             self._picamera2 = picam
             self._use_picamera2 = True
             print(f"[CAMERA] Pi Camera Module 3 via picamera2 (PRIMARY)")
             print(f"[CAMERA] Resolution: {self.width}x{self.height} @ {self.fps}fps | Mirror: {'ON' if self._mirror else 'OFF'}")
+            print(f"[CAMERA] Format: RGB888 → BGR (for dlib/face_detection)")
             return True
 
         except Exception as e:
@@ -518,29 +503,30 @@ class CameraModule:
         """
         Capture from Pi Camera Module 3 (IMX708). Always returns BGR or None.
 
-        Format is RGB888 (set in _try_picamera2).
+        Format is RGB888 (set in _try_picamera2), which MUST be converted to BGR
+        for use in face_detection.py and dlib-based verification.
 
-        Channel handling (detected once at startup, stored in _picam_4ch_skip_first):
-          3-ch RGB888   → cvtColor(RGB2BGR)              → BGR ✓
-          4-ch XRGB8888 → frame[:, :, 1:] → RGB          → cvtColor → BGR ✓
-          4-ch RGBA8888 → frame[:, :, :3] → RGB           → cvtColor → BGR ✓
+        The conversion RGB→BGR is CRITICAL:
+          - picamera2 always produces RGB888 (not BGR888, even if requested)
+          - dlib and face_recognition expect BGR format
+          - If RGB→BGR conversion is skipped, face detection fails silently
         """
         try:
             frame = self._picamera2.capture_array()
             if frame is None or frame.size == 0:
                 return None
 
-            # Strip 4th channel using the format detected at startup
+            # Ensure 3-channel RGB (some builds may produce 4-channel XRGB8888)
             if frame.ndim == 3 and frame.shape[2] == 4:
-                if getattr(self, '_picam_4ch_skip_first', True):
-                    # XRGB8888: channels = [X, R, G, B] — skip X at index 0
-                    frame = frame[:, :, 1:]
-                else:
-                    # RGBA8888: channels = [R, G, B, A] — drop alpha at index 3
-                    frame = frame[:, :, :3]
+                # XRGB8888 (rare): channels = [X, R, G, B] — skip X at index 0
+                # RGBA8888 (rare): channels = [R, G, B, A] — drop alpha at index 3
+                # We assume XRGB8888 (X is padding byte, constant 0 or 255)
+                frame = frame[:, :, 1:]  # Keep RGB from XRGB
 
-            # Always convert RGB → BGR (RGB888 is NOT OpenCV native format)
-            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            # CRITICAL CONVERSION: RGB888 → BGR for dlib/face_detection
+            # Must happen EVERY frame. If skipped, face detection fails.
+            if frame.shape[2] == 3:
+                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
             if self._mirror:
                 frame = cv2.flip(frame, 1)

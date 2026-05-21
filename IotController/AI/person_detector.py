@@ -44,8 +44,11 @@ class PersonDetector:
         self.net = None
         self.use_hog_fallback = False
 
-        # HOG fallback detector
-        self._hog = None
+        # HOG always pre-initialized as emergency fallback.
+        # This prevents NoneType errors when MobileNet SSD loads OK but
+        # fails at inference time (OpenCV 4.13 BatchNorm assertion bug).
+        self._hog = cv2.HOGDescriptor()
+        self._hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
 
         self._load_model()
 
@@ -67,12 +70,10 @@ class PersonDetector:
             except Exception as e:
                 print(f"[PERSON DETECTOR] MobileNet SSD load failed: {e}")
 
-        # Fallback to HOG+SVM
+        # Fallback to HOG+SVM (self._hog already initialized in __init__ — no re-creation)
         print("[PERSON DETECTOR] Model files not found — using HOG+SVM fallback")
         print(f"[PERSON DETECTOR] Expected: {prototxt}")
         self.use_hog_fallback = True
-        self._hog = cv2.HOGDescriptor()
-        self._hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
 
     def detect_persons(self, frame):
         """
@@ -92,15 +93,38 @@ class PersonDetector:
     def _detect_mobilenet(self, frame):
         """MobileNet SSD person detection (primary method)."""
         try:
+            # Validate frame dimensions
+            if frame is None or len(frame.shape) != 3:
+                return []
+            
             h, w = frame.shape[:2]
+            if h < 50 or w < 50:
+                return []  # Frame too small
 
             # Create blob — 300x300 is MobileNet SSD's native input size
-            blob = cv2.dnn.blobFromImage(
-                cv2.resize(frame, (300, 300)),
-                0.007843,       # scale factor (1/127.5)
-                (300, 300),     # spatial size
-                127.5           # mean subtraction
-            )
+            try:
+                resized = cv2.resize(frame, (300, 300))
+                if resized is None or resized.size == 0:
+                    return []
+                    
+                blob = cv2.dnn.blobFromImage(
+                    resized,
+                    0.007843,       # scale factor (1/127.5)
+                    (300, 300),     # spatial size
+                    127.5,          # mean subtraction
+                    swapRB=False,   # Keep BGR as-is (camera native)
+                    crop=False      # Don't crop to square
+                )
+                
+                if blob is None or blob.size == 0:
+                    print("[PERSON DETECTOR] Blob creation failed — switching to HOG fallback")
+                    self.use_hog_fallback = True
+                    return self._detect_hog(frame)
+                    
+            except Exception as blob_err:
+                print(f"[PERSON DETECTOR] Blob creation error: {blob_err} — switching to HOG")
+                self.use_hog_fallback = True
+                return self._detect_hog(frame)
 
             self.net.setInput(blob)
             detections = self.net.forward()
@@ -138,8 +162,23 @@ class PersonDetector:
 
             return persons
 
+        except (cv2.error, RuntimeError) as e:
+            # OpenCV batch norm or other DNN errors — switch to HOG
+            error_str = str(e).lower()
+            if "batch_norm" in error_str or "assertion failed" in error_str or "blobs.size()" in error_str:
+                print(f"[PERSON DETECTOR] *** DNN LAYER FAILURE DETECTED ***")
+                print(f"[PERSON DETECTOR] *** FALLING BACK TO HOG+SVM FALLBACK ***")
+                self.use_hog_fallback = True
+                try:
+                    return self._detect_hog(frame)
+                except Exception as hog_err:
+                    print(f"[PERSON DETECTOR] HOG fallback also failed: {hog_err}")
+                    return []
+            else:
+                print(f"[PERSON DETECTOR ERROR] {e}")
+                return []
         except Exception as e:
-            print(f"[PERSON DETECTOR ERROR] {e}")
+            print(f"[PERSON DETECTOR ERROR] Unexpected error: {e}")
             return []
 
     def _detect_hog(self, frame):

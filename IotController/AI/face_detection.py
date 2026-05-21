@@ -41,22 +41,42 @@ class FaceDetector:
     """
 
     def __init__(self):
-        # Haar fallback when face_recognition not installed
-        # cv2.data.haarcascades exists on OpenCV ≥ 4.x; fall back for older Pi builds
+        # ── Haar cascade (fallback when face_recognition not installed) ──────────
+        # Try multiple paths in priority order for cross-platform compatibility
+        import os as _os
+        _cascade_file = 'haarcascade_frontalface_default.xml'
+        _cascade_search_paths = []
+
         try:
-            cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+            _cascade_search_paths.append(cv2.data.haarcascades + _cascade_file)
         except AttributeError:
-            import os as _os
-            cascade_path = _os.path.join(
-                _os.path.dirname(cv2.__file__),
-                'data', 'haarcascade_frontalface_default.xml'
-            )
-        self.face_cascade = cv2.CascadeClassifier(cascade_path)
+            pass
+
+        _cascade_search_paths += [
+            # Common Raspberry Pi paths
+            f'/usr/share/opencv4/haarcascades/{_cascade_file}',
+            f'/usr/local/share/opencv4/haarcascades/{_cascade_file}',
+            f'/usr/share/opencv/haarcascades/{_cascade_file}',
+            # Fallback via cv2 package directory
+            _os.path.join(_os.path.dirname(cv2.__file__), 'data', _cascade_file),
+        ]
+
+        self.face_cascade = None
+        for _path in _cascade_search_paths:
+            if _os.path.exists(_path):
+                _clf = cv2.CascadeClassifier(_path)
+                if not _clf.empty():
+                    self.face_cascade = _clf
+                    print(f"[FACE DETECTOR] Haar cascade loaded: {_path}")
+                    break
+
+        if self.face_cascade is None:
+            print("[FACE DETECTOR] WARNING: Haar cascade not found on any search path.")
+            print("[FACE DETECTOR] Install: sudo apt-get install libopencv-dev")
 
         # ── Blur rejection ──────────────────────────────────────────────────
-        # Frames with Laplacian variance below this are too blurry to detect.
-        # Lower this if the camera is legitimately soft (e.g. wide aperture).
-        self.blur_threshold = 8.0
+        # Camera Module 3 is slightly soft; 5.0 is more forgiving than 8.0
+        self.blur_threshold = 5.0
         self.last_blur_score = 0.0
 
     # =========================================================================
@@ -170,11 +190,19 @@ class FaceDetector:
         """
         Haar cascade detector — used when face_recognition is not installed.
         Works on BGR directly (no conversion needed).
+        Uses looser parameters for handheld Camera Module 3.
         """
+        if self.face_cascade is None or self.face_cascade.empty():
+            return []  # Cascade not loaded — cannot detect
+
         small = cv2.resize(frame, (320, 240))
         gray  = cv2.equalizeHist(cv2.cvtColor(small, cv2.COLOR_BGR2GRAY))
         faces = self.face_cascade.detectMultiScale(
-            gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30)
+            gray,
+            scaleFactor=1.08,   # finer scale steps than default 1.1
+            minNeighbors=4,     # was 5 — loosened for moving/handheld camera
+            minSize=(20, 20),   # was (30,30) — catch smaller/distant faces
+            flags=cv2.CASCADE_SCALE_IMAGE
         )
         if not isinstance(faces, np.ndarray) or len(faces) == 0:
             return []

@@ -86,29 +86,33 @@ def load_embedding_from_db(raw_value):
             pass
 
     # ── Path 3: base64 JPEG image — extract embedding from the photo ─────────
-    try:
-        b64_part = raw_str.split(",", 1)[1] if "," in raw_str else raw_str
-        img_bytes = base64.b64decode(b64_part)
-        img_array = np.frombuffer(img_bytes, dtype=np.uint8)
-        img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
-        if img is not None:
-            rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            with _DLIB_LOCK:
-                locs = face_recognition.face_locations(rgb, model="hog")
-                if not locs:
-                    locs = face_recognition.face_locations(rgb, model="hog",
-                                                           number_of_times_to_upsample=2)
-            if locs:
-                loc = max(locs, key=lambda l: (l[2]-l[0])*(l[1]-l[3]))
+    # SKIP if face_recognition is not available
+    if _HAS_FACE_RECOGNITION:
+        try:
+            b64_part = raw_str.split(",", 1)[1] if "," in raw_str else raw_str
+            img_bytes = base64.b64decode(b64_part)
+            img_array = np.frombuffer(img_bytes, dtype=np.uint8)
+            img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+            if img is not None:
+                rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                 with _DLIB_LOCK:
-                    encs = face_recognition.face_encodings(rgb, [loc], num_jitters=5)
-                if encs:
-                    return _validate_embedding(np.array(encs[0], dtype=np.float64),
-                                               source="JPEG-photo")
-            else:
-                print("[VERIFY] Path 3: no face found in stored JPEG photo")
-    except Exception as e:
-        print(f"[VERIFY] Path 3 failed: {e}")
+                    locs = face_recognition.face_locations(rgb, model="hog")
+                    if not locs:
+                        locs = face_recognition.face_locations(rgb, model="hog",
+                                                               number_of_times_to_upsample=2)
+                if locs:
+                    loc = max(locs, key=lambda l: (l[2]-l[0])*(l[1]-l[3]))
+                    with _DLIB_LOCK:
+                        encs = face_recognition.face_encodings(rgb, [loc], num_jitters=5)
+                    if encs:
+                        return _validate_embedding(np.array(encs[0], dtype=np.float64),
+                                                   source="JPEG-photo")
+                else:
+                    print("[VERIFY] Path 3: no face found in stored JPEG photo")
+        except Exception as e:
+            print(f"[VERIFY] Path 3 failed: {e}")
+    else:
+        print("[VERIFY] Path 3 skipped: face_recognition not installed")
 
     print("[VERIFY] load_embedding_from_db: all decode paths failed")
     return None
@@ -200,7 +204,11 @@ class FaceVerifier:
         Extract 128-dim face encoding from a BGR frame.
         Returns (encoding_float64, bbox_xywh) or (None, None).
         """
-        if image is None or not _HAS_FACE_RECOGNITION:
+        if image is None:
+            return None, None
+        if not _HAS_FACE_RECOGNITION:
+            print("[ERROR] face_recognition not installed — cannot extract encodings. "
+                  "Install: pip install face-recognition dlib")
             return None, None
         try:
             rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -267,6 +275,9 @@ class FaceVerifier:
         if enc is not None:
             self.current_encoding = enc
             self.current_time     = datetime.now()
+            print("[VERIFY] Face stored in buffer (encoding ready for RFID verification)")
+        else:
+            print("[VERIFY] Failed to extract encoding from detected face — buffer empty")
 
     # =========================================================================
     # MULTI-FRAME VERIFICATION ENTRY POINT
@@ -327,7 +338,20 @@ class FaceVerifier:
                    camera_get_frame_fn, overlay_setter_fn,
                    result_callback_fn, guidance_fn=None):
 
-        # ── Load stored embedding ─────────────────────────────────────────────
+        # ── Library guard (must be first) ────────────────────────────────────────
+        # face_recognition must be installed for ANY biometric verification.
+        # Without it, Path 3 (JPEG → embedding) and all frame encoding fail.
+        # Return NO_LIBRARY so main.py routes to IDLE instead of ALERT.
+        if not _HAS_FACE_RECOGNITION:
+            print("[VERIFY] *** face_recognition library NOT installed ***")
+            print("[VERIFY] Biometric verification impossible without it.")
+            print("[VERIFY] Fix on Raspberry Pi:  sudo pip3 install face-recognition dlib")
+            result_callback_fn(self._make_result(
+                verified=False, confidence=0.0, best_distance=9.99,
+                frames_checked=0, reason="NO_LIBRARY", user_id=user_id))
+            return
+
+        # ── Load stored embedding ───────────────────────────────────────────────
         stored_enc = load_embedding_from_db(stored_embedding_str)
         if stored_enc is None:
             print("[VERIFY] LOAD_ERROR — stored embedding is invalid/missing")
@@ -571,8 +595,9 @@ class FaceVerifier:
             "best_distance":  round(best_distance, 4),
             "frames_checked": frames_checked,
             "message":        ("ACCESS GRANTED" if verified
-                               else f"FACE {reason.replace('_',' ')}"),
-            "reason":         reason,       # MATCH | NO_MATCH | TIMEOUT | LOAD_ERROR
+                               else ("INSTALL face-recognition" if reason == "NO_LIBRARY"
+                                     else f"FACE {reason.replace('_',' ')}")),
+            "reason":         reason,       # MATCH | NO_MATCH | TIMEOUT | LOAD_ERROR | NO_LIBRARY
             "user_id":        user_id,
         }
 

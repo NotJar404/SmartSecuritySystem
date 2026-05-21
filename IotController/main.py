@@ -52,8 +52,8 @@ class SmartSecuritySystem:
     """
 
     def __init__(self, use_simulated_rfid=False,
-                 api_url="http://localhost:5145/api/access/rfid",
-                 base_url="http://localhost:5145",
+                 api_url="http://192.168.0.100:5145/api/access/rfid",
+                 base_url="http://192.168.0.100:5145",
                  camera_id=1,
                  room_id=1,
                  max_stay_minutes=20,
@@ -349,6 +349,39 @@ class SmartSecuritySystem:
         self._api_retry_max_attempts = 3
         self._api_retry_delay = 5  # seconds between retries
 
+        # =========================
+        # API FAILURE SPAM SUPPRESSION
+        # Non-critical failures are logged at most once per 60s per endpoint
+        # =========================
+        self._api_fail_logged = {}   # {endpoint: last_log_time}
+
+        # =========================
+        # INLINE SQLITE OFFLINE BUFFER
+        # Persists critical events when backend is unreachable.
+        # Survives Pi reboots. Synced by _offline_buffer_sync_worker.
+        # =========================
+        import sqlite3 as _sqlite3
+        self._sqlite3 = _sqlite3
+        _db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "local_events.db")
+        self._offline_db_path = _db_path
+        try:
+            with self._sqlite3.connect(_db_path) as _c:
+                _c.execute("""
+                    CREATE TABLE IF NOT EXISTS offline_events (
+                        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                        endpoint      TEXT    NOT NULL,
+                        payload       TEXT    NOT NULL,
+                        created_at    REAL    NOT NULL,
+                        synced        INTEGER NOT NULL DEFAULT 0,
+                        attempts      INTEGER NOT NULL DEFAULT 0
+                    )
+                """)
+            print(f"[OFFLINE BUFFER] SQLite journal ready: {_db_path}")
+        except Exception as _e:
+            print(f"[OFFLINE BUFFER] Could not init SQLite buffer: {_e}")
+            self._offline_db_path = None
+
     # =========================
     # INIT SYSTEM
     # =========================
@@ -433,7 +466,32 @@ class SmartSecuritySystem:
             print("[WARN]  Anyone with a valid RFID card can enter.")
             print("[WARN]  Enable via the dashboard Settings > Biometric Lock.")
             print("")
-        # ────────────────────────────────────────────────────────────────────
+
+        # ── face_recognition availability diagnostic ────────────────────────────
+        try:
+            import face_recognition as _fr_probe  # noqa: F401
+            del _fr_probe
+            print("[SYSTEM] face_recognition library : INSTALLED ✓")
+        except ImportError:
+            print("")
+            print("!" * 60)
+            print("[CRITICAL] face_recognition is NOT installed on this device!")
+            print("[CRITICAL] Biometric face verification WILL FAIL for every tap.")
+            print("[CRITICAL]")
+            print("[CRITICAL] Fix (run on the Raspberry Pi):")
+            print("[CRITICAL]   sudo pip3 install face-recognition dlib")
+            print("[CRITICAL] Or inside a venv:")
+            print("[CRITICAL]   pip install face-recognition dlib")
+            print("!" * 60)
+            print("")
+        # ────────────────────────────────────────────────────────────
+
+        # ── Offline SQLite buffer sync worker ───────────────────────────────
+        if self._offline_db_path:
+            threading.Thread(target=self._offline_buffer_sync_worker,
+                             daemon=True, name="offline-sync").start()
+            print("[SYSTEM] Offline buffer sync worker started")
+        # ──────────────────────────────────────────────────────────────
 
     # =========================
     # FSM STATE TRANSITION (THREAD-SAFE)
@@ -584,17 +642,18 @@ class SmartSecuritySystem:
                     raw_occupancy = self.person_tracker.get_active_count()
 
                     # Still run face detection at reduced rate for face buffer
-                    # SKIP while verification is collecting — dlib is not thread-safe
-                    # (calling face_recognition from two threads simultaneously → SIGSEGV)
-                    if now - self.last_face_update > 2 and not self.face_verifier.is_collecting:
+                    # NOTE: Verification thread collects frames itself — we don't need to skip
+                    # face detection. The dlib mutex in face_detection.py prevents conflicts.
+                    if now - self.last_face_update > 1.0:  # Run face detect every second
                         faces, face_images = self.face_detector.detect_faces(frame)
+                        self.last_face_update = now
                 else:
                     # =========================
                     # IDLE/ACCESS MODE: Face detection
-                    # SKIP while verification thread is running — dlib is not thread-safe
+                    # Run continuously for RFID verification preparation
+                    # Verification thread has its own dlib lock — no conflict
                     # =========================
-                    if not self.face_verifier.is_collecting:
-                        faces, face_images = self.face_detector.detect_faces(frame)
+                    faces, face_images = self.face_detector.detect_faces(frame)  # No rate limiting
                     raw_occupancy = len(faces)
 
                     # Debug: periodically log detection stats
@@ -652,8 +711,9 @@ class SmartSecuritySystem:
                     armed=self._master_armed,
                     verification_overlay=_v_overlay,
                     countdown_seconds=_countdown,
-                    # Pass live face-buffer state so the guide oval is green/orange
-                    face_detected=(self.face_verifier.current_encoding is not None)
+                    # CRITICAL FIX: face_detected must reflect actual face detection, not verifier buffer state
+                    # If faces were detected in this frame, show them; if none, show placeholder
+                    face_detected=(len(faces) > 0)
                                    if current_state in (STATE_IDLE, STATE_ACCESS) else None
                 )
 
@@ -1201,7 +1261,7 @@ class SmartSecuritySystem:
         try:
             resp = requests.get(
                 f"{self.base_url}/api/access/rfid?uid={uid_str}&roomId={self.room_id}",
-                timeout=2
+                timeout=3  # Increased from 2s for unstable networks
             )
             data = resp.json() if resp.status_code == 200 else {}
 
@@ -1244,8 +1304,11 @@ class SmartSecuritySystem:
                 self.set_state(STATE_IDLE)
                 return
 
+        except requests.exceptions.Timeout:
+            print(f"[RFID] Backend timeout (connection took too long) "
+                  f"-- set ASPNET_URL env var. Falling back to local .pkl verification.")
         except requests.exceptions.ConnectionError:
-            print(f"[RFID] Backend offline (localhost:{self.base_url.split(':')[-1]}) "
+            print(f"[RFID] Backend offline (host={self.base_url.split('/')[2]}) "
                   f"-- set ASPNET_URL env var. Falling back to local .pkl verification.")
         except Exception as e:
             print(f"[RFID] Backend lookup failed: {e}")
@@ -1461,6 +1524,23 @@ class SmartSecuritySystem:
                 self.buzzer.pattern_beep(times=2, interval=0.3)
                 self.set_state(STATE_IDLE)
                 # Do NOT push alert -- camera/positioning issue, not a security threat
+
+            elif reason == "NO_LIBRARY":
+                # face_recognition not installed — config issue, NOT a security threat
+                # Go to IDLE so the person can retry after the library is installed
+                self._verification_overlay = {
+                    'status':     'LIBRARY MISSING',
+                    'uid':        uid_str,
+                    'name':       'pip install face-recognition dlib',
+                    'confidence': 0,
+                    'start_time': time.time()
+                }
+                print(f"[CONFIG ERROR] face_recognition NOT installed — cannot verify {user_id}")
+                print(f"[CONFIG ERROR] Run on Pi: sudo pip3 install face-recognition dlib")
+                self.rgb_led.status_denied()
+                self.buzzer.pattern_beep(times=2, interval=0.3)
+                self.set_state(STATE_IDLE)
+                # Do NOT push ALERT — this is a library config issue, not a threat
 
             elif reason == "LOAD_ERROR" or failure_type in ("No registered face", "FACE LOAD ERROR"):
                 # ADMIN ISSUE: user has no enrolled face data
@@ -1701,12 +1781,12 @@ class SmartSecuritySystem:
             print(f"[ALARM] Settings fetch failed (using last known): {e}")
 
     def _alarm_settings_poller(self):
-        """Background thread: poll alarm + system settings every 3 seconds (FIX-4)."""
+        """Background thread: poll alarm + system settings every 30 seconds."""
         while self.is_running:
             self._fetch_alarm_settings()
             self._fetch_system_config()
-            self._poll_lockdown_status()  # FIX-3: check lockdown from dashboard
-            time.sleep(3)
+            self._poll_lockdown_status()
+            time.sleep(30)  # 30s is sufficient; was 3s which caused log spam
 
     # =========================
     # SYSTEM CONFIG (DB-DRIVEN â€” ALL UI CARDS)
@@ -2098,8 +2178,10 @@ class SmartSecuritySystem:
     def post_to_dashboard(self, endpoint, payload, critical=False):
         """
         Centralized POST to ASP.NET backend.
-        - critical=True: ENTRY, EXIT, ALERT -- queued for retry on failure
-        - critical=False: occupancy, detection -- fire-and-forget
+        - critical=True: ENTRY, EXIT, ALERT -- queued for retry on failure,
+          then persisted to local SQLite if retries are exhausted.
+        - critical=False: occupancy, detection -- fire-and-forget.
+          Repeated failures are logged at most once per 60s per endpoint.
         """
         url = f"{self.base_url}{endpoint}"
         try:
@@ -2108,18 +2190,27 @@ class SmartSecuritySystem:
         except Exception as e:
             if critical and self._enable_api_retry:
                 self._api_retry_queue.put({
-                    "url": url,
-                    "payload": payload,
+                    "url":      url,
+                    "endpoint": endpoint,
+                    "payload":  payload,
                     "attempts": 0,
                     "timestamp": time.time()
                 })
-                print(f"[API RETRY] Queued critical POST to {endpoint} ({e})")
+                print(f"[API RETRY] Queued critical POST to {endpoint} ({type(e).__name__})")
             else:
-                print(f"[API] Non-critical POST failed: {endpoint} ({e})")
+                # Suppress repeated identical failures — log at most once per 60s
+                _now = time.time()
+                _last = self._api_fail_logged.get(endpoint, 0)
+                if _now - _last > 60:
+                    print(f"[API] Non-critical POST failed: {endpoint} "
+                          f"({type(e).__name__}) — will retry silently")
+                    self._api_fail_logged[endpoint] = _now
             return None
 
     def _api_retry_worker(self):
-        """Background thread: retries failed critical API calls (max 3 attempts, 5s delay)."""
+        """Background thread: retries failed critical API calls.
+        After max attempts: persists to local SQLite buffer instead of discarding.
+        """
         print("[API RETRY] Worker started")
         while self.is_running:
             try:
@@ -2127,13 +2218,28 @@ class SmartSecuritySystem:
             except queue.Empty:
                 continue
 
-            url = item["url"]
-            payload = item["payload"]
+            url      = item["url"]
+            endpoint = item.get("endpoint", "")
+            payload  = item["payload"]
             attempts = item["attempts"]
 
             if attempts >= self._api_retry_max_attempts:
                 print(f"[API RETRY] GAVE UP after {attempts} attempts: {url}")
-                print(f"[API RETRY] Lost payload: {json.dumps(payload)[:200]}")
+                # Persist to SQLite so sync worker can retry after connectivity restores
+                if self._offline_db_path:
+                    try:
+                        with self._sqlite3.connect(self._offline_db_path) as _c:
+                            _c.execute(
+                                "INSERT INTO offline_events "
+                                "(endpoint, payload, created_at) VALUES (?,?,?)",
+                                (endpoint, json.dumps(payload), time.time())
+                            )
+                        print(f"[OFFLINE BUFFER] Saved to SQLite for later sync: {endpoint}")
+                    except Exception as _dbe:
+                        print(f"[OFFLINE BUFFER] SQLite save failed: {_dbe}")
+                        print(f"[API RETRY] Lost payload: {json.dumps(payload)[:200]}")
+                else:
+                    print(f"[API RETRY] Lost payload: {json.dumps(payload)[:200]}")
                 continue
 
             time.sleep(self._api_retry_delay)
@@ -2148,6 +2254,73 @@ class SmartSecuritySystem:
                 item["attempts"] = attempts + 1
                 self._api_retry_queue.put(item)
                 print(f"[API RETRY] Attempt {attempts + 1}/{self._api_retry_max_attempts} failed: {e}")
+
+    def _offline_buffer_sync_worker(self):
+        """
+        Background thread: syncs SQLite-buffered critical events to ASP.NET.
+        Runs every 60 seconds. Only fires if backend is reachable.
+        Marks events as synced on HTTP 200; increments attempts on failure.
+        Events with 10+ attempts are abandoned (cleanup runs every 6 hrs).
+        """
+        print("[OFFLINE SYNC] Worker started — will flush buffered events every 60s")
+        _cleanup_counter = 0
+
+        while self.is_running:
+            time.sleep(60)
+
+            if not self._offline_db_path:
+                continue
+
+            try:
+                with self._sqlite3.connect(self._offline_db_path) as _c:
+                    rows = _c.execute(
+                        "SELECT id, endpoint, payload FROM offline_events "
+                        "WHERE synced=0 AND attempts<10 ORDER BY created_at ASC LIMIT 20"
+                    ).fetchall()
+            except Exception as _e:
+                print(f"[OFFLINE SYNC] SQLite read error: {_e}")
+                continue
+
+            if not rows:
+                continue
+
+            print(f"[OFFLINE SYNC] Attempting to sync {len(rows)} buffered event(s)...")
+            synced = 0
+            for row_id, ep, pl_json in rows:
+                try:
+                    pl = json.loads(pl_json)
+                    url = f"{self.base_url}{ep}"
+                    resp = requests.post(url, json=pl, timeout=5)
+                    if resp.status_code == 200:
+                        with self._sqlite3.connect(self._offline_db_path) as _c:
+                            _c.execute("UPDATE offline_events SET synced=1 WHERE id=?",
+                                       (row_id,))
+                        synced += 1
+                    else:
+                        raise Exception(f"HTTP {resp.status_code}")
+                except Exception as _e:
+                    with self._sqlite3.connect(self._offline_db_path) as _c:
+                        _c.execute("UPDATE offline_events SET attempts=attempts+1 WHERE id=?",
+                                   (row_id,))
+
+            if synced:
+                print(f"[OFFLINE SYNC] Synced {synced}/{len(rows)} buffered event(s)")
+
+            # Housekeeping every ~6 hours (360 × 60s = 21600s)
+            _cleanup_counter += 1
+            if _cleanup_counter >= 360:
+                _cleanup_counter = 0
+                _cutoff = time.time() - 7 * 86400  # 7 days
+                try:
+                    with self._sqlite3.connect(self._offline_db_path) as _c:
+                        _deleted = _c.execute(
+                            "DELETE FROM offline_events WHERE synced=1 OR created_at<?",
+                            (_cutoff,)
+                        ).rowcount
+                    if _deleted:
+                        print(f"[OFFLINE SYNC] Cleaned up {_deleted} old event(s)")
+                except Exception:
+                    pass
 
     # =========================
     # STATE TRANSITION API (-> ASP.NET Backend)

@@ -583,7 +583,7 @@ def render_verification_overlay(frame, overlay_data):
 
 
 def render_face_guide(frame, face_detected: bool, state: str = "ACCESS",
-                      face_boxes=None):
+                      face_boxes=None, color_override=None):
     """
     Draw face bounding boxes in IDLE / ACCESS state.
     OVAL REMOVED — replaced with plain rectangles.
@@ -591,6 +591,7 @@ def render_face_guide(frame, face_detected: bool, state: str = "ACCESS",
     Colors:
       IDLE  (monitoring, no RFID) → BLUE  (255, 100, 0)
       ACCESS (RFID tapped, verifying) → YELLOW (0, 255, 255)
+      color_override: GREEN (0,200,0) = GRANTED | RED (0,0,200) = DENIED
 
     If face_boxes is provided, draws each box.
     If face_boxes is empty/None but face_detected, draws a centre placeholder.
@@ -602,8 +603,18 @@ def render_face_guide(frame, face_detected: bool, state: str = "ACCESS",
     sf   = _scale_factor(frame)
     font = cv2.FONT_HERSHEY_SIMPLEX
 
-    box_color  = (0, 255, 255) if state == "ACCESS" else (255, 100, 0)
-    label      = "VERIFYING..." if state == "ACCESS" else ("FACE DETECTED" if face_detected else "NO FACE")
+    # Determine box color: override takes priority (GRANTED=green, DENIED=red)
+    if color_override is not None:
+        box_color = color_override
+        if color_override == (0, 200, 0):
+            label = "ACCESS GRANTED ✓"
+        elif color_override == (0, 0, 200):
+            label = "ACCESS DENIED ✗"
+        else:
+            label = "VERIFYING..." if state == "ACCESS" else ("FACE DETECTED" if face_detected else "NO FACE")
+    else:
+        box_color  = (0, 255, 255) if state == "ACCESS" else (255, 100, 0)
+        label      = "VERIFYING..." if state == "ACCESS" else ("FACE DETECTED" if face_detected else "NO FACE")
     label_color = box_color
 
     drawn = False
@@ -611,6 +622,8 @@ def render_face_guide(frame, face_detected: bool, state: str = "ACCESS",
         for (x, y, bw, bh) in face_boxes:
             if bw > 0 and bh > 0:
                 cv2.rectangle(frame, (x, y), (x + bw, y + bh), box_color, 2)
+                # Corner accents for better visibility
+                draw_corner_accents(frame, x, y, bw, bh, box_color)
                 # Label above the box
                 font_scale = 0.45 * sf
                 thick = max(1, int(1.5 * sf))
@@ -625,8 +638,12 @@ def render_face_guide(frame, face_detected: bool, state: str = "ACCESS",
 
     if not drawn:
         # No box available — show a simple text badge at the bottom-centre
-        msg = "FACE DETECTED - TAP RFID" if face_detected else "NO FACE - LOOK AT CAMERA"
-        color = (0, 220, 80) if face_detected else (0, 165, 255)
+        if color_override is not None:
+            msg = label
+            color = box_color
+        else:
+            msg = "FACE DETECTED - TAP RFID" if face_detected else "NO FACE - LOOK AT CAMERA"
+            color = (0, 220, 80) if face_detected else (0, 165, 255)
         font_scale = 0.48 * sf
         thick = max(1, int(1.5 * sf))
         (tw, th), _ = cv2.getTextSize(msg, font, font_scale, thick)
@@ -715,11 +732,26 @@ def render_full_frame(frame, state, occupancy, sessions=0,
         if tracked_persons:
             boxes_rendered = render_person_boxes(frame, tracked_persons)
     else:
-        # IDLE / ACCESS: draw plain rectangle bounding boxes — no oval
-        # Blue in IDLE, Yellow in ACCESS (verifying)
+        # IDLE / ACCESS: draw face bounding boxes
+        # Derive box colour from the current verification result:
+        #   GRANTED / MATCH  → green   (confirmation)
+        #   DENIED  / errors → red     (rejection)
+        #   VERIFYING        → default state colour (yellow)
+        _box_color_override = None
+        if verification_overlay:
+            _vstatus = verification_overlay.get('status', '')
+            if ('GRANTED' in _vstatus or
+                    ('MATCH' in _vstatus and 'NO' not in _vstatus
+                     and 'VERIFYING' not in _vstatus)):
+                _box_color_override = (0, 200, 0)   # Green — access granted
+            elif any(x in _vstatus for x in
+                     ('DENIED', 'NO MATCH', 'TIMEOUT', 'LIBRARY',
+                      'INSTALL', 'MISSING', 'LOAD ERROR')):
+                _box_color_override = (0, 0, 200)   # Red — denied / error
+
         if face_detected is not None:
             render_face_guide(frame, face_detected, state,
-                              face_boxes=faces)
+                              face_boxes=faces, color_override=_box_color_override)
 
     # 3. REC indicator (ALERT state or active recording)
     if state == 'ALERT' or is_recording:
