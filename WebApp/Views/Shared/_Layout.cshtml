@@ -13,7 +13,60 @@
     <link rel="stylesheet" href="~/lib/fontawesome/css/all.min.css" />
 </head>
 <body>
-    <div class="dashboard-wrapper">
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- GLOBAL LOCKDOWN BANNER — shown on every page when lockdown     -->
+<!-- active. Polls /api/system/status every 4s. Outside all panels. -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div id="globalLockdownBanner" style="
+    display:none; position:fixed; top:0; left:0; width:100%; z-index:19999;
+    background:linear-gradient(90deg,#7f0000,#dc2626,#7f0000);
+    background-size:200% 100%; animation:lockdownSlide 3s linear infinite;
+    color:#fff; font-weight:700; font-size:.88rem; letter-spacing:.04em;
+    padding:9px 16px; display:none; align-items:center; gap:10px;
+    box-shadow:0 4px 18px rgba(220,38,38,.55);
+" role="alert">
+    <i class="fas fa-lock" style="font-size:1rem;"></i>
+    <span>🔒 LOCKDOWN ACTIVE — All Entry Points Secured</span>
+    <span id="globalLockdownReason" style="font-weight:400;opacity:.85;margin-left:6px;"></span>
+    <span style="flex:1"></span>
+    <button onclick="globalResolveLockdown()" style="
+        background:rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.4);
+        color:#fff; border-radius:5px; padding:2px 11px; font-size:.8rem; cursor:pointer;
+        font-weight:600; letter-spacing:.03em;
+    ">🔓 Resolve</button>
+</div>
+
+<!-- GLOBAL ALARM BANNER — shown when Pi pushes an active alarm     -->
+<div id="globalAlarmBanner" style="
+    display:none; position:fixed; top:0; left:0; width:100%; z-index:19998;
+    background:linear-gradient(90deg,#92400e,#f59e0b,#92400e);
+    background-size:200% 100%; animation:lockdownSlide 2s linear infinite;
+    color:#fff; font-weight:700; font-size:.88rem; letter-spacing:.04em;
+    padding:9px 16px; align-items:center; gap:10px;
+    box-shadow:0 4px 18px rgba(245,158,11,.5);
+" role="alert">
+    <i class="fas fa-triangle-exclamation" style="font-size:1rem;"></i>
+    <span id="globalAlarmLabel">⚠️ ALARM ACTIVE</span>
+    <span style="flex:1"></span>
+    <button onclick="globalDeactivateAlarm()" style="
+        background:rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.4);
+        color:#fff; border-radius:5px; padding:2px 11px; font-size:.8rem; cursor:pointer;
+        font-weight:600;
+    ">✖ Deactivate</button>
+</div>
+
+<style>
+    @@keyframes lockdownSlide {
+        0%   { background-position: 0% 50%; }
+        100% { background-position: 200% 50%; }
+    }
+    /* Push page content down when banners are visible */
+    body.lockdown-active  .dashboard-wrapper { margin-top: 41px; }
+    body.alarm-active     .dashboard-wrapper { margin-top: 41px; }
+    body.lockdown-active.alarm-active .dashboard-wrapper { margin-top: 82px; }
+</style>
+
+<div class="dashboard-wrapper">
         <aside class="sidebar">
             <div class="sidebar-logo">
                 <div class="logo-icon"><i class="fa fa-shield-halved"></i></div>
@@ -273,6 +326,90 @@
                     window.location.href = '/Auth/Logout';
                 }
             });
+        }
+    </script>
+    <script>
+        // ═════════════════════════════════════════════════════════════════════
+        // GLOBAL LOCKDOWN + ALARM POLLER — runs on every page
+        // Polls /api/system/status every 4s and shows/hides banners.
+        // ═════════════════════════════════════════════════════════════════════
+        (function initGlobalStatusPoller() {
+            const lockdownBanner = document.getElementById('globalLockdownBanner');
+            const lockdownReason = document.getElementById('globalLockdownReason');
+            const alarmBanner    = document.getElementById('globalAlarmBanner');
+            const alarmLabel     = document.getElementById('globalAlarmLabel');
+
+            const ALARM_LABELS = {
+                intrusion:   '🚨 INTRUDER ALERT — Lockdown in effect',
+                fire:        '🔥 FIRE ALARM — Evacuate immediately',
+                earthquake:  '🌍 EARTHQUAKE DRILL — Take cover',
+                forcedentry: '📢 EMERGENCY DRILL — Follow evacuation plan',
+                medical:     '🏥 MEDICAL EMERGENCY — Clearing access'
+            };
+
+            let _lastLockdown = false;
+            let _lastAlarm    = false;
+
+            function pollGlobalStatus() {
+                fetch('/api/system/status')
+                .then(r => r.json())
+                .then(data => {
+                    // ── Lockdown banner ──
+                    if (data.lockdown && !_lastLockdown) {
+                        lockdownBanner.style.display = 'flex';
+                        document.body.classList.add('lockdown-active');
+                        if (lockdownReason) lockdownReason.textContent =
+                            data.lockdownReason ? '— ' + data.lockdownReason : '';
+                    } else if (!data.lockdown && _lastLockdown) {
+                        lockdownBanner.style.display = 'none';
+                        document.body.classList.remove('lockdown-active');
+                    }
+                    _lastLockdown = !!data.lockdown;
+
+                    // ── Alarm banner ──
+                    if (data.alarmActive && !_lastAlarm) {
+                        const label = ALARM_LABELS[data.alarmType] ||
+                                      '⚠️ ALARM ACTIVE: ' + data.alarmType.toUpperCase();
+                        if (alarmLabel) alarmLabel.textContent = label;
+                        alarmBanner.style.display = 'flex';
+                        document.body.classList.add('alarm-active');
+                    } else if (!data.alarmActive && _lastAlarm) {
+                        alarmBanner.style.display = 'none';
+                        document.body.classList.remove('alarm-active');
+                    }
+                    _lastAlarm = !!data.alarmActive;
+                })
+                .catch(() => {});
+            }
+
+            // First poll immediately, then every 4 seconds
+            pollGlobalStatus();
+            setInterval(pollGlobalStatus, 4000);
+        })();
+
+        function globalResolveLockdown() {
+            if (!confirm('🔓 Resolve lockdown and restore normal access?')) return;
+            fetch('/api/system/lockdown/resolve', { method: 'POST' })
+            .then(r => r.json())
+            .then(() => {
+                document.getElementById('globalLockdownBanner').style.display = 'none';
+                document.body.classList.remove('lockdown-active');
+                // Sync page-level banners if they exist
+                const pgBanner = document.getElementById('lockdownBanner');
+                if (pgBanner) pgBanner.style.display = 'none';
+            })
+            .catch(() => alert('❌ Failed to resolve lockdown.'));
+        }
+
+        function globalDeactivateAlarm() {
+            if (!confirm('Deactivate the active alarm?')) return;
+            fetch('/api/system/alarm/resolve', { method: 'POST' })
+            .then(r => r.json())
+            .then(() => {
+                document.getElementById('globalAlarmBanner').style.display = 'none';
+                document.body.classList.remove('alarm-active');
+            })
+            .catch(() => alert('❌ Failed to deactivate alarm.'));
         }
     </script>
 </body>

@@ -229,6 +229,33 @@
                 </button>
             </div>
 
+            <!-- LOCKDOWN CONTROL CARD -->
+            <div class="control-card" id="lockdownCard">
+                <div class="card-title-area">
+                    <h5><i class="fa fa-lock text-danger me-3"></i>Lockdown Control</h5>
+                    <span class="status-indicator-dot" id="lockdownStatusDot"></span>
+                </div>
+                <div id="lockdownStatusRow" class="setting-row mb-3" style="background:rgba(220,38,38,.06);border-radius:8px;padding:10px 12px;">
+                    <div class="label-desc">
+                        <label id="lockdownStatusLabel" style="font-weight:700;">System Normal</label>
+                        <small id="lockdownStatusReason" style="color:#6b7280;">No active lockdown</small>
+                    </div>
+                    <span id="lockdownStatusBadge" class="badge bg-success" style="font-size:.75rem;padding:4px 10px;">NORMAL</span>
+                </div>
+                <button id="lockdownActivateBtn" class="btn w-100 mb-2 py-2"
+                    style="background:#dc2626;color:#fff;border:none;border-radius:8px;font-weight:700;letter-spacing:.04em;"
+                    onclick="systemLockdown()">
+                    <i class="fa fa-lock me-2"></i>ACTIVATE LOCKDOWN
+                </button>
+                <button id="lockdownResolveBtn" class="btn w-100 py-2" style="display:none;
+                    background:#10b981;color:#fff;border:none;border-radius:8px;font-weight:700;letter-spacing:.04em;"
+                    onclick="systemResolveLockdown()">
+                    <i class="fa fa-unlock me-2"></i>RESOLVE LOCKDOWN
+                </button>
+                <small class="text-muted extra-small d-block mt-2">
+                    Activating lockdown locks all entry points and triggers red LED on Raspberry Pi.
+                </small>
+            </div>
 
         </div>
 
@@ -282,57 +309,70 @@
         localStorage.setItem('warmTheme', isWarm);
     }
 
-    // =========================
-    // ALARM PROTOCOL — ACTIVATE (calls hardware via API)
-    // =========================
-    let activeAlarmType = null;
+    // ================================================================
+    // ALARM PROTOCOL
+    // Maps UI row IDs to display labels sent to the Pi /alarm endpoint.
+    // Maps Pi-returned types back to UI row IDs (for checkAlarmStatus).
+    // ================================================================
+    const ALARM_UI_TO_LABEL = {
+        'intruder':   'Intruder Alert',
+        'fire':       'Fire Alarm',
+        'earthquake': 'Earthquake Drill',
+        'emergency':  'Emergency Drill'
+    };
+    const ALARM_API_TO_UI = {
+        'intrusion':   'intruder',
+        'intruder':    'intruder',
+        'fire':        'fire',
+        'earthquake':  'earthquake',
+        'forcedentry': 'emergency',
+        'emergency':   'emergency',
+        'medical':     'emergency'
+    };
 
-    function activateAlarm(type, label) {
-        if (!confirm(`⚠️ SAFETY CHECK: Are you sure you want to activate ${label}?\n\nThis will trigger hardware on the Raspberry Pi.`)) return;
+    let activeAlarmType = null;  // UI row ID e.g. 'intruder'
 
-        const btn = document.querySelector(`#alarmRow-${type} .btn-alarm`);
+    function activateAlarm(uiType, label) {
+        if (!confirm('⚠️ SAFETY CHECK: Are you sure you want to activate ' + label + '?\n\nThis will trigger hardware on the Raspberry Pi.')) return;
+
+        const btn = document.querySelector('#alarmRow-' + uiType + ' .btn-alarm');
         if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> ...'; }
 
+        const apiLabel = ALARM_UI_TO_LABEL[uiType] || label;
         fetch('/api/system/alarm', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: label, duration: 60 })
+            body: JSON.stringify({ type: apiLabel, duration: 60 })
         })
-        .then(r => r.json())
-        .then(data => {
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
             if (!data.success) {
                 showToast('Alarm already active or blocked.', 'error');
-                if (btn) { btn.disabled = false; btn.innerHTML = `<i class="fa fa-shield-alt"></i> ACTIVATE`; }
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa fa-shield-alt"></i> ACTIVATE'; }
                 return;
             }
-
-            activeAlarmType = type;
-
-            // Highlight the active row
-            document.querySelectorAll('.setting-row[id^="alarmRow"]').forEach(r => r.classList.remove('alarm-active', 'fire-active', 'earthquake-active', 'emergency-active'));
-            const row = document.getElementById(`alarmRow-${type}`);
-            if (row) { row.classList.add('alarm-active'); if (type !== 'intruder') row.classList.add(`${type}-active`); }
-
-            // Show fullscreen blinking overlay
-            const overlay = document.getElementById('alarmOverlay');
-            if (overlay) { overlay.className = 'alarm-overlay ' + type; overlay.style.display = 'block'; }
-
-            // Show deactivate button
-            document.getElementById('alarmDeactivateBtn').style.display = 'flex';
-
-            // Disable all activate buttons
-            document.querySelectorAll('.btn-alarm').forEach(b => { b.disabled = true; });
-
-            // Update alarm status dot
-            const dot = document.getElementById('alarmStatusDot');
-            if (dot) { dot.classList.add('online'); dot.style.background = '#dc2626'; dot.style.boxShadow = '0 0 8px rgba(220,38,38,0.6)'; }
-
-            showToast(`${label} ACTIVATED — Hardware triggered`, 'success');
+            setAlarmActiveUI(uiType);
+            showToast(label + ' ACTIVATED — Hardware triggered', 'success');
         })
-        .catch(err => {
+        .catch(function(err) {
             showToast('Failed to activate alarm: ' + err.message, 'error');
-            if (btn) { btn.disabled = false; btn.innerHTML = `<i class="fa fa-shield-alt"></i> ACTIVATE`; }
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa fa-shield-alt"></i> ACTIVATE'; }
         });
+    }
+
+    function setAlarmActiveUI(uiType) {
+        activeAlarmType = uiType;
+        document.querySelectorAll('.setting-row[id^="alarmRow"]').forEach(function(r) {
+            r.classList.remove('alarm-active','fire-active','earthquake-active','emergency-active');
+        });
+        var row = document.getElementById('alarmRow-' + uiType);
+        if (row) { row.classList.add('alarm-active'); if (uiType !== 'intruder') row.classList.add(uiType + '-active'); }
+        var overlay = document.getElementById('alarmOverlay');
+        if (overlay) { overlay.className = 'alarm-overlay ' + uiType; overlay.style.display = 'block'; }
+        document.getElementById('alarmDeactivateBtn').style.display = 'flex';
+        document.querySelectorAll('.btn-alarm').forEach(function(b) { b.disabled = true; });
+        var dot = document.getElementById('alarmStatusDot');
+        if (dot) { dot.classList.add('online'); dot.style.background = '#dc2626'; dot.style.boxShadow = '0 0 8px rgba(220,38,38,0.6)'; }
     }
 
     // =========================
@@ -340,41 +380,29 @@
     // =========================
     function deactivateAlarm() {
         if (!confirm('Are you sure you want to DEACTIVATE all alarms?')) return;
+        fetch('/api/system/alarm/resolve', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+        .then(function(r) { return r.json(); })
+        .then(function() { clearAlarmUI(); showToast('All alarms deactivated', 'success'); })
+        .catch(function(err) { showToast('Failed to deactivate: ' + err.message, 'error'); });
+    }
 
-        fetch('/api/system/alarm/resolve', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        })
-        .then(r => r.json())
-        .then(data => {
-            activeAlarmType = null;
-
-            // Clear all row states
-            document.querySelectorAll('.setting-row[id^="alarmRow"]').forEach(r => r.classList.remove('alarm-active', 'fire-active', 'earthquake-active', 'emergency-active'));
-
-            // Hide overlay
-            const overlay = document.getElementById('alarmOverlay');
-            if (overlay) { overlay.style.display = 'none'; overlay.className = 'alarm-overlay'; }
-
-            // Hide deactivate button
-            document.getElementById('alarmDeactivateBtn').style.display = 'none';
-
-            // Re-enable all activate buttons
-            document.querySelectorAll('.btn-alarm').forEach(b => {
-                b.disabled = false;
-                const type = b.classList.contains('intruder') ? 'shield-alt' :
-                             b.classList.contains('fire') ? 'fire-extinguisher' :
-                             b.classList.contains('earthquake') ? 'globe' : 'bullhorn';
-                b.innerHTML = `<i class="fa fa-${type}"></i> ACTIVATE`;
-            });
-
-            // Reset status dot
-            const dot = document.getElementById('alarmStatusDot');
-            if (dot) { dot.style.background = ''; dot.style.boxShadow = ''; dot.classList.remove('online'); }
-
-            showToast('All alarms deactivated', 'success');
-        })
-        .catch(err => showToast('Failed to deactivate: ' + err.message, 'error'));
+    function clearAlarmUI() {
+        activeAlarmType = null;
+        document.querySelectorAll('.setting-row[id^="alarmRow"]').forEach(function(r) {
+            r.classList.remove('alarm-active','fire-active','earthquake-active','emergency-active');
+        });
+        var overlay = document.getElementById('alarmOverlay');
+        if (overlay) { overlay.style.display = 'none'; overlay.className = 'alarm-overlay'; }
+        document.getElementById('alarmDeactivateBtn').style.display = 'none';
+        document.querySelectorAll('.btn-alarm').forEach(function(b) {
+            b.disabled = false;
+            var t = b.classList.contains('intruder') ? 'shield-alt' :
+                    b.classList.contains('fire') ? 'fire-extinguisher' :
+                    b.classList.contains('earthquake') ? 'globe' : 'bullhorn';
+            b.innerHTML = '<i class="fa fa-' + t + '"></i> ACTIVATE';
+        });
+        var dot = document.getElementById('alarmStatusDot');
+        if (dot) { dot.style.background = ''; dot.style.boxShadow = ''; dot.classList.remove('online'); }
     }
 
     // =========================
@@ -575,6 +603,10 @@
         checkAlarmStatus();
         setInterval(checkAlarmStatus, 3000);
 
+        // Lockdown card state (every 5 seconds)
+        pollLockdownCard();
+        setInterval(pollLockdownCard, 5000);
+
         // Real-time config sync (every 30 seconds)
         setInterval(syncConfigFromServer, 30000);
 
@@ -626,52 +658,85 @@
         .catch(() => {});
     }
 
-    // =========================
-    // REAL-TIME ALARM STATUS (from Python IoT)
-    // =========================
+    // ================================================================
+    // REAL-TIME ALARM STATUS (from Python IoT push)
+    // Normalizes Pi types (intrusion/forcedentry) to UI row IDs.
+    // ================================================================
     function checkAlarmStatus() {
         fetch('/api/system/alarm-status')
-        .then(r => r.json())
-        .then(data => {
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
             if (data.active && data.type) {
-                activeAlarmType = data.type;
-
-                // Highlight matching row
-                document.querySelectorAll('.setting-row[id^="alarmRow"]').forEach(r => r.classList.remove('alarm-active', 'fire-active', 'earthquake-active', 'emergency-active'));
-                const row = document.getElementById(`alarmRow-${data.type}`);
-                if (row) { row.classList.add('alarm-active'); if (data.type !== 'intruder') row.classList.add(`${data.type}-active`); }
-
-                // Show overlay
-                const overlay = document.getElementById('alarmOverlay');
-                if (overlay) { overlay.className = 'alarm-overlay ' + data.type; overlay.style.display = 'block'; }
-
-                // Show deactivate + disable activate buttons
-                document.getElementById('alarmDeactivateBtn').style.display = 'flex';
-                document.querySelectorAll('.btn-alarm').forEach(b => { b.disabled = true; });
-
-                // Status dot
-                const dot = document.getElementById('alarmStatusDot');
-                if (dot) { dot.classList.add('online'); dot.style.background = '#dc2626'; dot.style.boxShadow = '0 0 8px rgba(220,38,38,0.6)'; }
+                var uiType = ALARM_API_TO_UI[data.type.toLowerCase()] || data.type.toLowerCase();
+                if (!activeAlarmType) setAlarmActiveUI(uiType);
             } else {
-                if (activeAlarmType) {
-                    activeAlarmType = null;
-                    document.querySelectorAll('.setting-row[id^="alarmRow"]').forEach(r => r.classList.remove('alarm-active', 'fire-active', 'earthquake-active', 'emergency-active'));
-                    const overlay = document.getElementById('alarmOverlay');
-                    if (overlay) { overlay.style.display = 'none'; overlay.className = 'alarm-overlay'; }
-                    document.getElementById('alarmDeactivateBtn').style.display = 'none';
-                    document.querySelectorAll('.btn-alarm').forEach(b => {
-                        b.disabled = false;
-                        const type = b.classList.contains('intruder') ? 'shield-alt' :
-                                     b.classList.contains('fire') ? 'fire-extinguisher' :
-                                     b.classList.contains('earthquake') ? 'globe' : 'bullhorn';
-                        b.innerHTML = `<i class="fa fa-${type}"></i> ACTIVATE`;
-                    });
-                    const dot = document.getElementById('alarmStatusDot');
-                    if (dot) { dot.style.background = ''; dot.style.boxShadow = ''; dot.classList.remove('online'); }
-                }
+                if (activeAlarmType) clearAlarmUI();
             }
         })
-        .catch(() => {});
+        .catch(function() {});
+    }
+
+    // ================================================================
+    // LOCKDOWN CONTROL (System page card)
+    // ================================================================
+    function systemLockdown() {
+        if (!confirm('🔒 SAFETY CHECK: Activate full lockdown?\n\nThis will lock all entry points and trigger red LED on the Raspberry Pi.')) return;
+        var btn = document.getElementById('lockdownActivateBtn');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin me-2"></i>Activating...'; }
+        fetch('/api/system/lockdown', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason: 'Manual lockdown from System Settings' })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa fa-lock me-2"></i>ACTIVATE LOCKDOWN'; }
+            if (data.duplicate) { showToast('Lockdown already active.', 'info'); }
+            else { setLockdownUI(true, 'Manual lockdown from System Settings'); showToast('🔒 Lockdown activated — Pi hardware locked', 'success'); }
+        })
+        .catch(function(err) {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa fa-lock me-2"></i>ACTIVATE LOCKDOWN'; }
+            showToast('Failed to activate lockdown: ' + err.message, 'error');
+        });
+    }
+
+    function systemResolveLockdown() {
+        if (!confirm('🔓 Resolve lockdown and restore normal access?')) return;
+        fetch('/api/system/lockdown/resolve', { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function() { setLockdownUI(false); showToast('🔓 Lockdown resolved', 'success'); })
+        .catch(function(err) { showToast('Failed to resolve: ' + err.message, 'error'); });
+    }
+
+    function setLockdownUI(active, reason) {
+        var dot    = document.getElementById('lockdownStatusDot');
+        var label  = document.getElementById('lockdownStatusLabel');
+        var small  = document.getElementById('lockdownStatusReason');
+        var badge  = document.getElementById('lockdownStatusBadge');
+        var actBtn = document.getElementById('lockdownActivateBtn');
+        var resBtn = document.getElementById('lockdownResolveBtn');
+        if (active) {
+            if (dot)    { dot.classList.add('online'); dot.style.background = '#dc2626'; dot.style.boxShadow = '0 0 8px rgba(220,38,38,.6)'; }
+            if (label)  label.textContent = '🔒 LOCKDOWN ACTIVE';
+            if (small)  small.textContent = reason || 'All entry points locked';
+            if (badge)  { badge.textContent = 'LOCKED'; badge.className = 'badge bg-danger'; }
+            if (actBtn) actBtn.style.display = 'none';
+            if (resBtn) resBtn.style.display = 'block';
+        } else {
+            if (dot)    { dot.classList.remove('online'); dot.style.background = ''; dot.style.boxShadow = ''; }
+            if (label)  label.textContent = 'System Normal';
+            if (small)  small.textContent = 'No active lockdown';
+            if (badge)  { badge.textContent = 'NORMAL'; badge.className = 'badge bg-success'; }
+            if (actBtn) actBtn.style.display = 'block';
+            if (resBtn) resBtn.style.display = 'none';
+        }
+    }
+
+    function pollLockdownCard() {
+        fetch('/api/system/lockdown')
+        .then(function(r) { return r.json(); })
+        .then(function(d) { setLockdownUI(d.active, d.reason); })
+        .catch(function() {});
     }
 </script>
 }
